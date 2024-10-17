@@ -11,7 +11,7 @@ const DefaultLayout = (props) => {
 	});
 	return (
 		<Fragment>
-			<NavbarDefault login />
+			{/* <NavbarDefault login /> */}
 			<main>
 				{props.children}
 			</main>

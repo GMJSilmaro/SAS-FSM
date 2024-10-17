@@ -9,6 +9,8 @@ import Swal from 'sweetalert2';
 const SignIn = () => {
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
+  const [workerId, setWorkerId] = useState('');
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -50,12 +52,13 @@ const SignIn = () => {
       // Step 4: Set other cookies using js-cookie (optional)
       Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
       Cookies.set('email', email, { secure: true, sameSite: 'None' });
+      Cookies.set('workerId', data.workerId, { secure: true, sameSite: 'None' });
       Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
   
       // Step 5: Success flow with SweetAlert
       Swal.fire({
         title: 'Welcome!',
-        text: `Welcome back, ${user.email}!`,
+        text: `Welcome back, ${data.fullName}!`,
         icon: 'success',
         confirmButtonText: 'OK',
       }).then(() => {

@@ -5,17 +5,15 @@ import { Row, Col, Image, Dropdown, ListGroup } from 'react-bootstrap';
 import SimpleBar from 'simplebar-react';
 import 'simplebar/dist/simplebar.min.css';
 import { GKTippy } from 'widgets';
-import DotBadge from 'components/bootstrap/DotBadge';
 import DarkLightMode from 'layouts/DarkLightMode';
 import NotificationList from 'data/Notification';
 import useMounted from 'hooks/useMounted';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
-import { db } from '../firebase'; 
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 const QuickMenu = () => {
-  const uid = Cookies.get('uid');
   const hasMounted = useMounted();
   const isDesktop = useMediaQuery({ query: '(min-width: 1224px)' });
   const router = useRouter();
@@ -23,17 +21,18 @@ const QuickMenu = () => {
 
   useEffect(() => {
     const fetchUserDetails = async () => {
-      const email = Cookies.get('email');
+      const email = Cookies.get('email'); // Get email from cookie
+      const workerID = Cookies.get('workerID'); // Get workerID from cookie if available
 
-      if (email) {
+      if (email) { // Check if email exists
         try {
-          // Query Firestore to find user by email
+          // Query Firestore to find user by workerID
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('email', '==', email));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];  // Assuming email is unique, get the first doc
+            const userDoc = querySnapshot.docs[0];
             setUserDetails(userDoc.data());
           } else {
             console.log('User not found');
@@ -43,13 +42,12 @@ const QuickMenu = () => {
         }
       } else {
         console.log('No email cookie found, redirecting to sign-in');
-        router.push('/authentication/sign-in');
+        router.push('/authentication/sign-in'); // Redirect if no email
       }
     };
 
     fetchUserDetails();
-  }, [router]); 
-  
+  }, [router]);
 
   const handleSignOut = async () => {
     try {
@@ -101,7 +99,7 @@ const QuickMenu = () => {
                   </Col>
                   <Col xs="auto" className="text-center me-2">
                     <GKTippy content="Mark as unread">
-                      <Link href="#"><DotBadge bg="secondary"></DotBadge></Link>
+                      {/* <Link href="#"><DotBadge bg="secondary"></DotBadge></Link> */}
                     </GKTippy>
                   </Col>
                 </Row>
@@ -115,7 +113,6 @@ const QuickMenu = () => {
 
   return (
     <Fragment>
-      {/* <DarkLightMode /> */}
       <ListGroup
         as="ul"
         bsPrefix="navbar-nav"
@@ -180,7 +177,7 @@ const QuickMenu = () => {
               <div className="d-flex">
                 {userDetails && (
                   <div>
-                    <h5 className="mb-1">{userDetails.firstName}</h5>
+                    <h5 className="mb-1">{userDetails.fullName}</h5>
                     <p className="mb-0 text-muted">{userDetails.email}</p>
                   </div>
                 )}

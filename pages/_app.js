@@ -29,7 +29,9 @@ function MyApp({ Component, pageProps }) {
   const keywords = "SAP B1, Service Layer, Admin dashboard, Portal, web apps, bootstrap 5, Pixelcare Consulting";
 
   // Choose layout based on route
-  const Layout = Component.Layout || (router.pathname.includes('dashboard') ? (router.pathname.includes('instructor') || router.pathname.includes('student') ? DefaultMarketingLayout : DefaultDashboardLayout) : DefaultMarketingLayout);
+  // const Layout = Component.Layout || (router.pathname.includes('dashboard') ? (router.pathname.includes('instructor') || router.pathname.includes('student') ? DefaultMarketingLayout : DefaultDashboardLayout) : DefaultMarketingLayout);
+  const Layout = Component.Layout || (router.pathname.includes('dashboard') ? DefaultDashboardLayout : DefaultMarketingLayout);
+
 
 // Check token for protected routes
 useEffect(() => {
