@@ -1,10 +1,10 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, query, where, collection, getDocs } from 'firebase/firestore';
 import { app } from '../../firebase'; 
 import jwt from 'jsonwebtoken';
 import https from 'https';
-
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -12,7 +12,7 @@ const auth = getAuth(app);
 // Fetch Firestore data by email to get workerId and user details
 async function fetchUserDataByEmail(email) {
   const usersRef = collection(db, 'users');
-  const q = query(usersRef, where('email', '==', email)); // Query Firestore by email
+  const q = query(usersRef, where('email', '==', email)); 
   
   try {
     const querySnapshot = await getDocs(q);
@@ -76,6 +76,7 @@ export default async function handler(req, res) {
     // Set session cookies securely
     res.setHeader('Set-Cookie', [
       `B1SESSION=${sessionId}; HttpOnly; Secure; SameSite=None`,
+      `ROUTEID=.node4; Secure; SameSite=None`,
     ]);
 
     // Step 6: Generate JWT token
@@ -88,7 +89,7 @@ export default async function handler(req, res) {
       message: 'Login successful',
       uid: user.uid,
       email: user.email,
-      workerId: userData.workerID, 
+      workerId: userData.workerId, 
       fullName: userData.fullName,
       isAdmin: userData.isAdmin,
       customToken,

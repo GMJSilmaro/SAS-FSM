@@ -48,18 +48,16 @@ const JobTask = ({ tasks, addTask, handleTaskChange, handleCheckboxChange, delet
                   placeholder="Enter task description"
                 />
               </td>
-              <td>
+              <td className="text-center">
                 <Form.Check
                   type="checkbox"
-                  className="d-flex justify-content-center align-items-center"
-                  checked={task.isComplete}
-                  onChange={() => handleCheckboxChange(index, "isComplete")}
+                  checked={task.isDone}
+                  onChange={() => handleCheckboxChange(index, "isDone")}
                 />
               </td>
-              <td>
+              <td className="text-center">
                 <Form.Check
                   type="checkbox"
-                  className="d-flex justify-content-center align-items-center"
                   checked={task.isPriority}
                   onChange={() => handleCheckboxChange(index, "isPriority")}
                 />

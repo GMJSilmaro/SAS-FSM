@@ -22,12 +22,16 @@ import {
   setDoc,
   doc,
   Timestamp,
+  getDoc,
 } from "firebase/firestore";
 import Swal from "sweetalert2";
 import styles from "./CreateJobs.module.css";
 import { ToastContainer, toast } from "react-toastify";
 import JobTask from "./tabs/JobTasklist";
 import { useRouter } from "next/router";
+import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from 'widgets';
+import { getAuth } from 'firebase/auth';
+
 
 const AddNewJobs = () => {
   const router = useRouter();
@@ -37,6 +41,12 @@ const AddNewJobs = () => {
   const [selectedWorkers, setSelectedWorkers] = useState([]);
   const [tasks, setTasks] = useState([]); // Initialize tasks
 
+  const [serviceCalls, setServiceCalls] = useState([]);
+  const [salesOrders, setSalesOrders] = useState([]);
+  const [selectedServiceCall, setSelectedServiceCall] = useState(null);
+  const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
+
+
   const [customers, setCustomers] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -45,56 +55,174 @@ const AddNewJobs = () => {
   const [selectedContact, setSelectedContact] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [formData, setFormData] = useState({
-    contactId: "",
-    customerName: "",
-    firstName: "",
-    middleName: "",
-    lastName: "",
-    phoneNumber: "",
-    mobilePhone: "",
-    email: "",
-    locationName: "",
-    streetNo: "",
-    streetAddress: "",
-    block: "",
-    buildingNo: "",
-    country: "",
-    stateProvince: "",
-    city: "",
-    zipCode: "",
+    jobID: "", // unique
     jobNo: "",
     jobName: "",
-    description: "",
-    jobPriority: "",
-    jobStatus: "",
-    startDate: "",
-    endDate: "",
-    startTime: "",
-    endTime: "",
+    jobDescription: "",
+    serviceCallID: "",
+    salesOrderID: "",
+    customerID: "",
+    customerName: "",
+    contact: {
+      contactID: "",
+      contactFullname: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      email: "",
+      mobilePhone: "",
+      phoneNumber: "",
+      notification: {
+        notifyCustomer: false, // Default false, can be updated based on user input
+      },
+    },
+    assignedWorkers: {}, // Empty object, will be filled when workers are assigned
+    jobStatus: "Created", // Should be populated later, e.g., Work in Progress, Completed, etc.
+    priority: "", // Low, Medium, High, or any other predefined statuses
+    startDate: "", // Initialize as empty string instead of null
+    endDate: "", // Initialize as empty string instead of null
+    startTime: "", // Will be a string representing the time, e.g., '09:00'
+    endTime: "", // Will be a string representing the time, e.g., '17:00'
+    scheduleSession: "",
     estimatedDurationHours: "",
     estimatedDurationMinutes: "",
-    adminWorkerNotify: false,
-    customerNotify: false,
+    location: {
+      locationName: "",
+      address: {
+        streetNo: "",
+        streetAddress: "",
+        block: "",
+        buildingNo: "",
+        city: "",
+        stateProvince: "",
+        postalCode: "",
+      },
+      coordinates: {
+        latitude: "", // Initialize as empty string instead of null
+        longitude: "", // Initialize as empty string instead of null
+      },
+    },
+    taskList: [
+      {
+        taskID: "", // Will be generated or populated
+        taskName: "",
+        taskDescription: "",
+        assignedTo: "", // Will store worker ID or name
+        isPriority: false, // Default false, can be updated later
+        isDone: false, // Default false, can be updated when completed
+        completionDate: "", // Initialize as empty string instead of null
+      },
+    ],
+    equipments: [
+      {
+        ItemCode: "",
+        itemName: "",
+        itemGroup: "",
+        brand: "",
+        equipmentLocation: "",
+        equipmentType: "",
+        modelSeries: "",
+        serialNo: "",
+        notes: "",
+        warrantyStartDate: "", // Initialize as empty string instead of null
+        warrantyEndDate: "", // Initialize as empty string instead of null
+      },
+    ],
+    customerSignature: {
+      signatureURL: "", // URL for the signature image
+      signedBy: "", // Automatically filled with customerName during job creation
+      signatureTimestamp: "", // Initialize as empty string instead of null
+    },
   });
+  const initialFormData = {
+    jobID: "", // unique
+    jobNo: "",
+    jobName: "",
+    jobDescription: "",
+    serviceCallID: "",
+    salesOrderID: "",
+    customerID: "",
+    customerName: "",
+    contact: {
+      contactID: "",
+      contactFullname: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      email: "",
+      mobilePhone: "",
+      phoneNumber: "",
+      notification: {
+        notifyCustomer: false, // Default false, can be updated based on user input
+      },
+    },
+    assignedWorkers: {}, // Empty object, will be filled when workers are assigned
+    jobStatus: "Created", // Should be populated later, e.g., Work in Progress, Completed, etc.
+    priority: "", // Low, Medium, High, or any other predefined statuses
+    startDate: "", // Initialize as empty string instead of null
+    endDate: "", // Initialize as empty string instead of null
+    startTime: "", // Will be a string representing the time, e.g., '09:00'
+    endTime: "", // Will be a string representing the time, e.g., '17:00'
+    scheduleSession: "",
+    estimatedDurationHours: "",
+    estimatedDurationMinutes: "",
+    location: {
+      locationName: "",
+      address: {
+        streetNo: "",
+        streetAddress: "",
+        block: "",
+        buildingNo: "",
+        city: "",
+        stateProvince: "",
+        postalCode: "",
+      },
+      coordinates: {
+        latitude: "", // Initialize as empty string instead of null
+        longitude: "", // Initialize as empty string instead of null
+      },
+    },
+    taskList: [
+      {
+        taskID: "", // Will be generated or populated
+        taskName: "",
+        taskDescription: "",
+        assignedTo: "", // Will store worker ID or name
+        isPriority: false, // Default false, can be updated later
+        isDone: false, // Default false, can be updated when completed
+        completionDate: "", // Initialize as empty string instead of null
+      },
+    ],
+    equipments: [
+      {
+        ItemCode: "",
+        itemName: "",
+        itemGroup: "",
+        brand: "",
+        equipmentLocation: "",
+        equipmentType: "",
+        modelSeries: "",
+        serialNo: "",
+        notes: "",
+        warrantyStartDate: "", // Initialize as empty string instead of null
+        warrantyEndDate: "", // Initialize as empty string instead of null
+      },
+    ],
+    customerSignature: {
+      signatureURL: "", // URL for the signature image
+      signedBy: "", // Automatically filled with customerName during job creation
+      signatureTimestamp: "", // Initialize as empty string instead of null
+    },
+  };
+  
+  
+  
 
   const [showServiceLocation, setShowServiceLocation] = useState(true);
   const [showEquipments, setShowEquipments] = useState(true);
   const [jobNo, setJobNo] = useState("0000");
   const [validated, setValidated] = useState(false);
   const [activeKey, setActiveKey] = useState("summary");
-
-  const logActivity = async (activity, activitybrief) => {
-    try {
-      await addDoc(collection(db, "recentActivities"), {
-        activity,
-        activitybrief,
-        time: Timestamp.now(),
-        icon: "check",
-      });
-    } catch (error) {
-      console.error("Error logging activity:", error);
-    }
-  };
 
   const fetchCustomers = async () => {
     try {
@@ -182,30 +310,69 @@ const AddNewJobs = () => {
     setTasks((prevTasks) => [
       ...prevTasks,
       {
+        taskID: `task-${prevTasks.length + 1}`, 
         taskName: "",
         taskDescription: "",
-        isComplete: false,
+        assignedTo: "", 
         isPriority: false,
+        isDone: false,
+        completionDate: null, 
       },
     ]);
   };
 
-  const handleTaskChange = (index, field, value) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[index][field] = value;
-    setTasks(updatedTasks);
+  const fetchCoordinates = async (locationName) => {
+    const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    const encodedLocation = encodeURIComponent(locationName);
+  
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedLocation}&key=${apiKey}`
+    );
+  
+    const data = await response.json();
+    if (data.status === 'OK' && data.results.length > 0) {
+      const location = data.results[0].geometry.location;
+      return {
+        latitude: location.lat,
+        longitude: location.lng
+      };
+    } else {
+      throw new Error('Location not found');
+    }
   };
+  
+// Handle ReactQuill change event for the job description
+const handleDescriptionChange = (htmlContent) => {
+  console.log('Updated description (HTML):', htmlContent);  // Debugging
+  setFormData((prevState) => ({
+    ...prevState,
+    jobDescription: htmlContent,  // Store the HTML content
+  }));
+};
 
-  const handleCheckboxChange = (index, field) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[index][field] = !updatedTasks[index][field];
-    setTasks(updatedTasks);
-  };
 
-  const deleteTask = (index) => {
-    const updatedTasks = tasks.filter((_, i) => i !== index);
-    setTasks(updatedTasks);
-  };
+
+
+
+// Function to handle task field change
+const handleTaskChange = (index, field, value) => {
+  const updatedTasks = [...tasks];
+  updatedTasks[index][field] = value;
+  setTasks(updatedTasks);
+};
+
+ // Function to handle checkbox change for priority and completion status
+const handleCheckboxChange = (index, field) => {
+  const updatedTasks = [...tasks];
+  updatedTasks[index][field] = !updatedTasks[index][field];
+  setTasks(updatedTasks);
+};
+
+// Function to delete a task
+const deleteTask = (index) => {
+  const updatedTasks = tasks.filter((_, i) => i !== index);
+  setTasks(updatedTasks);
+};
 
   const handleWorkersChange = (selectedOptions) => {
     setSelectedWorkers(selectedOptions);
@@ -215,146 +382,276 @@ const AddNewJobs = () => {
     setSelectedContact(null);
     setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
+  
     const selectedCustomer = customers.find(
       (option) => option.value === selectedOption.value
     );
+  
     setFormData({
       ...formData,
       customerName: selectedCustomer ? selectedCustomer.label : "",
     });
-
-    // Fetch contacts, locations, and equipments for the selected customer
+  
+    // Fetch related data for the selected customer
     try {
-      const response = await fetch("/api/getContacts", {
+      // Fetch contacts for the customer
+      const contactsResponse = await fetch("/api/getContacts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-
-      if (!response.ok) {
+  
+      if (!contactsResponse.ok) {
         throw new Error("Failed to fetch contacts");
       }
-
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        throw new Error("Unexpected response format");
-      }
-
-      const formattedContacts = data.map((item) => ({
+  
+      const contactsData = await contactsResponse.json();
+      const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
         label: item.contactId,
         ...item,
       }));
-
       setContacts(formattedContacts);
-    } catch (error) {
-      console.error("Error fetching contacts:", error);
-      setContacts([]);
-    }
-
-    // Fetch locations for the selected customer
-    try {
-      const response = await fetch("/api/getLocation", {
+  
+      // Fetch locations for the customer
+      const locationsResponse = await fetch("/api/getLocation", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-
-      if (!response.ok) {
+  
+      if (!locationsResponse.ok) {
         throw new Error("Failed to fetch locations");
       }
-
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        throw new Error("Unexpected response format");
-      }
-
-      const formattedLocations = data.map((item) => ({
+  
+      const locationsData = await locationsResponse.json();
+      const formattedLocations = locationsData.map((item) => ({
         value: item.siteId,
         label: item.siteId,
         ...item,
       }));
-
       setLocations(formattedLocations);
-    } catch (error) {
-      console.error("Error fetching locations:", error);
-      setLocations([]);
-    }
-
-    // Fetch Equipments for the selected customer
-    try {
-      const response = await fetch("/api/getEquipments", {
+  
+      // Fetch equipments for the customer
+      const equipmentsResponse = await fetch("/api/getEquipments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-
-      if (!response.ok) {
+  
+      if (!equipmentsResponse.ok) {
         throw new Error("Failed to fetch equipments");
       }
-
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        throw new Error("Unexpected response format");
-      }
-
-      const formattedEquipments = data.map((item) => ({
+  
+      const equipmentsData = await equipmentsResponse.json();
+      const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
         label: item.ItemCode,
         ...item,
       }));
-
       setEquipments(formattedEquipments);
+  
+      // Fetch service calls for the customer
+      const serviceCallResponse = await fetch("/api/getServiceCall", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cardCode: selectedOption.value }),
+      });
+  
+      if (!serviceCallResponse.ok) {
+        throw new Error("Failed to fetch service calls");
+      }
+  
+      const serviceCallsData = await serviceCallResponse.json();
+      const formattedServiceCalls = serviceCallsData.map((item) => ({
+        value: item.serviceCallID,
+        label: item.serviceCallID + " - " + item.subject,
+      }));
+      setServiceCalls(formattedServiceCalls);
+  
+      // Fetch sales orders for the customer
+      const salesOrderResponse = await fetch("/api/getSalesOrder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cardCode: selectedOption.value }),
+      });
+  
+      if (!salesOrderResponse.ok) {
+        throw new Error("Failed to fetch sales orders");
+      }
+  
+      const salesOrdersData = await salesOrderResponse.json();
+      const formattedSalesOrders = salesOrdersData.map((item) => ({
+        value: item.DocNum,
+        label: item.DocNum,
+      }));
+      setSalesOrders(formattedSalesOrders);
     } catch (error) {
-      console.error("Error fetching equipments:", error);
+      console.error("Error fetching related data:", error);
+      setContacts([]);
+      setLocations([]);
       setEquipments([]);
+      setServiceCalls([]);
+      setSalesOrders([]);
     }
   };
+  
+
+  // const handleContactChange = (selectedOption) => {
+  //   setSelectedContact(selectedOption);
+  //   setFormData({
+  //     ...formData,
+  //     firstName: selectedOption.firstName || "",
+  //     middleName: selectedOption.middleName || "",
+  //     lastName: selectedOption.lastName || "",
+  //     phoneNumber: selectedOption.tel1 || "",
+  //     mobilePhone: selectedOption.tel2 || "",
+  //     email: selectedOption.email || "",
+  //   });
+  // };
+
+  // const handleContactChange = (selectedOption) => {
+  //   setSelectedContact(selectedOption);
+  
+  //   // Combine firstName, middleName, and lastName into fullName
+  //   const contactFullname = `${selectedOption.firstName || ''} ${selectedOption.middleName || ''} ${selectedOption.lastName || ''}`.trim();
+  
+  //   setFormData({
+  //     ...formData,
+  //     contact: {
+  //       contactID: selectedOption.value,
+  //       contactFullname: contactFullname,
+  //       contactPhoneNumber: selectedOption.tel1 || "",
+  //       contactMobilePhone: selectedOption.tel2 || "",
+  //       contactEmail: selectedOption.email || "",
+  //     },
+  //   });
+  // };
+
+  // const handleContactChange = (selectedOption) => {
+  //   setSelectedContact(selectedOption);
+  //   setFormData({
+  //     ...formData,
+  //     firstName: selectedOption.firstName || "",
+  //     middleName: selectedOption.middleName || "",
+  //     lastName: selectedOption.lastName || "",
+  //     phoneNumber: selectedOption.tel1 || "",
+  //     mobilePhone: selectedOption.tel2 || "",
+  //     email: selectedOption.email || "",
+  //   });
+  // };
 
   const handleContactChange = (selectedOption) => {
+    if (!selectedOption) return;
+  
+    const fullName = `${selectedOption.firstName || ""} ${selectedOption.middleName || ""} ${selectedOption.lastName || ""}`.trim();
+  
     setSelectedContact(selectedOption);
-    setFormData({
-      ...formData,
-      firstName: selectedOption.firstName || "",
-      middleName: selectedOption.middleName || "",
-      lastName: selectedOption.lastName || "",
-      phoneNumber: selectedOption.tel1 || "",
-      mobilePhone: selectedOption.tel2 || "",
-      email: selectedOption.email || "",
-    });
+  
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      contact: {
+        ...prevFormData.contact, // Ensure you don't overwrite other fields like notification
+        contactID: selectedOption.value || "",
+        contactFullname: fullName,
+        firstName: selectedOption.firstName || "",
+        middleName: selectedOption.middleName || "",
+        lastName: selectedOption.lastName || "",
+        phoneNumber: selectedOption.tel1 || "",
+        mobilePhone: selectedOption.tel2 || "",
+        email: selectedOption.email || "",
+      }
+    }));
   };
+  
+  
 
-  const handleLocationChange = (selectedOption) => {
+  const handleLocationChange = async (selectedOption) => {
     const selectedLocation = locations.find(
       (location) => location.value === selectedOption.value
     );
+    
     setSelectedLocation(selectedLocation);
-    setFormData({
-      ...formData,
-      locationName: selectedLocation.siteId,
-      streetNo: selectedLocation.streetNo || "",
-      streetAddress: selectedLocation.street || "",
-      block: selectedLocation.block || "",
-      buildingNo: selectedLocation.building || "",
-      country: selectedLocation.countryName || "",
-      stateProvince: "",
-      city: selectedLocation.city || "",
-      zipCode: selectedLocation.zipCode || "",
-    });
-  };
-
-  const handleSelectedEquipmentsChange = (selectedEquipments) => {
+  
+    // Update nested `location` and `address` in `formData`
     setFormData((prevFormData) => ({
       ...prevFormData,
-      equipments: selectedEquipments,
+      location: {
+        ...prevFormData.location, // Spread existing location object
+        locationName: selectedLocation.siteId || "",
+        address: {
+          ...prevFormData.location.address, 
+          streetNo: selectedLocation.streetNo || "",
+          streetAddress: selectedLocation.streetAddress || "",
+          block: selectedLocation.block || "",
+          buildingNo: selectedLocation.building || "",
+          country: selectedLocation.countryName || "",
+          stateProvince: selectedLocation.stateProvince || "",
+          city: selectedLocation.city || "",
+          postalCode: selectedLocation.zipCode || "",
+        }
+      }
+    }));
+  
+    try {
+      const coordinates = await fetchCoordinates(selectedLocation.street);
+      setFormData((prevFormData) => ({
+        ...prevFormData,
+        location: {
+          ...prevFormData.location,
+          coordinates: {
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+          },
+        },
+      }));
+    } catch (error) {
+      console.error("Error fetching coordinates:", error);
+    }
+  };
+  
+  
+
+
+  // const handleSelectedEquipmentsChange = (selectedEquipments) => {
+  //   setFormData((prevFormData) => ({
+  //     ...prevFormData,
+  //     equipment: selectedEquipments,
+  //   }));
+  // };
+
+  const handleSelectedEquipmentsChange = (selectedEquipments) => {
+    const formattedEquipments = selectedEquipments.map((equipment) => ({
+      itemCode: equipment.ItemCode || "", 
+      itemName: equipment.ItemName || "", 
+      itemGroup: equipment.ItemGroup || "",
+      brand: equipment.Brand || "",
+      equipmentLocation: equipment.EquipmentLocation || "",
+      equipmentType: equipment.EquipmentType || "",
+      modelSeries: equipment.ModelSeries || "",
+      serialNo: equipment.SerialNo || "",
+      notes: equipment.Notes || "",
+      warrantyStartDate: equipment.WarrantyStartDate || null,
+      warrantyEndDate: equipment.WarrantyEndDate || null,
+    }));
+  
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      equipments: formattedEquipments,
     }));
   };
+  
+  
 
   const handleNextClick = () => {
     if (activeKey === "summary") {
@@ -407,124 +704,196 @@ const AddNewJobs = () => {
     // SENT API THRU SAP
   };
 
-  // const handleSubmitClick = async () => {
-  //   try {
-  //     const formattedStartDateTime = formatDateTime(
-  //       formData.startDate,
-  //       formData.startTime
-  //     );
-  //     const formattedDuration = formatDuration(
-  //       formData.estimatedDurationHours,
-  //       formData.estimatedDurationMinutes
-  //     );
-
-  //     const newJobData = {
-  //       ...formData,
-  //       start: formattedStartDateTime,
-  //       duration: formattedDuration,
-  //       jobNo: jobNo,
-  //       assignedWorkers: selectedWorkers.map((worker) => worker.value),
-  //     };
-
-  //     const jobRef = doc(db, "jobs", jobNo);
-  //     await setDoc(jobRef, newJobData);
-
-  //     Swal.fire({
-  //       title: "Success!",
-  //       text: "Job created successfully.",
-  //       icon: "success",
-  //     });
-
-  //     // Increment jobNo for the UI
-  //     setJobNo((prevJobNo) =>
-  //       (parseInt(prevJobNo, 10) + 1).toString().padStart(6, "0")
-  //     );
-  //   } catch (e) {
-  //     console.error("Error adding document: ", e);
-  //     Swal.fire({
-  //       title: "Error!",
-  //       text: "An error occurred while saving data.",
-  //       icon: "error",
-  //     });
-  //   }
-  // };
-
-  // const handleSubmitClick = async () => {
-  //     try {
-  //         const formattedStartDateTime = formatDateTime(formData.startDate, formData.startTime);
-  //         const formattedDuration = formatDuration(formData.estimatedDurationHours, formData.estimatedDurationMinutes);
-
-  //         const newJobData = {
-  //             ...formData,
-  //             start: formattedStartDateTime,
-  //             duration: formattedDuration,
-  //             jobNo: jobNo,
-  //             assignedWorkers: selectedWorkers.map(worker => worker.value),
-  //         };
-
-  //         const jobRef = doc(db, "jobs", jobNo);
-  //         await setDoc(jobRef, newJobData);
-
-  //         alert('Form submitted successfully!');
-
-  //         // Increment jobNo for the UI
-  //         setJobNo((prevJobNo) => (parseInt(prevJobNo, 10) + 1).toString().padStart(6, '0'));
-  //     } catch (e) {
-  //         console.error("Error adding document: ", e);
-  //         alert('Error submitting the form!');
-  //     }
-  // };
 
   const handleSubmitClick = async () => {
-    try {
-      const formattedStartDateTime = formatDateTime(
+    // Validation function to check required fields
+    const isValid = () => {
+      const requiredFields = [
+        formData.jobName,
         formData.startDate,
-        formData.startTime
-      );
-      const formattedDuration = formatDuration(
-        formData.estimatedDurationHours,
-        formData.estimatedDurationMinutes
-      );
-
-      const newJobData = {
+        formData.endDate,
+        formData.contact?.firstName,
+        formData.location?.locationName,
+      ];
+  
+      // Check for empty fields
+      for (const field of requiredFields) {
+        if (!field || field.trim() === "") {
+          return false;
+        }
+      }
+  
+      // Check if there are any assigned workers
+      if (selectedWorkers.length === 0) {
+        return false;
+      }
+  
+      return true;
+    };
+  
+    if (!isValid()) {
+      // If validation fails, show a SweetAlert message
+      Swal.fire({
+        title: "Validation Error!",
+        text: "Please fill in all required fields before submitting.",
+        icon: "error",
+      });
+      return; 
+    }
+  
+    try {
+      const formattedStartDateTime = formatDateTime(formData.startDate, formData.startTime);
+      const formattedEndDateTime = formatDateTime(formData.endDate, formData.endTime);
+  
+      const assignedWorkers = selectedWorkers.map((worker) => ({
+        workerId: worker.value,
+      }));
+  
+  
+      const updatedFormData = {
         ...formData,
-        start: formattedStartDateTime,
-        duration: formattedDuration,
+        jobID: jobNo,
         jobNo: jobNo,
-        TaskList: tasks,
-        assignedWorkers: selectedWorkers.map((worker) => worker.value),
+        serviceCallID: selectedServiceCall ? selectedServiceCall.value : "",
+        salesOrderID: selectedSalesOrder ? selectedSalesOrder.value : "",
+        assignedWorkers,
+        customerID: selectedCustomer ? selectedCustomer.value : "",
+        startDate: formattedStartDateTime,
+        endDate: formattedEndDateTime,
+        location: selectedLocation
+          ? {
+              locationName: selectedLocation.label,
+              address: {
+                streetNo: selectedLocation.streetNo || "",
+                streetAddress: selectedLocation.street || "",
+                block: selectedLocation.block || "",
+                city: selectedLocation.city || "",
+                stateProvince: selectedLocation.stateProvince || "",
+                postalCode: selectedLocation.postalCode || "",
+              },
+              coordinates: {
+                latitude: formData.location.coordinates.latitude,
+                longitude: formData.location.coordinates.longitude,
+              },
+            }
+          : null,
+        taskList: tasks.map((task) => ({
+          taskID: task.taskID || "",
+          taskName: task.taskName || "",
+          taskDescription: task.taskDescription || "",
+          assignedTo: task.assignedTo || "",
+          isPriority: task.isPriority || false,
+          isDone: task.isDone || false,
+          completionDate: task.completionDate || null,
+        })),
+        equipments: formData.equipments.map((equipment) => ({
+          itemCode: equipment.itemCode || "", 
+          itemName: equipment.itemName || "",
+          itemGroup: equipment.itemGroup || "",
+          brand: equipment.brand || "",
+          equipmentLocation: equipment.equipmentLocation || "",
+          equipmentType: equipment.equipmentType || "",
+          modelSeries: equipment.modelSeries || "",
+          serialNo: equipment.serialNo || "",
+          notes: equipment.notes || "",
+          warrantyStartDate: equipment.warrantyStartDate || null,
+          warrantyEndDate: equipment.warrantyEndDate || null,
+        })),
+        customerSignature: {
+          signatureURL: formData.customerSignature.signatureURL || "",
+          signedBy: formData.contactFullname || "",
+          signatureTimestamp: formData.customerSignature.signatureTimestamp || null,
+        },
       };
-
+  
+      // Save the job document
       const jobRef = doc(db, "jobs", jobNo);
-      await setDoc(jobRef, newJobData);
+      await setDoc(jobRef, updatedFormData);
+  
+    // Step 1: Get the authenticated user's UID
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    const uid = currentUser?.uid || "anonymous";
 
-      // Show success toast
-      toast.success("Job created successfully!");
+    console.log('Searching for workerId by matching uid in users collection:', uid);
 
-      // Log the activity
-      await logActivity(
-        "Job Created",
-        `Job ${formData.jobName} (Job No: ${jobNo}) was created.`
-      );
+    // Step 2: Load all user documents
+    const usersCollectionRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersCollectionRef);
 
-      // Show success SweetAlert
+    let workerId = null;
+    let fullName = 'anonymous';  // Default value if no match is found
+
+    // Step 3: Loop through each user document and check if `uid` matches
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      if (userData.uid === uid) {
+        workerId = userData.workerId;  // Get the workerId from the document where uid matches
+        console.log('Matching workerId found:', workerId);
+      }
+    });
+
+    // Step 4: If a workerId was found, use it to get the user's full name
+    if (workerId) {
+      const workerDocRef = doc(db, 'users', workerId);  // Now fetch the document by workerId
+      const workerDoc = await getDoc(workerDocRef);
+
+      if (workerDoc.exists()) {
+        const workerData = workerDoc.data();
+        if (workerData.fullName) {
+          fullName = workerData.fullName;  // Get the fullName from the worker document
+          console.log('Full name found:', fullName);
+        }
+      } else {
+        console.log(`No document found for workerId: ${workerId}`);
+      }
+    } else {
+      console.log('No matching user found for the current UID');
+    }
+
+          // Step 5: Create a log entry for "Job Created" using `jobID` as the document ID
+        const logRef = doc(db, `jobs/${jobNo}/logs`, jobNo);  // Use `jobNo` as the document ID
+
+        const logEntry = {
+          logID: `${jobNo}`,  // Set logID to `jobNo` since it is now the document ID
+          jobID: jobNo,
+          workerId: workerId || 'unknown',
+          uid: uid,  
+          event: "Job Created",
+          details: `Job ${formData.jobName} was created by ${fullName}.`,  // Use the full name here
+          previousStatus: null,
+          newStatus: formData.jobStatus,
+          timestamp: Timestamp.now(),
+          relatedDocuments: {},
+        };
+
+        // Use `setDoc` to save the document with `jobNo` as the ID
+        await setDoc(logRef, logEntry);
+
+      // Show success SweetAlert and redirect after clicking OK
       Swal.fire({
         title: "Success!",
         text: "Job created successfully.",
         icon: "success",
+      }).then(() => {
+        // Redirect using window.location.replace() to avoid adding the current page to session history
+        window.location.replace("/dashboard/jobs/create-jobs");
       });
-
-      // Redirect after the user clicks OK
-      router.replace("/dashboard/jobs/list-jobs");
-
+      
+  
+      // Clear the form data after submission
+      setFormData(initialFormData);
+  
       // Increment jobNo for the UI
       setJobNo((prevJobNo) =>
         (parseInt(prevJobNo, 10) + 1).toString().padStart(6, "0")
       );
+
+  
     } catch (e) {
       console.error("Error adding document: ", e);
       toast.error("An error occurred while saving data.");
-
+  
       Swal.fire({
         title: "Error!",
         text: "An error occurred while saving data.",
@@ -532,6 +901,12 @@ const AddNewJobs = () => {
       });
     }
   };
+  
+  
+  
+  
+  
+  
 
   const handleSubmit = (event) => {
     const form = event.currentTarget;
@@ -597,7 +972,7 @@ const AddNewJobs = () => {
               <Form.Control
                 required
                 type="text"
-                value={formData.firstName}
+                value={formData.contact.firstName}
                 readOnly
                 disabled
               />
@@ -608,7 +983,7 @@ const AddNewJobs = () => {
               <Form.Control
                 required
                 type="text"
-                value={formData.middleName}
+                value={formData.contact.middleName}
                 readOnly
                 disabled
               />
@@ -619,7 +994,7 @@ const AddNewJobs = () => {
               <Form.Control
                 required
                 type="text"
-                value={formData.lastName}
+                value={formData.contact.lastName}
                 readOnly
                 disabled
               />
@@ -630,7 +1005,7 @@ const AddNewJobs = () => {
             <Form.Group as={Col} md="4" controlId="validationCustomPhoneNumber">
               <Form.Label>Phone Number</Form.Label>
               <Form.Control
-                defaultValue={formData.phoneNumber}
+                defaultValue={formData.contact.phoneNumber}
                 type="text"
                 readOnly
                 disabled
@@ -642,7 +1017,7 @@ const AddNewJobs = () => {
             <Form.Group as={Col} md="4" controlId="validationCustomMobilePhone">
               <Form.Label>Mobile Phone</Form.Label>
               <Form.Control
-                defaultValue={formData.mobilePhone}
+                defaultValue={formData.contact.mobilePhone}
                 type="text"
                 readOnly
                 disabled
@@ -654,7 +1029,7 @@ const AddNewJobs = () => {
             <Form.Group as={Col} md="4" controlId="validationCustomEmail">
               <Form.Label>Email</Form.Label>
               <Form.Control
-                defaultValue={formData.email}
+                defaultValue={formData.contact.email}
                 type="email"
                 readOnly
                 disabled
@@ -689,92 +1064,93 @@ const AddNewJobs = () => {
                 </Form.Group>
               </Row>
               <Row className="mb-3">
-                <Form.Group as={Col} controlId="locationName">
-                  <Form.Label>Location Name</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.locationName}
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} controlId="streetAddress">
-                  <Form.Label>Street No.</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.streetNo}
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} controlId="streetAddress">
-                  <Form.Label>Street Address</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.streetAddress}
-                    readOnly
-                  />
-                </Form.Group>
-              </Row>
-              <Row className="mb-3">
-                <Form.Group as={Col} controlId="block">
-                  <Form.Label>Block</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.block}
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} controlId="building">
-                  <Form.Label>Building No.</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.buildingNo}
-                    readOnly
-                  />
-                </Form.Group>
-              </Row>
-              <Row className="mb-3">
-                <Form.Group as={Col} md="3" controlId="country">
-                  <Form.Label>Country</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.country}
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} md="3" controlId="stateProvince">
-                  <Form.Label>State/Province</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.stateProvince}
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} md="3" controlId="city">
-                  <Form.Label>City</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.city}
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} md="3" controlId="zipCode">
-                  <Form.Label>Zip/Postal Code</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.zipCode}
-                    readOnly
-                  />
-                </Form.Group>
-              </Row>
+  <Form.Group as={Col} controlId="locationName">
+    <Form.Label>Location Name</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.locationName || ""} // Fallback to an empty string
+      readOnly
+    />
+  </Form.Group>
+  <Form.Group as={Col} controlId="streetNo">
+    <Form.Label>Street No.</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.streetNo || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+  <Form.Group as={Col} controlId="streetAddress">
+    <Form.Label>Street Address</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.streetAddress || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+</Row>
+<Row className="mb-3">
+  <Form.Group as={Col} controlId="block">
+    <Form.Label>Block</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.block || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+  <Form.Group as={Col} controlId="buildingNo">
+    <Form.Label>Building No.</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.buildingNo || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+</Row>
+<Row className="mb-3">
+  <Form.Group as={Col} md="3" controlId="country">
+    <Form.Label>Country</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.country || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+  <Form.Group as={Col} md="3" controlId="stateProvince">
+    <Form.Label>State/Province</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.stateProvince || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+  <Form.Group as={Col} md="3" controlId="city">
+    <Form.Label>City</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.city || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+  <Form.Group as={Col} md="3" controlId="postalCode">
+    <Form.Label>Zip/Postal Code</Form.Label>
+    <Form.Control
+      type="text"
+      disabled
+      value={formData.location?.address?.postalCode || ""} // Ensure fallback
+      readOnly
+    />
+  </Form.Group>
+</Row>
+
             </>
           )}
 
@@ -871,6 +1247,32 @@ const AddNewJobs = () => {
                 <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
               </Form.Select>
             </Form.Group> */}
+            <Form.Group as={Col} md="3" controlId="serviceCall">
+              <Form.Label>Service Call</Form.Label>
+              <Select
+                instanceId="service-call-select"
+                options={serviceCalls}
+                value={selectedServiceCall}
+                onChange={(selectedOption) =>
+                  setSelectedServiceCall(selectedOption)
+                }
+                placeholder="Select Service Call"
+              />
+            </Form.Group>
+
+            <Form.Group as={Col} md="3" controlId="salesOrder">
+              <Form.Label>Sales Order</Form.Label>
+              <Select
+                instanceId="sales-order-select"
+                options={salesOrders}
+                value={selectedSalesOrder}
+                onChange={(selectedOption) =>
+                  setSelectedSalesOrder(selectedOption)
+                }
+                placeholder="Select Sales Order"
+              />
+            </Form.Group>
+
             <Form.Group as={Col} controlId="jobName">
               <Form.Label>Job Name</Form.Label>
               <Form.Control
@@ -881,58 +1283,55 @@ const AddNewJobs = () => {
                 placeholder="Enter Job Name"
               />
             </Form.Group>
-            
           </Row>
           <Row className="mb-3">
-            <Form.Group controlId="description">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                placeholder="Enter job description"
-              />
-            </Form.Group>
+          <Form.Group controlId="description">
+          <Form.Label>Description</Form.Label>
+          <ReactQuillEditor 
+            initialValue={formData.jobDescription}  // Pass the initial value 
+            onDescriptionChange={handleDescriptionChange}  // Handle changes
+          />
+        </Form.Group>
+
+
           </Row>
           <Row className="mb-3">
             <Form.Group as={Col} md="4" controlId="jobCategory">
               <Form.Label>Job Priority</Form.Label>
               <Form.Select
-                name="jobPriority"
-                value={formData.jobPriority}
+                name="priority"
+                value={formData.priority}
                 onChange={handleInputChange}
                 aria-label="Select job category"
               >
                 <option value="" disabled>
                   Select Priority
                 </option>
-                <option value="L">Low</option>
-                <option value="M">Mid</option>
-                <option value="H">High</option>
+                <option value="Low">Low</option>
+                <option value="Mid">Mid</option>
+                <option value="High">High</option>
               </Form.Select>
             </Form.Group>
             <Form.Group as={Col} md="4" controlId="jobCategory">
               <Form.Label>Job Status</Form.Label>
               <Form.Select
                 name="jobStatus"
-                value={formData.jobStatus}
+                value={formData.jobStatus} 
                 onChange={handleInputChange}
                 aria-label="Select job status"
               >
                 <option value="" disabled>
                   Select Status
                 </option>
-                <option value="C">Created</option>
-                {/* <option value="CO">Confirm</option>
-                <option value="CA">Cancel</option>
-                <option value="JS">Job Started</option>
-                <option value="JC">Job Complete</option>
-                <option value="V">Validate</option>
-                <option value="S">Scheduled</option> */}
+                <option value="Created">Created</option>
+                <option value="InProgress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Rescheduled">Rescheduled</option>
+                <option value="Cancelled">Cancelled</option>
               </Form.Select>
             </Form.Group>
+
             <Form.Group as={Col} md="4" controlId="jobWorker">
               <Form.Label>Assigned Worker</Form.Label>
               <Select
@@ -979,7 +1378,6 @@ const AddNewJobs = () => {
                 <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
               </Form.Select>
             </Form.Group>
-        
           </Row>
           <Row className="mb-3">
             <Form.Group as={Col} md="4" controlId="startTime">
@@ -1037,7 +1435,7 @@ const AddNewJobs = () => {
                 name="adminWorkerNotify"
                 checked={formData.adminWorkerNotify}
                 onChange={handleInputChange}
-                label="Admin/Worker: Email Notify when Job Status changed and new Job message Submitted"
+                label="Admin/Worker: Notify when Job Status changed and new Job message Submitted"
               />
             </Form.Group>
             <Form.Group controlId="customerNotify">
@@ -1046,7 +1444,7 @@ const AddNewJobs = () => {
                 name="customerNotify"
                 checked={formData.customerNotify}
                 onChange={handleInputChange}
-                label="Customer: Email Notify when Job Status changed and new Job message Submitted"
+                label="Customer: Notify when Job Status changed and new Job message Submitted"
               />
             </Form.Group>
           </Row> */}
@@ -1069,678 +1467,3 @@ const AddNewJobs = () => {
 };
 
 export default AddNewJobs;
-
-// // import React, { Fragment, useState, useEffect } from 'react';
-// // import {
-// //     Container,
-// //     Row,
-// //     Col,
-// //     Card,
-// //     Form,
-// //     FormGroup,
-// //     FormLabel,
-// //     FormControl,
-// //     Button,
-// //     InputGroup,
-// //     Alert,
-// //     Table,
-// //     Pagination
-// // } from 'react-bootstrap';
-// // import {
-// //   TableSmall
-// // } from 'widgets';
-
-// // // import required data file
-// // import BasicTableData from 'data/dashboard/tables/BasicTableData'
-// // import Tab from 'react-bootstrap/Tab';
-// // import Tabs from 'react-bootstrap/Tabs';
-// // import Select from 'react-select';
-// // import TableEquipments from 'widgets/tables/TableEquipments';
-// // import EquipmentsTable from 'pages/dashboard/tables/datatable-equipments';
-
-// // const options5 = [
-// //     { value: 'worker1', label: 'Worker 1' },
-// //     { value: 'worker2', label: 'Worker 2' },
-// //     { value: 'worker3', label: 'Worker 3' },
-// //     { value: 'worker4', label: 'Worker 4' },
-// //     { value: 'worker5', label: 'Worker 5' },
-// //     { value: 'worker6', label: 'Worker 6' },
-// // ];
-
-// // const AddNewJobs = () => {
-// //     const [customers, setCustomers] = useState([]);
-// //     const [contacts, setContacts] = useState([]);
-// //     const [locations, setLocations] = useState([]);
-// //     const [equipments, setEquipments] = useState([]);
-// //     const [selectedCustomer, setSelectedCustomer] = useState(null);
-// //     const [selectedContact, setSelectedContact] = useState(null);
-// //     const [selectedLocation, setSelectedLocation] = useState(null);
-// //     const [formData, setFormData] = useState({
-// //       customerName: '',
-// //       firstName: '',
-// //       middleName: '',
-// //       lastName: '',
-// //       phoneNumber: '',
-// //       mobilePhone: '',
-// //       email: '',
-// //       locationName: '',
-// //       streetNo: '',
-// //       streetAddress: '',
-// //       block: '',
-// //       buildingNo: '',
-// //       country: '',
-// //       stateProvince: '',
-// //       city: '',
-// //       zipCode: '',
-// //       equipments: []
-// //     });
-
-// //     const [showServiceLocation, setShowServiceLocation] = useState(true);
-// //     const [showEquipments, setShowEquipments] = useState(true);
-// //     const [selectedWorkers, setSelectedWorkers] = useState([]);
-
-// //     const [selectedEquipment, setSelectedEquipment] = useState([]);
-// //     const [validated, setValidated] = useState(false);
-// //     const [activeKey, setActiveKey] = useState('summary'); // Initial active tab
-
-// //       useEffect(() => {
-// //         const fetchCustomers = async () => {
-// //           try {
-// //             const response = await fetch('/api/getCustomers');
-// //             if (!response.ok) {
-// //               throw new Error('Failed to fetch customers');
-// //             }
-// //             const data = await response.json();
-// //             if (!Array.isArray(data)) {
-// //               throw new Error('Unexpected response format');
-// //             }
-// //             const formattedOptions = data.map(item => ({
-// //               value: item.cardCode,
-// //               label: item.cardCode + ' - ' + item.cardName,
-// //               cardName: item.cardName
-// //             }));
-// //             setCustomers(formattedOptions);
-// //           } catch (error) {
-// //             console.error('Error fetching customers:', error);
-// //             setCustomers([]); // Ensure options is an array
-// //           }
-// //         };
-
-// //         fetchCustomers();
-// //       }, []);
-
-// //       const handleCustomerChange = async (selectedOption) => {
-// //         setSelectedContact(null);
-// //         setSelectedLocation(null);
-
-// //         setSelectedCustomer(selectedOption);
-// //         const selectedCustomer = customers.find(option => option.value === selectedOption.value);
-// //         setFormData({ ...formData, customerName: selectedCustomer ? selectedCustomer.label : '' });
-
-// //         // Fetch contacts for the selected customer
-// //         try {
-// //           const response = await fetch('/api/getContacts', {
-// //             method: 'POST',
-// //             headers: {
-// //               'Content-Type': 'application/json'
-// //             },
-// //             body: JSON.stringify({ cardCode: selectedOption.value })
-// //           });
-
-// //           if (!response.ok) {
-// //             throw new Error('Failed to fetch contacts');
-// //           }
-
-// //           const data = await response.json();
-// //           if (!Array.isArray(data)) {
-// //             throw new Error('Unexpected response format');
-// //           }
-
-// //           const formattedContacts = data.map(item => ({
-// //             value: item.contactId,
-// //             label: item.contactId,
-// //             ...item
-// //           }));
-
-// //           setContacts(formattedContacts);
-// //         } catch (error) {
-// //           console.error('Error fetching contacts:', error);
-// //           setContacts([]);
-// //         }
-
-// //         // Fetch locations for the selected customer
-// //         try {
-// //           const response = await fetch('/api/getLocation', {
-// //             method: 'POST',
-// //             headers: {
-// //               'Content-Type': 'application/json'
-// //             },
-// //             body: JSON.stringify({ cardCode: selectedOption.value })
-// //           });
-
-// //           if (!response.ok) {
-// //             throw new Error('Failed to fetch locations');
-// //           }
-
-// //           const data = await response.json();
-// //           if (!Array.isArray(data)) {
-// //             throw new Error('Unexpected response format');
-// //           }
-
-// //           const formattedLocations = data.map(item => ({
-// //             value: item.siteId,
-// //             label: item.siteId,
-// //             ...item
-// //           }));
-
-// //           setLocations(formattedLocations);
-// //         } catch (error) {
-// //           console.error('Error fetching locations:', error);
-// //           setLocations([]);
-// //         }
-// //          // Fetch Equipments for the selected customer
-// //          try {
-// //           const response = await fetch('/api/getEquipments', {
-// //             method: 'POST',
-// //             headers: {
-// //               'Content-Type': 'application/json'
-// //             },
-// //             body: JSON.stringify({ cardCode: selectedOption.value })
-// //           });
-
-// //           if (!response.ok) {
-// //             throw new Error('Failed to fetch equipments');
-// //           }
-
-// //           const data = await response.json();
-// //           if (!Array.isArray(data)) {
-// //             throw new Error('Unexpected response format');
-// //           }
-
-// //           const formattedEquipments = data.map(item => ({
-// //             value: item.ItemCode,
-// //             label: item.ItemCode,
-// //             ...item
-// //           }));
-
-// //           setEquipments(formattedEquipments);
-// //         } catch (error) {
-// //           console.error('Error fetching equipments:', error);
-// //           setEquipments([]);
-// //         }
-// //       };
-
-// //       const handleContactChange = (selectedOption) => {
-// //         setSelectedContact(selectedOption);
-// //         setFormData({
-// //           ...formData,
-// //           firstName: selectedOption.firstName || '',
-// //           middleName: selectedOption.middleName || '',
-// //           lastName: selectedOption.lastName || '',
-// //           phoneNumber: selectedOption.tel1 || '',
-// //           mobilePhone: selectedOption.tel2 || '',
-// //           email: selectedOption.email || ''
-// //         });
-// //       };
-
-// //       const handleLocationChange = (selectedOption) => {
-// //         const selectedLocation = locations.find(location => location.value === selectedOption.value);
-// //         setSelectedLocation(selectedLocation);
-// //         setFormData({
-// //           ...formData,
-// //           locationName: selectedLocation.siteId,
-// //           streetNo: selectedLocation.streetNo || '',
-// //           streetAddress: selectedLocation.street || '',
-// //           block: selectedLocation.block || '',
-// //           buildingNo: selectedLocation.building || '',
-// //           country: selectedLocation.countryName || '',
-// //           stateProvince: '',
-// //           city: selectedLocation.city || '',
-// //           zipCode: selectedLocation.zipCode || ''
-// //         });
-// //       };
-
-// //       const handleSelectedEquipmentsChange = (selectedEquipments) => {
-// //         setFormData(prevFormData => ({
-// //           ...prevFormData,
-// //           equipments: selectedEquipments
-// //         }));
-// //       };
-
-// //     const handleNextClick = () => {
-// //         setActiveKey('scheduling'); // Switch to the 'Job Scheduling' tab
-// //     };
-
-// //     const handleSubmitClick = () => {
-// //         // Handle form submission or any other logic for the 'Job Scheduling' tab
-// //         alert('Form submitted successfully!');
-// //     };
-
-// //     const handleSubmit = (event) => {
-// //         const form = event.currentTarget;
-// //         if (form.checkValidity() === false) {
-// //             event.preventDefault();
-// //             event.stopPropagation();
-// //         }
-// //         setValidated(true);
-// //     };
-
-// //     // Function to toggle the visibility of the Service Location section
-// //     const toggleServiceLocation = () => {
-// //         setShowServiceLocation(!showServiceLocation);
-// //     };
-
-// //     // Function to toggle the visibility of the Equipments section
-// //     const toggleEquipments = () => {
-// //         setShowEquipments(!showEquipments);
-// //     };
-
-// //     return (
-// //         <Tabs
-// //             id="noanim-tab-example"
-// //             activeKey={activeKey}
-// //             onSelect={(key) => setActiveKey(key)} // Handle tab change event
-// //             className="mb-3"
-// //         >
-// //             <Tab eventKey="summary" title="Job Summary">
-// //                 <Form noValidate validated={validated} onSubmit={handleSubmit}>
-// //                     <Row className='mb-3'>
-// //                         <Form.Group as={Col} md="7" controlId="customerList">
-// //                             <Form.Label>Search Customer</Form.Label>
-// //                             <Select
-// //                                 instanceId="customer-select"
-// //                                 options={customers}
-// //                                 value={selectedCustomer}
-// //                                 onChange={handleCustomerChange}
-// //                                 placeholder="Enter Customer Name"
-// //                             />
-// //                         </Form.Group>
-
-// //                         {/* <Form.Group as={Col} md="4" controlId="customerName">
-// //                             <Form.Label>Customer Name</Form.Label>
-// //                             <Form.Control
-// //                                 required
-// //                                 type="text"
-// //                                 value={formData.customerName}
-// //                                 readOnly
-// //                             />
-// //                             <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-// //                         </Form.Group> */}
-// //                     </Row>
-
-// //                     <hr className="my-4" />
-// //                     <h5 className="mb-1">Primary Contact</h5>
-// //                     <p className="text-muted">Details about the customer.</p>
-
-// //                     <Row className="mb-3">
-// //                         <Form.Group as={Col} md="3" controlId="jobWorker">
-// //                             <Form.Label>Select Contact ID</Form.Label>
-// //                             <Select
-// //                                 instanceId="contact-select"
-// //                                 options={contacts}
-// //                                 value={selectedContact}
-// //                                 onChange={handleContactChange}
-// //                                 placeholder="Select Contact ID"
-// //                             />
-// //                         </Form.Group>
-// //                     </Row>
-
-// //                     <Row className="mb-3">
-// //                         <Form.Group as={Col} md="4" controlId="validationCustom01">
-// //                             <Form.Label>First name</Form.Label>
-// //                             <Form.Control
-// //                                 required
-// //                                 type="text"
-
-// //                                 value={formData.firstName}
-// //                                 readOnly
-// //                                 disabled
-// //                             />
-// //                             <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="validationCustom02">
-// //                             <Form.Label>Middle name</Form.Label>
-// //                             <Form.Control
-// //                                 required
-// //                                 type="text"
-
-// //                                 value={formData.middleName}
-// //                                 readOnly
-// //                                 disabled
-// //                             />
-// //                             <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="validationCustom03">
-// //                             <Form.Label>Last name</Form.Label>
-// //                             <Form.Control
-// //                                 required
-// //                                 type="text"
-
-// //                                 value={formData.lastName}
-// //                                 readOnly
-// //                                 disabled
-// //                             />
-// //                             <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-// //                         </Form.Group>
-// //                     </Row>
-// //                     <Row className="mb-3">
-// //                         <Form.Group as={Col} md="4" controlId="validationCustomPhoneNumber">
-// //                             <Form.Label>Phone Number</Form.Label>
-// //                             <Form.Control
-// //                                 defaultValue={formData.phoneNumber}
-// //                                 type="text"
-
-// //                                 readOnly
-// //                                 disabled
-// //                             />
-// //                             <Form.Control.Feedback type="invalid">
-// //                                 Please provide a valid phone number.
-// //                             </Form.Control.Feedback>
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="validationCustomMobilePhone">
-// //                             <Form.Label>Mobile Phone</Form.Label>
-// //                             <Form.Control
-// //                                 defaultValue={formData.mobilePhone}
-// //                                 type="text"
-
-// //                                 readOnly
-// //                                 disabled
-// //                             />
-// //                             <Form.Control.Feedback type="invalid">
-// //                                 Please provide a valid mobile phone number.
-// //                             </Form.Control.Feedback>
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="validationCustomEmail">
-// //                             <Form.Label>Email</Form.Label>
-// //                             <Form.Control
-// //                                 defaultValue={formData.email}
-// //                                 type="email"
-
-// //                                 readOnly
-// //                                 disabled
-// //                             />
-// //                             <Form.Control.Feedback type="invalid">
-// //                                 Please provide a valid email.
-// //                             </Form.Control.Feedback>
-// //                         </Form.Group>
-// //                     </Row>
-
-// //                     <hr className="my-4" />
-// //   {/* Service Location Section */}
-// //   <h5 className="mb-1" style={{ cursor: 'pointer' }} onClick={toggleServiceLocation}>
-// //     Job Address {showServiceLocation ? '(-)' : '(+)'}
-// //   </h5>
-// //   {showServiceLocation && (
-// //     <>
-// //       <p className="text-muted">Details about the Job Address.</p>
-
-// //       <Row className="mb-3">
-// //         <Form.Group as={Col} md="4" controlId="jobLocation">
-// //           <Form.Label>Select Location ID</Form.Label>
-// //           <Select
-// //             instanceId="location-select"
-// //             options={locations}
-// //             value={selectedLocation}
-// //             onChange={handleLocationChange}
-// //             placeholder="Select Location ID"
-// //           />
-// //         </Form.Group>
-// //       </Row>
-
-// //       <Row className="mb-3">
-// //         <Form.Group as={Col} controlId="locationName">
-// //           <Form.Label>Location Name</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.locationName}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //         <Form.Group as={Col} controlId="streetAddress">
-// //           <Form.Label>Street No.</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.streetNo}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //         <Form.Group as={Col} controlId="streetAddress">
-// //           <Form.Label>Street Address</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.streetAddress}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //       </Row>
-// //       <Row className="mb-3">
-// //         <Form.Group as={Col} controlId="block">
-// //           <Form.Label>Block</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.block}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //         <Form.Group as={Col} controlId="building">
-// //           <Form.Label>Building No.</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.buildingNo}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //       </Row>
-// //       <Row className="mb-3">
-// //         <Form.Group as={Col} md="3" controlId="country">
-// //           <Form.Label>Country</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.country}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //         <Form.Group as={Col} md="3" controlId="stateProvince">
-// //           <Form.Label>State/Province</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.stateProvince}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //         <Form.Group as={Col} md="3" controlId="city">
-// //           <Form.Label>City</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.city}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //         <Form.Group as={Col} md="3" controlId="zipCode">
-// //           <Form.Label>Zip/Postal Code</Form.Label>
-// //           <Form.Control
-// //             type="text"
-// //             disabled
-// //             value={formData.zipCode}
-// //             readOnly
-// //           />
-// //         </Form.Group>
-// //       </Row>
-// //     </>
-// //   )}
-
-// //             <hr className="my-4" />
-// //             {/* Equipments Section */}
-// //             <h5 className="mb-1" style={{ cursor: 'pointer' }} onClick={toggleEquipments}>
-// //               Job Equipments {showEquipments ? '(-)' : '(+)'}
-// //             </h5>
-// //             {showEquipments && (
-// //               <>
-// //                 <p className="text-muted">Details about the Equipments.</p>
-// //                 <Row className='mb-3'>
-// //                   <EquipmentsTable equipments={equipments} onSelectedRowsChange={handleSelectedEquipmentsChange} />
-// //                 </Row>
-// //               </>
-// //             )}
-// //             <hr className="my-4" />
-// //                 </Form>
-// //                 <Row className="align-items-center">
-// //                     <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-1">
-// //                         <Button variant="primary" onClick={handleNextClick} className="float-end">
-// //                             Next
-// //                         </Button>
-// //                     </Col>
-// //                 </Row>
-
-// //             </Tab>
-// //             <Tab eventKey="scheduling" title="Job Scheduling">
-// //                 <Form>
-
-// //                     <Row className='mb-3'>
-// //                     <Col xs="auto">
-// //                 <Form.Group as={Col} controlId="jobNo">
-// //                   <Form.Label>Job No.</Form.Label>
-// //                   <Form.Control type="text" value={'000002'} readOnly style={{ width: '95px' }} />
-// //                 </Form.Group>
-// //               </Col>
-// //                         <Form.Group as={Col} controlId="jobName">
-// //                             <Form.Label>Job Name</Form.Label>
-// //                             <Form.Control type="text" placeholder="Enter Job Name" />
-// //                         </Form.Group>
-// //                     </Row>
-
-// //                     <Row className='mb-3'>
-// //                         <Form.Group controlId="description">
-// //                             <Form.Label>Description</Form.Label>
-// //                             <Form.Control as="textarea" rows={3} placeholder="Enter job description" />
-// //                         </Form.Group>
-// //                     </Row>
-
-// //                     <Row className='mb-3'>
-// //                         <Form.Group as={Col} md="4" controlId="jobCategory">
-// //                             <Form.Label>Job Priority</Form.Label>
-// //                             <Form.Select aria-label="Select job category">
-// //                                 <option value="" disabled>Select Priority</option>
-// //                                 <option value="L">Low</option>
-// //                                 <option value="M">Mid</option>
-// //                                 <option value="H">High</option>
-// //                             </Form.Select>
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="jobCategory">
-// //                             <Form.Label>Job Status</Form.Label>
-// //                             <Form.Select aria-label="Select job category">
-// //                                 <option value="" disabled>Select Status</option>
-// //                                 <option value="C">Created</option>
-// //                                 <option value="CO">Confirm</option>
-// //                                 <option value="CA">Cancel</option>
-// //                                 <option value="JS">Job Started</option>
-// //                                 <option value="JC">Job Complete</option>
-// //                                 <option value="V">Validate</option>
-// //                                 <option value="S">Scheduled</option>
-// //                                 <option value="US">Unscheduled</option>
-// //                                 <option value="RS">Re-scheduled</option>
-// //                             </Form.Select>
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="jobWorker">
-// //                             <Form.Label>Assigned Worker</Form.Label>
-// //                             <Select
-// //                                 instanceId={'wsad123wqwe'}
-// //                                 isMulti
-// //                                 options=''
-// //                                 value=''
-// //                                 onChange=''
-// //                                 placeholder="Search Worker"
-
-// //                             />
-// //                         </Form.Group>
-
-// //                     </Row>
-
-// //                     <Row className="mb-3">
-// //                         <Form.Group as={Col} md="4" controlId="arrivalTime">
-// //                             <Form.Label>Start Date</Form.Label>
-// //                             <Form.Control
-// //                                 type="date"
-// //                                 placeholder="Enter start date"
-// //                                 name="startDate"
-// //                             />
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="formEndTime">
-// //                             <Form.Label>End Date</Form.Label>
-// //                             <Form.Control
-// //                                 type="date"
-// //                                 placeholder="Enter end date"
-// //                                 name="endDate"
-// //                             />
-// //                         </Form.Group>
-// //                     </Row>
-// //                     <Row className="mb-3">
-// //                         <Form.Group as={Col} md="4" controlId="arrivalTime">
-// //                             <Form.Label>Start Time</Form.Label>
-
-// //                             <Form.Control
-// //                                 type="time"
-// //                                 placeholder="Enter start time"
-// //                                 name="startTime"
-// //                             />
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="4" controlId="formEndTime">
-// //                             <Form.Label>End Time</Form.Label>
-// //                             <Form.Control
-// //                                 type="time"
-// //                                 placeholder="Enter end time"
-// //                                 name="endTime"
-// //                             />
-// //                         </Form.Group>
-// //                         <Form.Group as={Col} md="3" controlId="estimatedDuration">
-// //                             <Form.Label>Estimated Duration</Form.Label>
-// //                             <InputGroup>
-// //                                 <Form.Control type="number" placeholder="Hours" />
-// //                                 <InputGroup.Text>h</InputGroup.Text>
-
-// //                                 <Form.Control type="number" placeholder="Minutes" />
-// //                                 <InputGroup.Text>m</InputGroup.Text>
-// //                             </InputGroup>
-// //                         </Form.Group>
-// //                     </Row>
-
-// //                     <Row className="mb-3">
-
-// //                     </Row>
-// //                     <hr className="my-4" />
-// //                     <p className="text-muted">Notification:</p>
-// //                     <Row className='mt-3'>
-// //                         <Form.Group controlId="adminWorkerNotify">
-// //                             <Form.Check type="checkbox" label="Admin/Worker: Email Notify when Job Status changed and new Job message Submitted" />
-// //                         </Form.Group>
-
-// //                         <Form.Group controlId="customerNotify">
-// //                             <Form.Check type="checkbox" label="Customer: Email Notify when Job Status changed and new Job Messaged Submitted" />
-// //                         </Form.Group>
-// //                     </Row>
-// //                     {/* SUBMIT BUTTON! */}
-// //                     <Row className="align-items-center">
-// //                         <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-4">
-// //                             <Button variant="primary" onClick={handleSubmitClick} className="float-end">
-// //                                 Submit
-// //                             </Button>
-// //                         </Col>
-// //                     </Row>
-// //                 </Form>
-
-// //             </Tab>
-
-// //         </Tabs>
-
-// //     );
-// // };
-
-// // export default AddNewJobs;

@@ -48,13 +48,14 @@ export default async function handler(req, res) {
 
 
     const serviceCalls = queryData.value.map(item => ({
-      serviceCallID: item.ServiceCallID,
-      subject: item.Subject,
-      customerName: item.CustomerName,
-      createDate: item.CreateDate,
-      createTime: item.CreateTime,
-      description: item.Description
+      serviceCallID: item["'ServiceCallID'"],
+      subject: item["'Subject'"], 
+      customerName: item["'CustomerName'"],
+      createDate: item["'CreateDate'"],
+      createTime: item["'CreateTime'"],
+      description: item["'Description'"]
     }));
+    
 
     res.status(200).json(serviceCalls);
   } catch (error) {

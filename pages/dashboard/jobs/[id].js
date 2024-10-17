@@ -3,20 +3,47 @@ import { useEffect, useState, Fragment } from "react";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import styles from "./ViewJobs.module.css"; // Import your CSS module
-import { Row, Col, Card, Image, OverlayTrigger, Tooltip, Breadcrumb, ListGroup } from "react-bootstrap";
-import { Calendar4, Clock, TelephoneFill, PersonFill, CheckCircle, XCircle, PlayCircle, Check, ClipboardCheck, FileText, QuestionCircle } from "react-bootstrap-icons";
+import {
+  Row,
+  Col,
+  Card,
+  Image,
+  OverlayTrigger,
+  Tooltip,
+  Breadcrumb,
+  ListGroup,
+} from "react-bootstrap";
+import {
+  Calendar4,
+  Clock,
+  TelephoneFill,
+  PersonFill,
+  CheckCircle,
+  XCircle,
+  PlayCircle,
+  Check,
+  ClipboardCheck,
+  FileText,
+  QuestionCircle,
+} from "react-bootstrap-icons";
 import { LoadScript, GoogleMap, Marker } from "@react-google-maps/api"; // Google Map import
-import { GridComponent, ColumnsDirective, ColumnDirective, Page, Inject } from '@syncfusion/ej2-react-grids';
-// import { registerLicense } from "@syncfusion/ej2-base";
+import {
+  GridComponent,
+  ColumnsDirective,
+  ColumnDirective,
+  Page,
+  Inject,
+} from "@syncfusion/ej2-react-grids";
 
-// registerLicense(process.env.REACT_APP_SYNCFUSION_LICENSE_KEY);
 // Helper function to fetch worker details from Firebase
 const fetchWorkerDetails = async (workerIds) => {
   const workersData = [];
-  for (const workerId of workerIds) {
-    const workerDoc = await getDoc(doc(db, "users", workerId));
-    if (workerDoc.exists()) {
-      workersData.push(workerDoc.data());
+  if (workerIds && workerIds.length > 0) {
+    for (const workerId of workerIds) {
+      const workerDoc = await getDoc(doc(db, "users", workerId));
+      if (workerDoc.exists()) {
+        workersData.push(workerDoc.data());
+      }
     }
   }
   return workersData;
@@ -31,22 +58,44 @@ const JobDetails = () => {
   const [activeTab, setActiveTab] = useState("overview"); // State for active tab
 
   useEffect(() => {
-    if (id) {
+    if (id && typeof id === "string") {
       const fetchJob = async () => {
-        const jobDoc = await getDoc(doc(db, "jobs", id));
-        if (jobDoc.exists()) {
-          const jobData = jobDoc.data();
-          setJob(jobData);
+        try {
+          const jobDoc = await getDoc(doc(db, "jobs", id));
+          if (jobDoc.exists()) {
+            const jobData = jobDoc.data();
+            setJob(jobData);
+            console.log("Job Data:", jobData);
 
-          // Fetch assigned worker details
-          const workerData = await fetchWorkerDetails(jobData.assignedWorkers);
-          setWorkers(workerData);
+            // Extract worker IDs from assignedWorkers array
+            const assignedWorkers = jobData.assignedWorkers || [];
+            if (Array.isArray(assignedWorkers)) {
+              const workerIds = assignedWorkers.map(
+                (worker) => worker.workerId
+              ); // Adjust this based on the structure
+              const workerData = await fetchWorkerDetails(workerIds); // Pass only IDs
+              setWorkers(workerData);
+            } else {
+              console.error("assignedWorkers is not an array");
+            }
 
-          // Get the location details for the Google Map
-          const fullAddress = `${jobData.streetAddress}, ${jobData.city}, ${jobData.stateProvince}, ${jobData.country}, ${jobData.zipCode}`;
-          getLocationFromAddress(fullAddress);
-        } else {
-          console.error("Job not found");
+            // Log the entire location object for debugging
+            console.log("Location Object:", jobData.location);
+
+            // Access streetAddress from location.address
+            const streetAddress =
+              jobData.location?.address?.streetAddress || "";
+            if (streetAddress) {
+              console.log("Street Address Found:", streetAddress);
+              getLocationFromAddress(streetAddress);
+            } else {
+              console.error("No street address found for the given job");
+            }
+          } else {
+            console.error("Job not found");
+          }
+        } catch (error) {
+          console.error("Error fetching job:", error);
         }
       };
 
@@ -56,15 +105,20 @@ const JobDetails = () => {
 
   // Function to get the lat and long from an address using Geocoding API
   const getLocationFromAddress = async (address) => {
-    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`;
-
-    const response = await fetch(geocodeUrl);
-    const data = await response.json();
-    if (data.results.length > 0) {
-      const location = data.results[0].geometry.location;
-      setLocation(location);
-    } else {
-      console.error("No location found for the given address");
+    try {
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        address
+      )}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`;
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+      if (data.results.length > 0) {
+        const location = data.results[0].geometry.location;
+        setLocation(location);
+      } else {
+        console.error("No location found for the given address");
+      }
+    } catch (error) {
+      console.error("Error fetching geolocation:", error);
     }
   };
 
@@ -77,146 +131,95 @@ const JobDetails = () => {
             <th>Task</th>
             <th>Done</th>
             <th>Date/Time</th>
-           
           </tr>
         </thead>
         <tbody>
-          {job.TaskList && job.TaskList.map((task, index) => (
-            <tr key={index}>
-              <td>{index + 1}</td>
-              <td>{task.taskName}</td>
-              <td>
-                <span
-                  className={`badge ${task.isComplete ? "bg-success" : "bg-danger"}`}
-                >
-                  {task.isComplete ? "Completed" : "Not Complete"}
-                </span>
-              </td>
-              <td>{new Date().toISOString()}</td> {/* Use your task's datetime field here */}
-             
-            </tr>
-          ))}
+          {job.TaskList &&
+            job.TaskList.map((task, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{task.taskName || "N/A"}</td>
+                <td>
+                  <span
+                    className={`badge ${
+                      task.isComplete ? "bg-success" : "bg-danger"
+                    }`}
+                  >
+                    {task.isComplete ? "Completed" : "Not Complete"}
+                  </span>
+                </td>
+                <td>{task.completionDate || "N/A"}</td>
+              </tr>
+            ))}
         </tbody>
       </table>
     );
   };
-  
-const renderEquipmentList = () => {
-    console.log(job.equipments); // Log to check data structure
 
+  const renderEquipmentList = () => {
     return (
-      <GridComponent dataSource={job.equipments} allowPaging={true} pageSettings={{ pageSize: 5 }}>
+      <GridComponent
+        dataSource={job.equipments || []}
+        allowPaging={true}
+        pageSettings={{ pageSize: 5 }}
+      >
         <ColumnsDirective>
-          {/* <ColumnDirective 
-            header='#' 
-            width='50' 
-            textAlign='Right' 
-            template={(data, index) => index + 1}  // Simple auto-increment index
-          /> */}
-          <ColumnDirective field='ItemName' header='Item Name' width='150' />
-          <ColumnDirective field='Brand' header='Brand' width='100' />
-          <ColumnDirective field='ModelSeries' header='Model Series' width='150' />
-          <ColumnDirective field='EquipmentLocation' header='Location' width='150' />
-          <ColumnDirective field='WarrantyStartDate' header='Warranty Start Date' width='150' format='yMd' />
-          <ColumnDirective field='WarrantyEndDate' header='Warranty End Date' width='150' format='yMd' />
+          <ColumnDirective field="itemName" header="Item Name" width="150" />
+          <ColumnDirective field="brand" header="Brand" width="100" />
+          <ColumnDirective
+            field="modelSeries"
+            header="Model Series"
+            width="150"
+          />
+          <ColumnDirective
+            field="equipmentLocation"
+            header="Location"
+            width="150"
+          />
+          <ColumnDirective
+            field="warrantyStartDate"
+            header="Warranty Start Date"
+            width="150"
+            format="yMd"
+          />
+          <ColumnDirective
+            field="warrantyEndDate"
+            header="Warranty End Date"
+            width="150"
+            format="yMd"
+          />
         </ColumnsDirective>
         <Inject services={[Page]} />
       </GridComponent>
     );
-};
-
-const getStatusIcon = (status) => {
-    switch (status) {
-      case "C":
-        return <FileText size={16} className="text-primary" />; // Icon for Created
-      case "CO":
-        return <CheckCircle size={16} className="text-primary" />; // Icon for Confirmed
-      case "CA":
-        return <XCircle size={16} className="text-danger" />; // Icon for Cancelled
-      case "JS":
-        return <PlayCircle size={16} className="text-warning" />; // Icon for Job Started
-      case "JC":
-        return <Check size={16} className="text-success" />; // Icon for Job Complete
-      case "V":
-        return <ClipboardCheck size={16} className="text-info" />; // Icon for Validate
-      case "S":
-        return <Clock size={16} className="text-secondary" />; // Icon for Scheduled
-      default:
-        return <QuestionCircle size={16} className="text-muted" />; // Icon for Unknown Status
-    }
-  };
-  
-
-const getJobStatusName = (status) => {
-    switch (status) {
-      case "C":
-        return "Created";
-      case "CO":
-        return "Confirmed";
-      case "CA":
-        return "Cancelled";
-      case "JS":
-        return "Job Started";
-      case "JC":
-        return "Job Complete";
-      case "V":
-        return "Validate";
-      case "S":
-        return "Scheduled";
-      default:
-        return "Unknown Status"; // Default case for unrecognized status
-    }
-  };
-  
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "C":
-        return { backgroundColor: "#9e9e9e", color: "#fff" }; // Created (Gray)
-      case "CO":
-        return { backgroundColor: "#2196f3", color: "#fff" }; // Confirmed (Blue)
-      case "CA":
-        return { backgroundColor: "#f44336", color: "#fff" }; // Cancelled (Red)
-      case "JS":
-        return { backgroundColor: "#FFA500", color: "#fff" }; // Job Started (Orange)
-      case "JC":
-        return { backgroundColor: "#32CD32", color: "#fff" }; // Job Complete (Light Green)
-      case "V":
-        return { backgroundColor: "#00bcd4", color: "#fff" }; // Validate (Cyan)
-      case "S":
-        return { backgroundColor: "#607d8b", color: "#fff" }; // Scheduled (Blue Gray)
-      default:
-        return { backgroundColor: "#9e9e9e", color: "#fff" }; // Default (Gray)
-    }
-  };
-  
-  
-  
-
-  const mapContainerStyle = {
-    width: "100%",
-    height: "350px",
   };
 
-  if (!job) {
-    return <div>Loading job details...</div>;
-  }
-
-  // Render content based on the active tab
   const renderTabContent = () => {
     switch (activeTab) {
       case "overview":
         return (
           <>
             <h4 className="mb-2">Job Description</h4>
-            <p>{job.description || "No description available"}</p>
-
+            <div
+              dangerouslySetInnerHTML={{
+                __html: job.jobDescription || "No description available",
+              }}
+            />
             <h4 className="mb-2">Address</h4>
-            <p>{`${job.streetAddress}, ${job.city}, ${job.stateProvince}, ${job.country} ${job.zipCode}`}</p>
+            <p>
+              {`${job.location?.address?.streetAddress || ""} 
+                ${job.location?.address?.city || ""} 
+                ${job.location?.address?.stateProvince || ""}
+                ${job.location?.address?.country || ""} 
+                ${job.location?.address?.postalCode || ""}`}
+            </p>
 
             {location && (
-              <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}>
+              <LoadScript
+                googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
+              >
                 <GoogleMap
-                  mapContainerStyle={mapContainerStyle}
+                  mapContainerStyle={{ width: "100%", height: "350px" }}
                   center={location}
                   zoom={15}
                 >
@@ -226,41 +229,101 @@ const getJobStatusName = (status) => {
             )}
           </>
         );
-      
       case "task":
-      return renderTaskList();
-          
-      case "report":
-        return <h4 className="mb-2">Report Information Content Goes Here...</h4>;
-      case "files":
-        return <h4 className="mb-2">Files Content Goes Here...</h4>;
-        case "equipment":
-            return renderEquipmentList(); // New equipment list rendering
-      case "summary":
-        return <h4 className="mb-2">Job Summary Content Goes Here...</h4>;
+        return renderTaskList();
+      case "equipment":
+        return renderEquipmentList();
       default:
-        return null;
+        return <h4 className="mb-2">Content not available.</h4>;
     }
   };
 
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "Created":
+        return <FileText size={16} className="text-primary" />; // Icon for Created
+      case "Confirmed":
+        return <CheckCircle size={16} className="text-primary" />; // Icon for Confirmed
+      case "Cancelled":
+        return <XCircle size={16} className="text-danger" />; // Icon for Cancelled
+      case "Job Started":
+        return <PlayCircle size={16} className="text-warning" />; // Icon for Job Started
+      case "Job Complete":
+        return <Check size={16} className="text-success" />; // Icon for Job Complete
+      case "Validate":
+        return <ClipboardCheck size={16} className="text-info" />; // Icon for Validate
+      case "Scheduled":
+        return <Clock size={16} className="text-secondary" />; // Icon for Scheduled
+      default:
+        return <QuestionCircle size={16} className="text-muted" />; // Icon for Unknown Status
+    }
+  };
+
+  const getJobStatusName = (status) => {
+    switch (status) {
+      case "Created":
+        return "Created";
+      case "Confirmed":
+        return "Confirmed";
+      case "Cancelled":
+        return "Cancelled";
+      case "Job Started":
+        return "Job Started";
+      case "Job Complete":
+        return "Job Complete";
+      case "Validate":
+        return "Validate";
+      case "Scheduled":
+        return "Scheduled";
+      default:
+        return "Unknown Status";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Created":
+        return { backgroundColor: "#9e9e9e", color: "#fff" };
+      case "Confirmed":
+        return { backgroundColor: "#2196f3", color: "#fff" };
+      case "Cancelled":
+        return { backgroundColor: "#f44336", color: "#fff" };
+      case "Job Started":
+        return { backgroundColor: "#FFA500", color: "#fff" };
+      case "Job Complete":
+        return { backgroundColor: "#32CD32", color: "#fff" };
+      case "Validate":
+        return { backgroundColor: "#00bcd4", color: "#fff" };
+      case "Scheduled":
+        return { backgroundColor: "#607d8b", color: "#fff" };
+      default:
+        return { backgroundColor: "#9e9e9e", color: "#fff" };
+    }
+  };
+
+  if (!job) {
+    return <div>Loading job details...</div>;
+  }
+
   return (
     <div className={styles.container}>
-
-      {/* Tab navigation */}
       <Fragment>
-      <h1 className="mb-1 h2 fw-bold">Job Details</h1>
-            <Breadcrumb>
-              <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
-              <Breadcrumb.Item href="#">Jobs</Breadcrumb.Item>
-              <Breadcrumb.Item active>{id}</Breadcrumb.Item>
-            </Breadcrumb>
+        <h1 className="mb-1 h2 fw-bold">Job Details</h1>
+        <Breadcrumb>
+          <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
+          <Breadcrumb.Item href="/dashboard/jobs/list-jobs">Jobs</Breadcrumb.Item>
+          <Breadcrumb.Item active>{id}</Breadcrumb.Item>
+        </Breadcrumb>
+
         <Row>
           <Col xs={12} className="mb-4">
             <ListGroup as="ul" bsPrefix="nav nav-lb-tab">
               <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
                 <a
                   href="#overview"
-                  className={`nav-link ${activeTab === "overview" ? "active" : ""}`}
+                  className={`nav-link ${
+                    activeTab === "overview" ? "active" : ""
+                  }`}
                   onClick={() => setActiveTab("overview")}
                 >
                   Overview
@@ -269,7 +332,9 @@ const getJobStatusName = (status) => {
               <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
                 <a
                   href="#equipment"
-                  className={`nav-link ${activeTab === "equipment" ? "active" : ""}`}
+                  className={`nav-link ${
+                    activeTab === "equipment" ? "active" : ""
+                  }`}
                   onClick={() => setActiveTab("equipment")}
                 >
                   Equipment
@@ -282,36 +347,6 @@ const getJobStatusName = (status) => {
                   onClick={() => setActiveTab("task")}
                 >
                   Task
-                </a>
-              </ListGroup.Item>
-              
-              <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
-                <a
-                  href="#report"
-                  className={`nav-link ${activeTab === "report" ? "active" : ""}`}
-                  onClick={() => setActiveTab("report")}
-                >
-                  Report
-                </a>
-              </ListGroup.Item>
-              
-              <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
-                <a
-                  href="#files"
-                  className={`nav-link ${activeTab === "files" ? "active" : ""}`}
-                  onClick={() => setActiveTab("files")}
-                >
-                  Files
-                </a>
-              </ListGroup.Item>
-             
-              <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
-                <a
-                  href="#summary"
-                  className={`nav-link ${activeTab === "summary" ? "active" : ""}`}
-                  onClick={() => setActiveTab("summary")}
-                >
-                  Summary
                 </a>
               </ListGroup.Item>
             </ListGroup>
@@ -331,20 +366,32 @@ const getJobStatusName = (status) => {
           <Card className="mb-4">
             <Card.Body className="py-3">
               <Card.Title as="h4">Customer</Card.Title>
+              {/* Customer Name (Contact) */}
               <div className="d-flex align-items-center mb-2">
                 <PersonFill size={16} className="text-primary me-2" />
                 <p className="mb-0">
-                  {job.firstName || "Unknown Customer"} {job.lastName || "Unknown Customer"}
+                  {job.contact?.firstName || "Unknown Customer"}{" "}
+                  {job.contact?.lastName || "Unknown Customer"}
                 </p>
               </div>
+
+              {/* Mobile Phone (Contact) */}
               <div className="d-flex align-items-center mb-2">
                 <TelephoneFill size={16} className="text-primary me-2" />
-                <p className="mb-0">{job.mobilePhone || "Unknown Mobile Phone"}</p>
+                <p className="mb-0">
+                  {job.contact?.mobilePhone || "Unknown Mobile Phone"}
+                </p>
               </div>
+
+              {/* Phone Number (Contact) */}
               <div className="d-flex align-items-center mb-2">
                 <TelephoneFill size={16} className="text-primary me-2" />
-                <p className="mb-0">{job.phoneNumber || "Unknown Phone Number"}</p>
+                <p className="mb-0">
+                  {job.contact?.phoneNumber || "Unknown Phone Number"}
+                </p>
               </div>
+
+              {/* Customer Company Name */}
               <div className="d-flex align-items-center mb-2">
                 <PersonFill size={16} className="text-primary me-2" />
                 <p className="mb-0">{job.customerName || "Unknown Company"}</p>
@@ -365,7 +412,9 @@ const getJobStatusName = (status) => {
                     }
                   >
                     <Image
-                      src={worker.profilePicture || "/images/default-avatar.jpg"}
+                      src={
+                        worker.profilePicture || "/images/default-avatar.jpg"
+                      }
                       alt={worker.firstName}
                       className="avatar-sm avatar rounded-circle me-2"
                     />
@@ -386,7 +435,9 @@ const getJobStatusName = (status) => {
                   </div>
                 </div>
                 <div>
-                  <p className="text-dark mb-0 fw-semi-bold">{job.startDate}</p>
+                  <p className="text-dark mb-0 fw-semi-bold">
+                    {job.startDate || "N/A"}
+                  </p>
                 </div>
               </div>
             </Card.Body>
@@ -399,7 +450,9 @@ const getJobStatusName = (status) => {
                   </div>
                 </div>
                 <div>
-                  <p className="text-dark mb-0 fw-semi-bold">{job.endDate}</p>
+                  <p className="text-dark mb-0 fw-semi-bold">
+                    {job.endDate || "N/A"}
+                  </p>
                 </div>
               </div>
             </Card.Body>
@@ -412,28 +465,27 @@ const getJobStatusName = (status) => {
                   </div>
                 </div>
                 <div>
-                  <p className="text-dark mb-0 fw-semi-bold">{job.duration}</p>
+                  <p className="text-dark mb-0 fw-semi-bold">
+                  <p>{`${job.estimatedDurationHours || 0} hrs ${job.estimatedDurationMinutes || 0} mins`}</p>
+                  </p>
                 </div>
               </div>
             </Card.Body>
             <Card.Body className="border-top py-3">
-  <div className="d-flex justify-content-between align-items-center">
-    <div className="d-flex align-items-center">
-      {getStatusIcon(job.jobStatus)} {/* Use the status icon here */}
-      <div className="ms-2">
-        <h5 className="mb-0 text-body">Status</h5>
-      </div>
-    </div>
-    <div>
-      <span 
-        className="badge" 
-        style={getStatusColor(job.jobStatus)} // Set background and text color dynamically
-      >
-        {getJobStatusName(job.jobStatus)} {/* Display full status name */}
-      </span>
-    </div>
-  </div>
-</Card.Body>
+              <div className="d-flex justify-content-between align-items-center">
+                <div className="d-flex align-items-center">
+                  {getStatusIcon(job.jobStatus)}
+                  <div className="ms-2">
+                    <h5 className="mb-0 text-body">Status</h5>
+                  </div>
+                </div>
+                <div>
+                  <span className="badge" style={getStatusColor(job.jobStatus)}>
+                    {getJobStatusName(job.jobStatus)}
+                  </span>
+                </div>
+              </div>
+            </Card.Body>
           </Card>
         </Col>
       </Row>
@@ -442,3 +494,4 @@ const getJobStatusName = (status) => {
 };
 
 export default JobDetails;
+
