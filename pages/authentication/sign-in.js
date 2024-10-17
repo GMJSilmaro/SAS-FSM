@@ -1,210 +1,101 @@
 import { Fragment, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Col, Row, Card, Form, Button, Image } from 'react-bootstrap';
-import Link from 'next/link';
-import { GeeksSEO } from 'widgets';
-import AuthLayout from 'layouts/dashboard/AuthLayout';
+import { signInWithEmailAndPassword } from 'firebase/auth';  
+import { auth } from '../../firebase';  
 import Cookies from 'js-cookie';
 import Swal from 'sweetalert2';
 
 const SignIn = () => {
-  const [workerId, setWorkerId] = useState('');
+  const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const [loading, setLoading] = useState(false);
-
-
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  
-  //   try {
-  //     const res = await fetch('/api/login', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ workerId, password }),
-  //     });
-  
-  //     if (!res.ok) {
-  //       throw new Error('Login failed. Please check your credentials.');
-  //     }
-  
-  //     const data = await res.json();
-  //     if (data.message === 'Login successful') {
-  //       console.log('Login successful');
-  //       console.log('uid:', data.uid);
-  //       console.log('workerId:', data.workerId);
-  //       console.log('isAdmin:', data.isAdmin);
-  //       console.log('customToken:', data.customToken);
-  //       console.log('Token', data.token);
-      
-  //       // Set cookies using js-cookie
-  //       Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
-  //       Cookies.set('workerId', data.workerId, { secure: true, sameSite: 'None' });
-  //       Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
-  //       Cookies.set('Token', data.token, { secure: true, sameSite: 'None' });
-  //       Cookies.set('customToken', data.customToken, { secure: true, sameSite: 'None' });
-        
-  //       // Handle redirection or other logic here
-  //       router.push('/dashboard/overview'); // Redirect to dashboard page
-  //     } else {
-  //       throw new Error('Login failed. Please check your credentials.');
-  //     }
-  //   } catch (error) {
-  //     setError(error.message);
-  //   }
-  // };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  
-  //   try {
-  //     const res = await fetch('/api/login', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ workerId, password }),
-  //     });
-  
-  //     if (!res.ok) {
-  //       const errorData = await res.json();
-  //       if (errorData.message === 'Invalid credentials') {
-  //         throw new Error('Login failed. Please check your credentials.');
-  //       } else if (errorData.message === 'Access denied. You are not authorized.') {
-  //         throw new Error('Access denied. You are not authorized.');
-  //       } else {
-  //         throw new Error('Login failed. Please check your credentials.');
-  //       }
-  //     }
-  
-  //     const data = await res.json();
-  //     if (data.message === 'Login successful') {
-  //       console.log('Login successful');
-  //       console.log('uid:', data.uid);
-  //       console.log('workerId:', data.workerId);
-  //       console.log('isAdmin:', data.isAdmin);
-  //       console.log('customToken:', data.customToken);
-  //       console.log('Token', data.token);
-  
-  //       // Set cookies using js-cookie
-  //       Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
-  //       Cookies.set('workerId', data.workerId, { secure: true, sameSite: 'None' });
-  //       Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
-  //       Cookies.set('Token', data.token, { secure: true, sameSite: 'None' });
-  //       Cookies.set('customToken', data.customToken, { secure: true, sameSite: 'None' });
-  
-  //       // Handle redirection or other logic here
-  //       router.push('/dashboard/overview'); // Redirect to dashboard page
-  //     } else {
-  //       throw new Error('Login failed. Please check your credentials.');
-  //     }
-  //   } catch (error) {
-  //     setError(error.message); // Update the error state with the specific error message
-  //   }
-  // };
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true); // Set loading to true when form is submitted
-  
+    setLoading(true);
+    
     try {
-      const res = await fetch('/api/login', {
+      // Step 1: Authenticate with Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+    
+      // Get Firebase token (optional for frontend use)
+      const token = await user.getIdToken();
+      Cookies.set('customToken', token, { secure: true, sameSite: 'Lax' });
+  
+      // Step 2: Send credentials to your backend to log in to SAP B1 and handle session cookies
+      const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ workerId, password }),
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // This ensures cookies like B1SESSION are sent and stored
       });
   
-      if (!res.ok) {
-        const errorData = await res.json();
-        if (errorData.message === 'Invalid credentials') {
-          throw new Error('Login failed. Please check your credentials.');
-        } else if (errorData.message === 'Access denied. You are not authorized.') {
-          throw new Error('Access denied. You are not authorized.');
-        } else {
-          throw new Error('Login failed. Please check your credentials.');
-        }
+      if (!response.ok) {
+        throw new Error('Login failed');
       }
   
-      const data = await res.json();
-      if (data.message === 'Login successful') {
-        console.log('Login successful');
-        console.log('uid:', data.uid);
-        console.log('workerId:', data.workerId);
-        console.log('isAdmin:', data.isAdmin);
-        console.log('customToken:', data.customToken);
-        console.log('Token', data.token);
+      const data = await response.json();
   
-        // Set cookies using js-cookie
-        Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
-        Cookies.set('workerId', data.workerId, { secure: true, sameSite: 'None' });
-        Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
-        Cookies.set('Token', data.token, { secure: true, sameSite: 'None' });
-        Cookies.set('customToken', data.customToken, { secure: true, sameSite: 'None' });
-  
-        // Show SweetAlert welcome message
-        Swal.fire({
-          title: 'Welcome!',
-          text: `Welcome back, ${data.firstName} ${data.middleName} ${data.lastName}!`,
-          icon: 'success',
-          confirmButtonText: 'OK',
-        }).then(() => {
-          // Redirect to dashboard page after closing the alert
-          router.push('/dashboard/overview');
-        });
-      } else {
-        throw new Error('Login failed. Please check your credentials.');
+      // Step 3: Validate isAdmin field before proceeding
+      if (!data.isAdmin) {
+        throw new Error('Access denied. You must be an admin to log in.');
       }
+  
+      // Step 4: Set other cookies using js-cookie (optional)
+      Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
+      Cookies.set('email', email, { secure: true, sameSite: 'None' });
+      Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
+  
+      // Step 5: Success flow with SweetAlert
+      Swal.fire({
+        title: 'Welcome!',
+        text: `Welcome back, ${user.email}!`,
+        icon: 'success',
+        confirmButtonText: 'OK',
+      }).then(() => {
+        router.push('/dashboard/overview');
+      });
     } catch (error) {
-      setError(error.message); // Update the error state with the specific error message
+      // If any error occurs, display it in the error state
+      setError(error.message);
     } finally {
-      setLoading(false); // Set loading to false after login attempt is finished
+      setLoading(false);
     }
   };
   
   
   return (
     <Fragment>
-      <GeeksSEO title="Sign In | SAS - SAP B1 Portal" />
-
       <Row className="align-items-center justify-content-center g-0 min-vh-100">
         <Col lg={5} md={5} className="py-8 py-xl-0">
           <Card>
             <Card.Body className="p-6">
               <div style={{ display: 'flex', justifyContent: 'center' }}>
-                {/* <Link href="/">
-               
-                </Link> */}
-                   <Image src="/images/SAS-LOGO.png" alt="SAS Logo" height={150} width={250} />
-               
-              
+                <Image src="/images/SAS-LOGO.png" alt="SAS Logo" height={150} width={250} />
               </div>
-              {/* <h1 className="mb-1 fw-bold">Sign in</h1> */}
               <Form onSubmit={handleSubmit}>
                 {error && <div className="alert alert-danger">{error}</div>}
                 <Row>
                   <Col lg={12} md={12} className="mb-3">
-                    <Form.Label>Worker ID </Form.Label>
+                    <Form.Label>Email</Form.Label>
                     <Form.Control
-                      type="text"
-                      id="workerid"
-                      placeholder="Worker ID here"
-                      value={workerId}
-                      onChange={(e) => setWorkerId(e.target.value)}
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </Col>
                   <Col lg={12} md={12} className="mb-3">
-                    <Form.Label>Password </Form.Label>
+                    <Form.Label>Password</Form.Label>
                     <Form.Control
                       type="password"
-                      id="password"
                       placeholder="**************"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -225,7 +116,5 @@ const SignIn = () => {
     </Fragment>
   );
 };
-
-SignIn.Layout = AuthLayout;
 
 export default SignIn;

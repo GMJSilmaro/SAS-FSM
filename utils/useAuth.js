@@ -1,74 +1,49 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import Cookies from 'js-cookie'; 
-import Swal from 'sweetalert2';
+// import { useEffect, useState } from 'react';
+// import { useRouter } from 'next/router';
+// import Cookies from 'js-cookie'; 
+// import Swal from 'sweetalert2';
 
-const useAuth = () => {
-  const router = useRouter();
-  const [authenticated, setAuthenticated] = useState(false);
+// const useAuth = () => {
+//   const router = useRouter();
+//   const [authenticated, setAuthenticated] = useState(false);
 
-  useEffect(() => {
-    const checkAuthentication = async () => {
-      try {
-        // Retrieve authentication data from cookies
-        const uid = Cookies.get('uid');
-        const workerId = Cookies.get('workerId');
-        const isAdmin = Cookies.get('isAdmin');
-        const customToken = Cookies.get('customToken'); // Check for customToken
+//   useEffect(() => {
+//     const checkAuthentication = async () => {
+//       try {
+//         // Log all available cookies
+//         console.log('All available cookies:', Cookies.get());
 
-        // Check if authentication data exists
-        if (!uid || !workerId || isAdmin === undefined || !customToken) {
-          throw new Error('Authentication data not found in cookies');
-        }
+//         // Retrieve the SAP B1 session cookie
+//         const sessionId = Cookies.get('B1SESSION');
+//         console.log('B1SESSION cookie:', sessionId);
 
-        // Set authenticated flag to true
-        setAuthenticated(true);
-        console.log('Authenticated');
+//         if (!sessionId) {
+//           throw new Error('SAP B1 Service Layer session not found');
+//         }
 
-        // Set a 30-minute timer for automatic sign-out
-        const sessionTimeout = 30 * 60 * 1000; // 30 minutes in milliseconds
-        const timer = setTimeout(() => {
-          console.log('Session expired. Logging out.');
-          Swal.fire({
-            title: 'Session Expired',
-            text: 'Your session has expired. You will be logged out.',
-            icon: 'warning',
-            confirmButtonText: 'OK',
-          }).then(() => {
-            signOutUser();
-          });
-        }, sessionTimeout);
+//         // If the session ID exists, consider the user authenticated
+//         setAuthenticated(true);
+//         console.log('Authenticated with Service Layer');
+//       } catch (error) {
+//         console.error('Authentication error:', error);
+//         console.log('Redirecting to sign-in page');
+//         router.push('/authentication/sign-in');
+//       }
+//     };
 
-        // Clean up the timer on unmount
-        return () => clearTimeout(timer);
-      } catch (error) {
-        console.error('Authentication error:', error);
-        console.log('Redirecting to sign-in page');
-        router.push('/authentication/sign-in');
-      }
-    };
+//     if (!authenticated) {
+//       checkAuthentication();
+//     }
+//   }, [router, authenticated]);
 
-    if (!authenticated) {
-      checkAuthentication();
-    }
-  }, [router, authenticated]); // Include router and authenticated in dependency array
+//   const signOutUser = () => {
+//     // Clear the Service Layer session and redirect to login page
+//     Cookies.remove('B1SESSION');
+//     Cookies.remove('ROUTEID');
+//     router.push('/authentication/sign-in');
+//   };
 
-  const signOutUser = () => {
-    // Clear session cookies
-    Cookies.remove('B1SESSION');
-    Cookies.remove('ROUTEID');
-    Cookies.remove('uid');
-    Cookies.remove('workerId');
-    Cookies.remove('isAdmin');
-    Cookies.remove('customToken'); // Remove customToken
+//   return authenticated;
+// };
 
-    // Redirect to sign-in page or perform any other sign-out actions
-    router.push('/authentication/sign-in');
-  };
-
-  return authenticated;
-};
-
-export default useAuth;
-
-
+// export default useAuth;

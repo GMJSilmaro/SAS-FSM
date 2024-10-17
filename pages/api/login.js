@@ -1,206 +1,85 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Use this only in development
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
-import { app } from '../../firebase'; // Import the Firebase app directly
+import { app } from '../../firebase'; 
 import jwt from 'jsonwebtoken';
 import https from 'https';
 
-// Initialize Firebase services
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Fetch user data based on workerId from Firestore
-async function fetchUserData(workerId) {
-  const userDocRef = doc(db, 'users', workerId);
+async function fetchUserDataByEmail(email) {
+  const userDocRef = doc(db, 'users', email);
   try {
     const userDocSnapshot = await getDoc(userDocRef);
     if (userDocSnapshot.exists()) {
-      const userData = userDocSnapshot.data();
-      console.log('User data fetched from Firestore:', userData);
-      return userData; // Return the user data
+      return userDocSnapshot.data();
     } else {
-      throw new Error('Invalid credentials');
+      throw new Error('User not found in Firestore');
     }
   } catch (error) {
-    console.error('Error fetching user data from Firestore:', error);
-    throw error;
+    throw new Error(`Error fetching user data: ${error.message}`);
   }
 }
 
 export default async function handler(req, res) {
-  const { workerId, password } = req.body;
-  console.log('Received request:', { workerId, password });
+  const { email, password } = req.body;
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
 
   try {
-    const userData = await fetchUserData(workerId);
-    console.log('Fetched user data:', userData);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Fetch Firestore data
+    const userData = await fetchUserDataByEmail(email);
 
     if (!userData.isAdmin) {
-      console.log('Access denied. User is not an admin.');
-      return res.status(401).json({ message: 'Access denied. You are not authorized.' });
+      return res.status(403).json({ message: 'Access denied. Admins only.' });
     }
 
-    const email = userData.email;
-    await signInWithEmailAndPassword(auth, email, password);
-    console.log('User signed in with email and password');
-
     // Trigger SAP B1 Service Layer Authentication
-    const sapLoginResponse = await fetch(process.env.SAP_SERVICE_LAYER_BASE_URL + 'Login', {
+    const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         CompanyDB: process.env.SAP_B1_COMPANY_DB,
         UserName: process.env.SAP_B1_USERNAME,
         Password: process.env.SAP_B1_PASSWORD,
       }),
-      agent: new https.Agent({ rejectUnauthorized: false }), // Avoid this in production
+      agent: new https.Agent({ rejectUnauthorized: false }),
     });
 
-    if (sapLoginResponse.ok) {
-      const sapLoginData = await sapLoginResponse.json();
-      const sessionId = sapLoginData.SessionId;
-      const sessionTimeout = 30;
-
-      res.setHeader('Set-Cookie', [
-        `B1SESSION=${sessionId}; HttpOnly; Secure; SameSite=None`,
-        `ROUTEID=.node4; Secure; SameSite=None`,
-      ]);
-
-      const token = { uid: auth.currentUser.uid, isAdmin: userData.isAdmin };
-      const secretKey = 'kdaJLPhRtGKGTLiAThdvHnVR0H544DOGM3Q2OBerQk4L0z1zzcaOVqU0afHK6ab'; 
-      const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
-
-      console.log('Generated custom token:', customToken);
-
-      return res.status(200).json({
-        message: 'Login successful',
-        uid: auth.currentUser.uid,
-        workerId,
-        firstName: userData.firstName,
-        middleName: userData.middleName,
-        lastName: userData.lastName,
-        isAdmin: userData.isAdmin,
-        token,
-        customToken,
-        sessionId, 
-        sessionTimeout,
-      });
-    } else {
-      console.error('SAP B1 Service Layer login failed:', sapLoginResponse.statusText);
-      return res.status(500).json({ message: 'SAP B1 Service Layer login failed' });
+    if (!sapLoginResponse.ok) {
+      throw new Error('SAP B1 Service Layer login failed');
     }
+
+    const sapLoginData = await sapLoginResponse.json();
+    const sessionId = sapLoginData.SessionId;
+
+    // Set session cookies securely
+    res.setHeader('Set-Cookie', [
+      `B1SESSION=${sessionId}; HttpOnly; Secure; SameSite=None`,
+    ]);
+
+    // Generate JWT token
+    const token = { uid: user.uid, isAdmin: userData.isAdmin };
+    const secretKey = 'kdaJLPhRtGKGTLiAThdvHnVR0H544DOGM3Q2OBerQk4L0z1zzcaOVqU0afHK6ab';
+    const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
+
+    return res.status(200).json({
+      message: 'Login successful',
+      uid: user.uid,
+      email: user.email,
+      fullName: userData.fullName,
+      isAdmin: userData.isAdmin,
+      customToken,
+      sessionId,
+    });
   } catch (error) {
-    console.error('Error logging in:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: error.message });
   }
 }
-
-
-// process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-// import { initializeApp } from 'firebase/app';
-// import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-// import { getFirestore, doc, getDoc } from 'firebase/firestore';
-// // import { firebaseConfig } from '../../firebase'; // Import your Firebase config
-// import jwt from 'jsonwebtoken';
-// import https from 'https';
-// import { app } from '../../firebase';
-// const auth = getAuth(app);
-
-// // // Initialize Firebase app
-// // if (!initializeApp.length) {
-// //   initializeApp(firebaseConfig);
-// // }
-
-// // Fetch user data based on workerId from Firestore
-// async function fetchUserData(workerId) {
-//   const db = getFirestore();
-//   const userDocRef = doc(db, 'users', workerId);
-//   try {
-//     const userDocSnapshot = await getDoc(userDocRef);
-//     if (userDocSnapshot.exists()) {
-//       const userData = userDocSnapshot.data();
-//       console.log('User data fetched from Firestore:', userData);
-//       return userData; // Return the user data
-//     } else {
-//       throw new Error('Invalid credentials');
-//     }
-//   } catch (error) {
-//     console.error('Error fetching user data from Firestore:', error);
-//     throw error;
-//   }
-// }
-
-// export default async function handler(req, res) {
-//   const { workerId, password } = req.body;
-//   console.log('Received request:', { workerId, password });
-
-//   try {
-//     const userData = await fetchUserData(workerId);
-//     console.log('Fetched user data:', userData);
-
-//     if (!userData.isAdmin) {
-//       console.log('Access denied. User is not an admin.');
-//       return res.status(401).json({ message: 'Access denied. You are not authorized.' });
-//     }
-
-//     const email = userData.email;
-//     const auth = getAuth();
-//     await signInWithEmailAndPassword(auth, email, password);
-//     console.log('User signed in with email and password');
-
-//     // Trigger SAP B1 Service Layer Authentication
-//     const sapLoginResponse = await fetch(process.env.SAP_SERVICE_LAYER_BASE_URL + 'Login', {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({
-//         CompanyDB: process.env.SAP_B1_COMPANY_DB,
-//         UserName: process.env.SAP_B1_USERNAME,
-//         Password: process.env.SAP_B1_PASSWORD,
-//       }),
-//       agent: new https.Agent({ rejectUnauthorized: false }), // Disable cert verification
-//     });
-
-//     if (sapLoginResponse.ok) {
-//       const sapLoginData = await sapLoginResponse.json();
-//       const sessionId = sapLoginData.SessionId;
-//       const sessionTimeout = 30;
-
-//       res.setHeader('Set-Cookie', [
-//         `B1SESSION=${sessionId}; HttpOnly; Secure; SameSite=None`,
-//         `ROUTEID=.node4; Secure; SameSite=None`,
-//       ]);
-
-//       const token = { uid: auth.currentUser.uid, isAdmin: userData.isAdmin };
-//       const secretKey = 'kdaJLPhRtGKGTLiAThdvHnVR0H544DOGM3Q2OBerQk4L0z1zzcaOVqU0afHK6ab'; 
-//       const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
-
-//       console.log('Generated custom token:', customToken);
-
-//       return res.status(200).json({
-//         message: 'Login successful',
-//         uid: auth.currentUser.uid,
-//         workerId,
-//         firstName: userData.firstName,
-//         middleName: userData.middleName,
-//         lastName: userData.lastName,
-//         isAdmin: userData.isAdmin,
-//         token,
-//         customToken,
-//         sessionId, 
-//         sessionTimeout,
-//       });
-//     } else {
-//       console.error('SAP B1 Service Layer login failed:', sapLoginResponse.statusText);
-//       return res.status(500).json({ message: 'SAP B1 Service Layer login failed' });
-//     }
-//   } catch (error) {
-//     console.error('Error logging in:', error);
-//     return res.status(500).json({ message: 'Internal server error' });
-//   }
-// }

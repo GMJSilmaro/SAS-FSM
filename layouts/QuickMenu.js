@@ -23,12 +23,17 @@ const QuickMenu = () => {
 
   useEffect(() => {
     const fetchUserDetails = async () => {
-      const uid = Cookies.get('workerId');
-      if (uid) {
+      const email = Cookies.get('email');
+
+      if (email) {
         try {
-          const userRef = doc(collection(db, 'users'), uid);
-          const userDoc = await getDoc(userRef);
-          if (userDoc.exists()) {
+          // Query Firestore to find user by email
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('email', '==', email));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];  // Assuming email is unique, get the first doc
             setUserDetails(userDoc.data());
           } else {
             console.log('User not found');
@@ -37,13 +42,13 @@ const QuickMenu = () => {
           console.error('Error fetching user details:', error.message);
         }
       } else {
-        // Redirect to sign-in if UID is not available
+        console.log('No email cookie found, redirecting to sign-in');
         router.push('/authentication/sign-in');
       }
     };
-  
+
     fetchUserDetails();
-  }, []);
+  }, [router]); 
   
 
   const handleSignOut = async () => {
@@ -55,10 +60,10 @@ const QuickMenu = () => {
         },
       });
       if (response.ok) {
-        document.cookie = 'authToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly';
+        document.cookie = 'customToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly';
         document.cookie = 'uid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
         document.cookie = 'isAdmin=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
-        document.cookie = 'workerId=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
+        document.cookie = 'email=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
         router.push('/authentication/sign-in');
       } else {
         throw new Error('Logout failed');

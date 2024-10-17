@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import useAuth from '../../utils/useAuth';
+// import useAuth from '../../utils/useAuth';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import dynamic from 'next/dynamic';
 import { Dropdown } from 'react-bootstrap';
+
+import Cookies from 'js-cookie';
 
 const db = getFirestore();
 
@@ -65,7 +67,7 @@ const ChartActionMenu = () => {
 };
 
 const Overview = () => {
-  useAuth();
+  // useAuth();
 
   const [userCount, setUserCount] = useState(null);
   const [jobCount, setJobCount] = useState({

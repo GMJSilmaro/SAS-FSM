@@ -6,13 +6,13 @@ import { getAuth } from "firebase/auth";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCvIXUF3JMGvsakHw6U9vUabVhyBM13GG8",
-  authDomain: "potensi-db.firebaseapp.com",
-  projectId: "potensi-db",
-  storageBucket: "potensi-db.appspot.com",
-  messagingSenderId: "1075549750844",
-  appId: "1:1075549750844:web:286062f6d24af6608f6539",
-  measurementId: "G-YGKW881Q7K"
+  apiKey: "AIzaSyAN7o4-N5unSUCtU7amZKRA4TRV7WjJ01Y",
+  authDomain: "sas-fsm.firebaseapp.com",
+  projectId: "sas-fsm",
+  storageBucket: "sas-fsm.appspot.com",
+  messagingSenderId: "653364522600",
+  appId: "1:653364522600:web:fc90ef9dedda2181a9d5dd",
+  measurementId: "G-JX36QS06TM"
 };
 
 // Initialize Firebase

@@ -1,7 +1,10 @@
 // import node module libraries
 import Head from 'next/head';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { NextSeo } from 'next-seo';
+
+import Cookies from 'js-cookie';
 
 // import provider and store from redux state management
 import { Provider } from 'react-redux';
@@ -27,6 +30,17 @@ function MyApp({ Component, pageProps }) {
 
   // Choose layout based on route
   const Layout = Component.Layout || (router.pathname.includes('dashboard') ? (router.pathname.includes('instructor') || router.pathname.includes('student') ? DefaultMarketingLayout : DefaultDashboardLayout) : DefaultMarketingLayout);
+
+// Check token for protected routes
+useEffect(() => {
+  const token = Cookies.get('customToken');
+
+  // If no token and trying to access protected routes, redirect to sign-in
+  if (!token && router.pathname.startsWith('/dashboard')) {
+    router.push('/authentication/sign-in');
+  }
+}, [router.pathname]); // Trigger on path change
+
 
   return (
     <Fragment>

@@ -12,6 +12,7 @@ const nextConfig = {
     SAP_B1_PASSWORD: process.env.SAP_B1_PASSWORD,
     REACT_APP_GOOGLE_MAPS_API_KEY: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
     REACT_APP_SYNCFUSION_LICENSE_KEY: process.env.REACT_APP_SYNCFUSION_LICENSE_KEY,
+    JWT_SECRET: process.env.JWT_SECRET,
   },
   sassOptions: {
     includePaths: [path.join(__dirname, 'styles')],
@@ -41,27 +42,7 @@ const nextConfig = {
       },
     ];
   },
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/dashboard/overview',
-        permanent: true,
-      },
-      {
-        source: '/dashboard/:path*',
-        has: [
-          {
-            type: 'cookie',
-            key: 'customToken', 
-            value: '^(?!.*$)', // Matches if the cookie does not exist
-          },
-        ],
-        permanent: false,
-        destination: '/authentication/sign-in',
-      },
-    ];
-  },
+ 
 };
 
 module.exports = nextConfig;
