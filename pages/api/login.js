@@ -28,6 +28,9 @@ async function fetchUserDataByEmail(email) {
 }
 
 export default async function handler(req, res) { 
+  const agent = new https.Agent({
+    rejectUnauthorized: false // Only for testing
+  });
   const { email, password } = req.body;
 
   if (req.method !== 'POST') {
@@ -77,21 +80,31 @@ export default async function handler(req, res) {
     // });
 
 
-      const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
+    try {
+      console.log('Attempting SAP B1 connection test');
+      const response = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           CompanyDB: process.env.SAP_B1_COMPANY_DB,
           UserName: process.env.SAP_B1_USERNAME,
-          Password: process.env.SAP_B1_PASSWORD,
+          Password: process.env.SAP_B1_PASSWORD
         }),
-        agent: new https.Agent({ rejectUnauthorized: false }),
+        agent: agent
       });
-    
-      if (!sapLoginResponse.ok) {
-        const errorText = await sapLoginResponse.text();
-        throw new Error(`SAP B1 Service Layer login failed: ${sapLoginResponse.status} - ${errorText}`);
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`SAP B1 responded with status: ${response.status}, message: ${errorText}`);
       }
+  
+      const data = await response.json();
+      console.log('SAP B1 connection successful');
+      res.status(200).json({ message: 'SAP B1 connection successful', data });
+    } catch (error) {
+      console.error('SAP B1 Connection Error:', error);
+      res.status(500).json({ message: 'SAP B1 connection failed', error: error.message });
+    }
 
     const sapLoginData = await sapLoginResponse.json();
     const sessionId = sapLoginData.SessionId;
