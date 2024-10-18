@@ -3,7 +3,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { renewSAPSession } from '../../utils/renewSAPSession';
 
 export default async function handler(req, res) {
-  const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
+  const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const b1session = req.cookies.B1SESSION;
   const routeid = req.cookies.ROUTEID;
 
