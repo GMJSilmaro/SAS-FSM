@@ -38,7 +38,7 @@ export async function middleware(request) {
         if (loginResponse.ok) {
           const loginData = await loginResponse.json();
           const newSessionId = loginData.SessionId;
-          const newExpiryTime = new Date(Date.now() + 30 * 60 * 1000); // Assuming session expires in 30 mins
+          const newExpiryTime = new Date(Date.now() + 30 * 60 * 1000); 
 
           // Set the new session cookies
           response.cookies.set('B1SESSION', newSessionId, { 

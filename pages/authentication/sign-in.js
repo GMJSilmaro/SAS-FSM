@@ -72,12 +72,13 @@ const SignIn = () => {
       toast.success('You have successfully logged in.');
 
     } catch (error) {
-      if (error === 'auth/wrong-password' || error === 'auth/user-not-found') {
+      console.error('Login error:', error);
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
         toast.error('Invalid email or password. Please try again.');
-      } else if (error === 'auth/invalid-email') {
+      } else if (error.code === 'auth/invalid-email') {
         toast.error('Invalid email format. Please enter a valid email.');
       } else {
-        toast.error(error.message);
+        toast.error(error.message || 'An error occurred during login. Please try again.');
       }
     } finally {
       setLoading(false);
