@@ -20,7 +20,7 @@ import { Fragment } from 'react';
 import { registerLicense } from "@syncfusion/ej2-base";
 import { ToastContainer } from 'react-toastify';
 
-registerLicense(process.env.REACT_APP_SYNCFUSION_LICENSE_KEY);
+registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY);
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();

@@ -23,15 +23,15 @@ export async function middleware(request) {
     if (timeUntilExpiry <= fiveMinutesInMilliseconds) {
       try {
         // Attempt to renew session
-        const loginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
+        const loginResponse = await fetch(`${process.env.NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}Login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            CompanyDB: process.env.SAP_B1_COMPANY_DB,
-            UserName: process.env.SAP_B1_USERNAME,
-            Password: process.env.SAP_B1_PASSWORD,
+            CompanyDB: process.env.NEXT_PUBLIC_SAP_B1_COMPANY_DB,
+            UserName: process.env.NEXT_PUBLIC_SAP_B1_USERNAME,
+            Password: process.env.NEXT_PUBLIC_SAP_B1_PASSWORD,
           }),
         });
 
@@ -67,7 +67,7 @@ export async function middleware(request) {
 
     // Check if the session is still valid using fetch
     try {
-      const sessionCheckResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Users('${process.env.SAP_B1_USERNAME}')`, {
+      const sessionCheckResponse = await fetch(`${process.env.NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}Users('${process.env.NEXT_PUBLIC_SAP_B1_USERNAME}')`, {
         headers: {
           'Cookie': `B1SESSION=${b1Session.value}`,
         },

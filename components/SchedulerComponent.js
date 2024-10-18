@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ScheduleComponent, Day, Week, Month, Agenda, Inject } from '@syncfusion/ej2-react-schedule';
-import { registerLicense } from '@syncfusion/ej2-base';
 import { collection, getDocs } from 'firebase/firestore'; // Firebase Firestore functions
 import { db } from '../firebase'; 
 
-// Register Syncfusion license
-registerLicense(process.env.REACT_APP_SYNCFUSION_LICENSE_KEY);
 
 const SchedulerComponent = () => {
     const [events, setEvents] = useState([]);
