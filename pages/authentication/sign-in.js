@@ -23,6 +23,8 @@ const SignIn = () => {
       // Step 1: Authenticate with Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+
+      console.log('Firebase authentication successful');
     
       // Get Firebase token (optional for frontend use)
       const token = await user.getIdToken();
@@ -45,6 +47,7 @@ const SignIn = () => {
       }
   
       const data = await response.json();
+      console.log('Backend login response:', data);
   
       // Step 3: Validate isAdmin field before proceeding
       if (!data.isAdmin) {
