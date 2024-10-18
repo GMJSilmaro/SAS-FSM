@@ -258,66 +258,7 @@ const FieldServiceSchedules = () => {
     [currentUser]
   );
 
-//  // Custom QuickInfo content template
-//  const quickInfoTemplatesContent = (props) => {
-//   const [localSelectedStatus, setLocalSelectedStatus] = useState(
-//     props.Subject || statusOptions[0]
-//   );
 
-  const handleStatusChange = (e) => {
-    const newValue = e.itemData.value;
-    setLocalSelectedStatus(newValue);
-    addEvent(newValue);
-  };
-
-  const addEvent = (status) => {
-    const scheduleObj = scheduleRef.current?.ej2_instances?.[0];
-    if (!scheduleObj) {
-      console.error("Schedule component is not available.");
-      return;
-    }
-
-    const eventObj = {
-      Id: props.Id || Math.random().toString(36).substr(2, 9),
-      Subject: status,
-      StartTime: props.StartTime,
-      EndTime: props.EndTime,
-      IsAllDay: props.IsAllDay,
-      WorkerId: props.WorkerId || null,
-    };
-
-    scheduleObj.addEvent(eventObj);
-    scheduleObj.closeQuickInfoPopup();
-  };
-
-  return (
-    <div>
-      <div>{props.StartTime.toLocaleString()} - {props.EndTime.toLocaleString()}</div>
-      <div>
-        <DropDownListComponent
-          id="status"
-          dataSource={statusOptions}
-          placeholder="Select a status"
-          value={localSelectedStatus}
-          change={handleStatusChange}
-        />
-      </div>
-    </div>
-  );
-};
-
-// QuickInfo footer
-const quickInfoTemplatesFooter = () => {
-  return (
-    <div>
-      <button className="e-btn" onClick={() => alert("Event Saved")}>
-        Save Event
-      </button>
-    </div>
-  );
-};
-
-const scheduleRef = useRef(null);
 
   const onActionComplete = useCallback(
     async (args) => {
