@@ -112,6 +112,7 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ message: 'An error occurred during login. Please try again.' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ message: 'An error occurred during login', error: error.message });
   }
 }
