@@ -1,11 +1,9 @@
 import { v4 as uuid } from 'uuid';
-import { HouseDoor, PersonFill, Calendar, BriefcaseFill, Map, User } from 'react-bootstrap-icons'; // import icons
 
 const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Dashboard',
-		icon: <HouseDoor />, // icon for Dashboard
 		link: '#',
 		children: [
 			{ id: uuid(), menuitem: 'Overview', link: '/dashboard/overview'},
@@ -15,7 +13,6 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Manage Users',
-		icon: <User size={15} />,
 		link: '#',
 		children: [
 			{
@@ -26,7 +23,6 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				menuitem: 'Worker',
-				icon: <User size={15} />,
 				link: '#',
 				children: [
 					{
@@ -99,7 +95,6 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Manage Jobs',
-		icon: <BriefcaseFill size={15} />, // icon for Jobs
 		link: '#',
 		children: [
 			{
@@ -109,13 +104,11 @@ const NavbarDefault = [
 			},
 			{
 				id: uuid(),
-				icon: <User size={15} />,
 				menuitem: 'Create Jobs',
 				link: '/dashboard/jobs/create-jobs'
 			},
 			{
 				id: uuid(),
-				icon: <User size={15} />,
 				menuitem: 'View Jobs',
 				link: '/dashboard/jobs/list-jobs'
 			}
@@ -125,7 +118,6 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Schedules',
-		icon: <PersonFill />, // icon for Field Worker
 		link: '#',
 		children: [
 			{
