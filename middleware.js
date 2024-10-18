@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 
-export async function middleware(request) {
+export function middleware(request) {
   if (request.nextUrl.pathname.startsWith('/api') && !request.nextUrl.pathname.startsWith('/api/login')) {
-    const response = NextResponse.next();
-
     const b1Session = request.cookies.get('B1SESSION');
     const sessionExpiry = request.cookies.get('B1SESSION_EXPIRY');
 
@@ -17,15 +15,15 @@ export async function middleware(request) {
     const fiveMinutesInMilliseconds = 5 * 60 * 1000;
 
     if (timeUntilExpiry <= fiveMinutesInMilliseconds) {
-      // Instead of renewing here, set a flag for renewal
-      response.cookies.set('RENEW_SESSION', 'true', { 
+      // Set a flag for renewal
+      const response = NextResponse.next();
+      response.cookies.set('RENEW_SAP_SESSION', 'true', { 
         httpOnly: true, 
         secure: true, 
         sameSite: 'none' 
       });
+      return response;
     }
-
-    return response;
   }
 
   return NextResponse.next();

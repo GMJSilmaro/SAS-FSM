@@ -1,4 +1,5 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+import { renewSAPSession } from '../../utils/renewSAPSession';
 
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, query, where, collection, getDocs } from 'firebase/firestore';
@@ -116,6 +117,28 @@ export default async function handler(req, res) {
       `ROUTEID=.node4; Secure; SameSite=None`,
       `B1SESSION_EXPIRY=${sessionExpiryTime.toISOString()}; HttpOnly; Secure; SameSite=None`
     ]);
+
+    if (req.cookies.RENEW_SESSION === 'true') {
+      try {
+        const renewResponse = await fetch(`${process.env.VERCEL_URL}/api/renew-session`, {
+          method: 'POST',
+          headers: {
+            Cookie: req.headers.cookie
+          }
+        });
+        if (!renewResponse.ok) {
+          throw new Error('Failed to renew session');
+        }
+        // Update cookies from the renew response
+        const cookies = renewResponse.headers.get('set-cookie');
+        if (cookies) {
+          res.setHeader('Set-Cookie', cookies);
+        }
+      } catch (error) {
+        console.error('Error renewing session:', error);
+        return res.status(401).json({ message: 'Session renewal failed' });
+      }
+    }
     
     const token = { 
       uid: user.uid, 
