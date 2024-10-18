@@ -1,35 +1,20 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
-import {
-  Row,
-  Col,
-  Card,
-  Button,
-  Badge,
-  Dropdown,
-  Tooltip,
-  OverlayTrigger,
-  Breadcrumb,
-} from "react-bootstrap";
+import { Row, Col, Card, Badge, Dropdown, Button, Breadcrumb, OverlayTrigger, Tooltip } from "react-bootstrap";
 import { MoreVertical, Trash, Edit } from "react-feather";
-import { useRouter } from "next/router";
 import { FaUser } from "react-icons/fa";
-
-// Firebase
-import { db } from "../../../firebase"; // Adjust the path as necessary
-import { collection, getDocs, doc, deleteDoc } from "firebase/firestore"; // Add 'doc' and 'deleteDoc'
-
-// DataTable component
+import { useRouter } from "next/router";
+import { db } from "../../../firebase";
+import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import DataTable from "react-data-table-component";
 import Swal from "sweetalert2";
-
-// Import CSS module
 import styles from "./ViewJobs.module.css";
 import { GeeksSEO } from "widgets";
 import JobStats from "sub-components/dashboard/projects/single/task/JobStats";
+import DOMPurify from 'dompurify';
+
 
 const ViewJobs = () => {
   const router = useRouter();
-
   const [jobs, setJobs] = useState([]);
   const [search, setSearch] = useState("");
   const [filteredJobs, setFilteredJobs] = useState([]);
@@ -37,91 +22,100 @@ const ViewJobs = () => {
 
   // Custom Styles for DataTable
   const customStyles = {
-    headCells: {
-      style: {
-        fontWeight: "bold",
-        fontSize: "14px",
-        backgroundColor: "#F1F5FC",
-        textAlign: "left",
-        whiteSpace: "normal", // Allow wrapping
-      },
+    headCells: { 
+      style: { 
+        fontWeight: "bold", 
+        fontSize: "14px", 
+        backgroundColor: "#F1F5FC" 
+      } 
     },
-    cells: {
-      style: {
-        color: "#64748b",
-        fontSize: "14px",
-        whiteSpace: "normal", // Allow wrapping
-        textAlign: "left",
-      },
+    cells: { 
+      style: { 
+        color: "#64748b", 
+        fontSize: "14px", 
+        textAlign: "left" 
+      } 
     },
-    rows: {
-      style: {
-        minHeight: "72px", // Adjust row height for better spacing
-        textAlign: "center", // Center align rows
-      },
-      highlightOnHoverStyle: {
-        backgroundColor: "#f1f5fc",
-        cursor: "pointer",
-      },
+    rows: { 
+      style: { 
+        minHeight: "72px",
+        cursor: 'pointer', // Add this line
+      }, 
+      highlightOnHoverStyle: { 
+        backgroundColor: "#f1f5fc" 
+      } 
     },
   };
 
-  // Priority Badge Styling
   const getPriorityBadge = (priority) => {
     switch (priority) {
-      case "L":
-        return <Badge bg="success">Low</Badge>;
-      case "M":
-        return <Badge bg="warning">Mid</Badge>;
-      case "H":
-        return <Badge bg="danger">High</Badge>;
-      default:
-        return priority;
+      case "Low": return <Badge bg="success">Low</Badge>;
+      case "Mid": return <Badge bg="warning">Mid</Badge>;
+      case "High": return <Badge bg="danger">High</Badge>;
+      default: return priority;
     }
   };
 
-  // Status Badge Styling
+  // const getStatusBadge = (status) => {
+  //   switch (status) {
+  //     case "Created": return <Badge bg="info">Created</Badge>;
+  //     case "Confirm": return <Badge bg="primary">Confirm</Badge>;
+  //     case "Cancel": return <Badge bg="danger">Cancel</Badge>;
+  //     case "Job Started": return <Badge bg="warning">Job Started</Badge>;
+  //     case "Job Complete": return <Badge bg="success">Job Complete</Badge>;
+  //     default: return status;
+  //   }
+  // };
   const getStatusBadge = (status) => {
+    const getStyle = (backgroundColor) => ({
+      backgroundColor,
+      color: "#fff",
+      padding: '0.5em 0.75em',
+      borderRadius: '0.25rem',
+      fontWeight: 'normal'
+    });
+  
     switch (status) {
-      case "C":
-        return <Badge bg="info">Created</Badge>;
-      case "CO":
-        return <Badge bg="primary">Confirm</Badge>;
-      case "CA":
-        return <Badge bg="danger">Cancel</Badge>;
-      case "JS":
-        return <Badge bg="warning">Job Started</Badge>;
-      case "JC":
-        return <Badge bg="success">Job Complete</Badge>;
-      case "V":
-        return <Badge bg="secondary">Validate</Badge>;
-      case "S":
-        return <Badge bg="info">Scheduled</Badge>;
-      case "US":
-        return <Badge bg="dark">Unscheduled</Badge>;
-      case "RS":
-        return <Badge bg="warning">Re-scheduled</Badge>;
+      case "Created":
+        return <Badge style={getStyle("#9e9e9e")}>Created</Badge>;
+      case "Confirmed":
+        return <Badge style={getStyle("#2196f3")}>Confirmed</Badge>;
+      case "Cancelled":
+        return <Badge style={getStyle("#f44336")}>Cancelled</Badge>;
+      case "Job Started":
+        return <Badge style={getStyle("#FFA500")}>Job Started</Badge>;
+      case "Job Complete":
+        return <Badge style={getStyle("#32CD32")}>Job Complete</Badge>;
+      case "Validate":
+        return <Badge style={getStyle("#00bcd4")}>Validate</Badge>;
+      case "Scheduled":
+        return <Badge style={getStyle("#607d8b")}>Scheduled</Badge>;
       default:
-        return status;
+        return <Badge style={getStyle("#9e9e9e")}>{status}</Badge>;
     }
   };
 
-  // Format Time
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
   const formatTime = (time) => {
-    if (!time) return ""; // Return an empty string if time is undefined or null
+    if (!time) return "";
     const [hours, minutes] = time.split(":");
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12; // Convert '0' hour to '12'
+    const formattedHour = hour % 12 || 12;
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
-  // Action Menu
-  const ActionMenu = ({ jobId }) => {
-    const handleEditClick = () => {
-      router.push(`./update-jobs/${jobId}`);
-    };
+    const handleRowClick = (row) => {
+    router.push(`/dashboard/jobs/${row.id}`);
+  };
 
+  const ActionMenu = ({ jobId }) => {
+    const handleEditClick = () => router.push(`./update-jobs/${jobId}`);
     const handleRemove = async (jobId) => {
       const result = await Swal.fire({
         title: "Are you sure?",
@@ -137,14 +131,10 @@ const ViewJobs = () => {
         try {
           const jobRef = doc(db, "jobs", jobId);
           await deleteDoc(jobRef);
-
           Swal.fire("Deleted!", "The job has been removed.", "success");
-
-          // Optionally refresh the jobs data
           setJobs(jobs.filter((job) => job.id !== jobId));
           setFilteredJobs(filteredJobs.filter((job) => job.id !== jobId));
         } catch (error) {
-          console.error("Error removing document: ", error);
           Swal.fire("Error!", "There was a problem removing the job.", "error");
         }
       }
@@ -167,34 +157,70 @@ const ViewJobs = () => {
       </Dropdown>
     );
   };
+  
 
-  const handleRowClick = (row) => {
-    router.push(`/dashboard/jobs/${row.id}`);
-  };
-
-  // Custom Toggle for Dropdown
   const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
-    <Button
-      ref={ref}
-      onClick={(e) => {
-        e.preventDefault();
-        onClick(e);
-      }}
-      className="btn-icon btn btn-ghost btn-sm rounded-circle"
-    >
+    <Button ref={ref} onClick={(e) => { e.preventDefault(); onClick(e); }} className="btn-icon btn btn-ghost btn-sm rounded-circle">
       {children}
     </Button>
   ));
   CustomToggle.displayName = "CustomToggle";
 
-  // Table Columns
+  const HTMLCell = ({ html, maxLength = 100 }) => {
+    const sanitizedHTML = DOMPurify.sanitize(html);
+    const textContent = sanitizedHTML.replace(/<[^>]+>/g, '');
+    const truncatedText = textContent.length > maxLength ? `${textContent.substring(0, maxLength)}...` : textContent;
+  
+    return (
+      <div title={textContent} style={{ cursor: 'pointer' }}>
+        <div dangerouslySetInnerHTML={{ __html: truncatedText }} />
+      </div>
+    );
+  };
+
+  const TooltipCell = ({ text, maxLength = 50 }) => {
+    const truncatedText = text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+    
+    return (
+      <div title={text} style={{ cursor: 'pointer' }}>
+        {truncatedText}
+      </div>
+    );
+  };
+
+  const AssignedWorkerCell = ({ workerFullName }) => {
+    const workers = workerFullName.split(', ');
+    const displayName = workers[0];
+    const remainingCount = workers.length - 1;
+  
+    return (
+      <OverlayTrigger
+        placement="top"
+        overlay={
+          <Tooltip id={`tooltip-${displayName}`}>
+            {workerFullName}
+          </Tooltip>
+        }
+      >
+        <div className="d-flex align-items-center">
+          <FaUser className="me-2" />
+          <span className="text-truncate" style={{ maxWidth: '120px' }}>
+            {displayName}
+          </span>
+          {remainingCount > 0 && (
+            <Badge bg="secondary" className="ms-2">+{remainingCount}</Badge>
+          )}
+        </div>
+      </OverlayTrigger>
+    );
+  };
+
   const columns = [
     {
       name: "",
-      cell: (row) => <ActionMenu jobId={row.id} />,
-      width: "60px",
+      cell: (row) => "",
+      width: "5px",
     },
-
     {
       name: "Job No.",
       selector: (row) => row.jobNo,
@@ -202,22 +228,28 @@ const ViewJobs = () => {
       width: "110px",
     },
     {
-      name: "Assigned Worker",
-      cell: (row) => (
-        <span>
-          <FaUser style={{ marginRight: "8px" }} />
-          {row.workerFullName}
-        </span>
-      ),
+      name: "Job Name",
+      cell: (row) => <TooltipCell text={row.jobName} />,
       sortable: true,
-      width: "200px",
+      width: "200px",  
     },
     {
-      name: "Job Name",
-      selector: (row) => row.jobName,
+      name: "Customer Name",
+      cell: (row) => <TooltipCell text={row.customerName} />,
       sortable: true,
-      wrap: true,
-      width: "200px",
+      width: "200px",  
+    },
+    {
+      name: "Location Name", 
+      cell: (row) => <TooltipCell text={row.locationName} />,
+      sortable: true,
+      width: "200px",  
+    },
+    {
+      name: "Job Description",
+      cell: (row) => <HTMLCell html={row.jobDescription} />,
+      sortable: false,
+      width: "150px",
     },
     {
       name: "Job Status",
@@ -226,27 +258,26 @@ const ViewJobs = () => {
       width: "150px",
     },
     {
-      name: "Job Description",
-      selector: (row) => row.description,
-      sortable: false,
-      wrap: true,
-      width: "300px",
-    },
-    {
       name: "Priority",
-      cell: (row) => getPriorityBadge(row.jobPriority),
+      cell: (row) => getPriorityBadge(row.priority),
       sortable: true,
       width: "110px",
     },
     {
+      name: "Assigned Worker",
+      cell: (row) => <AssignedWorkerCell workerFullName={row.workerFullName} />,
+      sortable: true,
+      width: "200px",
+    },
+    {
       name: "Start Date",
-      selector: (row) => row.startDate,
+      selector: (row) => formatDate(row.startDate),
       sortable: true,
       width: "150px",
     },
     {
       name: "End Date",
-      selector: (row) => row.endDate,
+      selector: (row) => formatDate(row.endDate),
       sortable: true,
       width: "150px",
     },
@@ -263,129 +294,112 @@ const ViewJobs = () => {
       width: "120px",
     },
   ];
+  
 
-  // Fetch Data
   useEffect(() => {
     const fetchJobs = async () => {
       const jobsSnapshot = await getDocs(collection(db, "jobs"));
       const usersSnapshot = await getDocs(collection(db, "users"));
-
+    
       const jobsData = jobsSnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data(),
+        ...doc.data(), // Ensure that customerName and locationName are part of job data
       }));
+    
       const usersData = usersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-
-      // Sort jobs by timestamp in descending order
+    
       const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
-
+    
       const mergedData = sortedJobsData.map((job) => {
+        console.log("Job:", job); // Log the entire job object
         const workerNames = job.assignedWorkers
-          .map((workerId) => {
+          .map((workerObj) => {
+            // console.log("Searching for workerId:", workerObj); 
+            const workerId = workerObj.workerId; // Extract the workerId from the object
             const worker = usersData.find((user) => user.workerId === workerId);
-            return worker
-              ? `${worker.firstName} ${worker.lastName}`
-              : "Unknown Worker";
+            //console.log("Found worker:", worker); // Log the found worker (or undefined)
+            return worker ? `${worker.fullName}` : `Unknown Worker (ID: ${workerId})`;
           })
           .join(", ");
-
+      
         return {
           ...job,
-          workerFullName: workerNames,
+          workerFullName: workerNames || "No workers assigned",
+          locationName: job.location?.locationName || "No location name",
         };
       });
-
+    
       setJobs(mergedData);
       setFilteredJobs(mergedData);
       setLoading(false);
     };
+    
 
     fetchJobs();
   }, []);
 
-  // Filter Rows Based on Search
   useEffect(() => {
-    const result = jobs.filter((item) => {
-      // Map short codes to full forms for jobPriority
-      const priorityMapping = {
-        L: "Low",
-        M: "Mid",
-        H: "High",
+    if (!search.trim()) {
+      setFilteredJobs(jobs);
+      return;
+    }
+  
+    const searchLower = search.toLowerCase().trim();
+  
+    const result = jobs.filter((job) => {
+      // Function to check if any value in the job object matches the search term
+      const isMatch = (value) => {
+        if (value == null) return false;
+        
+        if (typeof value === 'string') {
+          return value.toLowerCase().includes(searchLower);
+        }
+        
+        if (typeof value === 'number') {
+          return value.toString().includes(searchLower);
+        }
+        
+        if (value instanceof Date) {
+          return value.toLocaleDateString().toLowerCase().includes(searchLower);
+        }
+        
+        if (typeof value === 'object') {
+          return Object.values(value).some(isMatch);
+        }
+        
+        return false;
       };
-
-      // Map short codes to full forms for jobStatus
-      const statusMapping = {
-        C: "Created",
-        S: "Scheduled",
-        P: "Pending",
-        CA: "Cancel",
-        V: "Validate",
-        JC: "Job Complete",
-        S: "Scheduled",
-      };
-
-      // Get full form of jobPriority
-      const jobPriorityFull =
-        priorityMapping[item.jobPriority] || item.jobPriority;
-      // Get full form of jobStatus
-      const jobStatusFull = statusMapping[item.jobStatus] || item.jobStatus;
-
-      return (
-        (item.workerFullName &&
-          item.workerFullName.toLowerCase().includes(search.toLowerCase())) ||
-        (item.jobName &&
-          item.jobName.toLowerCase().includes(search.toLowerCase())) ||
-        (jobStatusFull &&
-          jobStatusFull.toLowerCase().includes(search.toLowerCase())) || // Search full status
-        (item.jobStatus &&
-          item.jobStatus.toLowerCase().includes(search.toLowerCase())) || // Search short status
-        (jobPriorityFull &&
-          jobPriorityFull.toLowerCase().includes(search.toLowerCase())) || // Search full priority
-        (item.jobPriority &&
-          item.jobPriority.toLowerCase().includes(search.toLowerCase())) || // Search short priority
-        (item.description &&
-          item.description.toLowerCase().includes(search.toLowerCase())) ||
-        (item.startDate &&
-          item.startDate.toLowerCase().includes(search.toLowerCase())) ||
-        (item.endDate &&
-          item.endDate.toLowerCase().includes(search.toLowerCase())) ||
-        (item.startTime &&
-          item.startTime.toLowerCase().includes(search.toLowerCase())) ||
-        (item.endTime &&
-          item.endTime.toLowerCase().includes(search.toLowerCase())) ||
-        (item.jobNo && item.jobNo.toString().includes(search))
-      );
+  
+      // Check all properties of the job object
+      return Object.values(job).some(isMatch);
     });
-
+  
     setFilteredJobs(result);
   }, [search, jobs]);
 
-  // Search Component
-  const subHeaderComponentMemo = useMemo(() => {
-    return (
-      <Fragment>
-        <input
-          type="text"
-          className="form-control me-4 mb-4"
-          placeholder="Search Jobs..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </Fragment>
-    );
-  }, [search]);
+  const subHeaderComponentMemo = useMemo(() => (
+    <Fragment>
+      <input 
+        type="text" 
+        className="form-control me-4 mb-4" 
+        placeholder="Search Jobs..." 
+        value={search} 
+        onChange={(e) => setSearch(e.target.value)} 
+      />
+    </Fragment>
+  ), [search]);
 
   return (
     <Fragment>
       <GeeksSEO title="Job Lists | SAS - SAP B1 Portal" />
 
       <Row>
-        <Col lg={12} md={12} sm={12}>
+        <Col lg={12}>
           <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-            <div className="mb-3 mb-md-0">
+            <div className="mb-3">
               <h1 className="mb-1 h2 fw-bold">Job Lists</h1>
               <Breadcrumb>
                 <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
@@ -398,7 +412,7 @@ const ViewJobs = () => {
       </Row>
       <JobStats />
       <Row>
-        <Col md={12} xs={12} className="mb-5">
+        <Col md={12}>
           <Card>
             <Card.Body className="px-0">
               <DataTable
@@ -410,8 +424,6 @@ const ViewJobs = () => {
                 subHeader
                 subHeaderComponent={subHeaderComponentMemo}
                 paginationRowsPerPageOptions={[5, 10, 15, 20, 25, 50]}
-                subHeaderAlign="left"
-                className={styles.dataTableRow} // Apply CSS module class
                 onRowClicked={handleRowClick}
               />
             </Card.Body>

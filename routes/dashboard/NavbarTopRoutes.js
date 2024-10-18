@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { HouseDoor, PersonFill, Calendar, BriefcaseFill, Map } from 'react-bootstrap-icons'; // import icons
+import { HouseDoor, PersonFill, Calendar, BriefcaseFill, Map, User } from 'react-bootstrap-icons'; // import icons
 
 const NavbarDefault = [
 	{
@@ -15,7 +15,7 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Manage Users',
-		icon: <PersonFill />, // icon for Field Worker
+		icon: <User size={15} />,
 		link: '#',
 		children: [
 			{
@@ -26,6 +26,7 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				menuitem: 'Worker',
+				icon: <User size={15} />,
 				link: '#',
 				children: [
 					{
@@ -45,52 +46,52 @@ const NavbarDefault = [
 					},
 				]
 			},
-			{
-				id: uuid(),
-				badge: 'NEW',
-				menuitem: 'Supervisor',
-				link: '#',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Manage Supervisor'
-					},
-					{
-						id: uuid(),
-						menuitem: 'Add Supervisor',
-						link: '/dashboard/workers/create-worker'
-					},
-					{
-						id: uuid(),
-						menuitem: 'View Supervisor',
-						link: '/dashboard/workers/list'
-					},
-				]
-			},
-			{
-				id: uuid(),
-				menuitem: 'Chief Service Officer',
-				link: '#',
-				badge: 'NEW',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Manage CSO'
-					},
-					{
-						id: uuid(),
-						menuitem: 'Add CSO',
-						link: '/dashboard/workers/create-worker'
-					},
-					{
-						id: uuid(),
-						menuitem: 'View CSO',
-						link: '/dashboard/workers/list'
-					},
-				]
-			},
+			// {
+			// 	id: uuid(),
+			// 	badge: 'NEW',
+			// 	menuitem: 'Supervisor',
+			// 	link: '#',
+			// 	children: [
+			// 		{
+			// 			id: uuid(),
+			// 			header: true,
+			// 			header_text: 'Manage Supervisor'
+			// 		},
+			// 		{
+			// 			id: uuid(),
+			// 			menuitem: 'Add Supervisor',
+			// 			link: '/dashboard/workers/create-worker'
+			// 		},
+			// 		{
+			// 			id: uuid(),
+			// 			menuitem: 'View Supervisor',
+			// 			link: '/dashboard/workers/list'
+			// 		},
+			// 	]
+			// },
+			// {
+			// 	id: uuid(),
+			// 	menuitem: 'Chief Service Officer',
+			// 	link: '#',
+			// 	badge: 'NEW',
+			// 	children: [
+			// 		{
+			// 			id: uuid(),
+			// 			header: true,
+			// 			header_text: 'Manage CSO'
+			// 		},
+			// 		{
+			// 			id: uuid(),
+			// 			menuitem: 'Add CSO',
+			// 			link: '/dashboard/workers/create-worker'
+			// 		},
+			// 		{
+			// 			id: uuid(),
+			// 			menuitem: 'View CSO',
+			// 			link: '/dashboard/workers/list'
+			// 		},
+			// 	]
+			// },
 			
 		],
 		isAuthenticated: true,
@@ -98,7 +99,7 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Manage Jobs',
-		icon: <BriefcaseFill />, // icon for Jobs
+		icon: <BriefcaseFill size={15} />, // icon for Jobs
 		link: '#',
 		children: [
 			{
@@ -108,11 +109,13 @@ const NavbarDefault = [
 			},
 			{
 				id: uuid(),
+				icon: <User size={15} />,
 				menuitem: 'Create Jobs',
 				link: '/dashboard/jobs/create-jobs'
 			},
 			{
 				id: uuid(),
+				icon: <User size={15} />,
 				menuitem: 'View Jobs',
 				link: '/dashboard/jobs/list-jobs'
 			}
@@ -177,56 +180,56 @@ const NavbarDefault = [
 		],
 		isAuthenticated: true,
 	},
-	{
-		id: uuid(),
-		menuitem: 'SAP B1 Data',
-		badge: 'NEW',
-		link: '#',
-		children: [
-			{
-				id: uuid(),
-				header: true,
-				header_text: 'View SAB B1 Data'
-			},
-			{
-				id: uuid(),
-				menuitem: 'Customers',
-				link: '#',
-				badge: 'NEW',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Customer Menu'
-					},
-					{
-						id: uuid(),
-						menuitem: 'View Customers',
-						link: '/dashboard/scheduling/jobs/past'
-					},
-				]
-			},
-			{
-				id: uuid(),
-				menuitem: 'Locations',
-				link: '#',
-				badge: 'NEW',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Locations Menu'
-					},
-					{
-						id: uuid(),
-						menuitem: 'View Locations',
-						link: '/dashboard/scheduling/workers/schedules'
-					},
-				]
-			},
-		],
-		isAuthenticated: true,
-	},
+	// {
+	// 	id: uuid(),
+	// 	menuitem: 'SAP B1 Data',
+	// 	badge: 'NEW',
+	// 	link: '#',
+	// 	children: [
+	// 		{
+	// 			id: uuid(),
+	// 			header: true,
+	// 			header_text: 'View SAB B1 Data'
+	// 		},
+	// 		{
+	// 			id: uuid(),
+	// 			menuitem: 'Customers',
+	// 			link: '#',
+	// 			badge: 'NEW',
+	// 			children: [
+	// 				{
+	// 					id: uuid(),
+	// 					header: true,
+	// 					header_text: 'Customer Menu'
+	// 				},
+	// 				{
+	// 					id: uuid(),
+	// 					menuitem: 'View Customers',
+	// 					link: '/dashboard/scheduling/jobs/past'
+	// 				},
+	// 			]
+	// 		},
+	// 		{
+	// 			id: uuid(),
+	// 			menuitem: 'Locations',
+	// 			link: '#',
+	// 			badge: 'NEW',
+	// 			children: [
+	// 				{
+	// 					id: uuid(),
+	// 					header: true,
+	// 					header_text: 'Locations Menu'
+	// 				},
+	// 				{
+	// 					id: uuid(),
+	// 					menuitem: 'View Locations',
+	// 					link: '/dashboard/scheduling/workers/schedules'
+	// 				},
+	// 			]
+	// 		},
+	// 	],
+	// 	isAuthenticated: true,
+	// },
 	
 	// {
 	// 	id: uuid(),
@@ -246,25 +249,25 @@ const NavbarDefault = [
 	// 		}
 	// 	],
 	// },
-	{
-		id: uuid(),
-		menuitem: 'Maps',
-		icon: <Map />, // icon for Maps
-		link: '#',
-		badge: 'NEW',
-		children: [
-			{
-				id: uuid(),
-				header: true,
-				header_text: 'Maps'
-			},
-			{
-				id: uuid(),
-				menuitem: 'View Map',
-				link: '/dashboard/map'
-			},
-		],
-	},
+	// {
+	// 	id: uuid(),
+	// 	menuitem: 'Maps',
+	// 	icon: <Map />, // icon for Maps
+	// 	link: '#',
+	// 	badge: 'NEW',
+	// 	children: [
+	// 		{
+	// 			id: uuid(),
+	// 			header: true,
+	// 			header_text: 'Maps'
+	// 		},
+	// 		{
+	// 			id: uuid(),
+	// 			menuitem: 'View Map',
+	// 			link: '/dashboard/map'
+	// 		},
+	// 	],
+	// },
 ];
 
 export default NavbarDefault;

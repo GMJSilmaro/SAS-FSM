@@ -1,0 +1,89 @@
+.timeline-resource-grouping.e-schedule:not(.e-device) .e-agenda-view .e-content-wrap table td:first-child {
+  width: 90px;
+}
+
+.timeline-resource-grouping.e-schedule .e-agenda-view .e-resource-column {
+  width: 100px;
+}
+
+.quickInfoContent {
+  padding: 10px 16px;
+}
+
+.eventTime {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.statusSelector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusSelector label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.selectWrapper {
+  position: relative;
+  flex-grow: 1;
+}
+
+.statusDropdown {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  appearance: none;
+  background-color: white;
+  cursor: pointer;
+}
+
+.dropdownIcon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #666;
+}
+
+.quickInfoFooter {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #eee;
+}
+
+.eBtn {
+  padding: 6px 12px;
+  font-size: 14px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.eFlat {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.eFlat:hover {
+  background-color: #e0e0e0;
+}
+
+.ePrimary {
+  background-color: #007bff;
+  color: white;
+}
+
+.ePrimary:hover {
+  background-color: #0056b3;
+}

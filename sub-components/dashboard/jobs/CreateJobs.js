@@ -29,8 +29,8 @@ import styles from "./CreateJobs.module.css";
 import { ToastContainer, toast } from "react-toastify";
 import JobTask from "./tabs/JobTasklist";
 import { useRouter } from "next/router";
-import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from 'widgets';
-import { getAuth } from 'firebase/auth';
+import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from "widgets";
+import { getAuth } from "firebase/auth";
 
 
 const AddNewJobs = () => {
@@ -45,7 +45,6 @@ const AddNewJobs = () => {
   const [salesOrders, setSalesOrders] = useState([]);
   const [selectedServiceCall, setSelectedServiceCall] = useState(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
-
 
   const [customers, setCustomers] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -130,7 +129,7 @@ const AddNewJobs = () => {
     ],
     customerSignature: {
       signatureURL: "", // URL for the signature image
-      signedBy: "", // Automatically filled with customerName during job creation
+      signedBy: "", 
       signatureTimestamp: "", // Initialize as empty string instead of null
     },
   });
@@ -210,13 +209,10 @@ const AddNewJobs = () => {
     ],
     customerSignature: {
       signatureURL: "", // URL for the signature image
-      signedBy: "", // Automatically filled with customerName during job creation
+      signedBy: "", 
       signatureTimestamp: "", // Initialize as empty string instead of null
     },
   };
-  
-  
-  
 
   const [showServiceLocation, setShowServiceLocation] = useState(true);
   const [showEquipments, setShowEquipments] = useState(true);
@@ -224,31 +220,110 @@ const AddNewJobs = () => {
   const [validated, setValidated] = useState(false);
   const [activeKey, setActiveKey] = useState("summary");
 
+  // const fetchCustomers = async () => {
+  //   try {
+  //     const response = await fetch("/api/getCustomers");
+  //     if (!response.ok) {
+  //       throw new Error("Failed to fetch customers");
+  //     }
+  //     const data = await response.json();
+  //     if (!Array.isArray(data)) {
+  //       throw new Error("Unexpected response format");
+  //     }
+  //     const formattedOptions = data.map((item) => ({
+  //       value: item.cardCode,
+  //       label: item.cardCode + " - " + item.cardName,
+  //       cardName: item.cardName,
+  //     }));
+  //     setCustomers(formattedOptions);
+  //   } catch (error) {
+  //     console.error("Error fetching customers:", error);
+  //     setCustomers([]); // Ensure options is an array
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   fetchCustomers();
+  // }, []);
+
+  const forceLogout = async () => {
+    try {
+      const response = await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include", // This is important for including cookies in the request
+      });
+      if (response.ok) {
+        toast.success(
+          "You have been logged out due to an authentication issue."
+        );
+        router.push("/authentication/sign-in"); // Redirect to login page
+      } else {
+        throw new Error("Logout failed");
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout. Please try again.");
+    }
+  };
+  
   const fetchCustomers = async () => {
     try {
       const response = await fetch("/api/getCustomers");
+  
+      // Check if the response is redirected to login page
+      if (response.redirected) {
+        toast.error("Session expired. Redirecting to login...");
+        forceLogout();
+        return;
+      }
+  
+      // Check if the response is OK
       if (!response.ok) {
         throw new Error("Failed to fetch customers");
       }
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        throw new Error("Unexpected response format");
+  
+      // Check content type to ensure it's JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text();
+        console.error("Unexpected content type, raw response:", responseText);
+        throw new Error("Received non-JSON response");
       }
+  
+      // Parse the response to JSON
+      const data = await response.json();
+  
+      // Validate if the response is an array
+      if (!Array.isArray(data)) {
+        throw new Error("Unexpected response format. Expected an array.");
+      }
+  
+      // Format the fetched customer data into options
       const formattedOptions = data.map((item) => ({
         value: item.cardCode,
         label: item.cardCode + " - " + item.cardName,
         cardName: item.cardName,
       }));
+  
+      // Set the formatted data in state
       setCustomers(formattedOptions);
+  
+      // Update the toast to show success
+      toast.success("Customers fetched successfully");
     } catch (error) {
       console.error("Error fetching customers:", error);
-      setCustomers([]); // Ensure options is an array
+      setCustomers([]); 
+      toast.error(`Error fetching customers: ${error.message}`);
+    } finally {
+   
     }
   };
-
+  
   useEffect(() => {
     fetchCustomers();
   }, []);
+  
+  
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -310,13 +385,13 @@ const AddNewJobs = () => {
     setTasks((prevTasks) => [
       ...prevTasks,
       {
-        taskID: `task-${prevTasks.length + 1}`, 
+        taskID: `task-${prevTasks.length + 1}`,
         taskName: "",
         taskDescription: "",
-        assignedTo: "", 
+        assignedTo: "",
         isPriority: false,
         isDone: false,
-        completionDate: null, 
+        completionDate: null,
       },
     ]);
   };
@@ -324,59 +399,227 @@ const AddNewJobs = () => {
   const fetchCoordinates = async (locationName) => {
     const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
     const encodedLocation = encodeURIComponent(locationName);
-  
+
     const response = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedLocation}&key=${apiKey}`
     );
-  
+
     const data = await response.json();
-    if (data.status === 'OK' && data.results.length > 0) {
+    if (data.status === "OK" && data.results.length > 0) {
       const location = data.results[0].geometry.location;
       return {
         latitude: location.lat,
-        longitude: location.lng
+        longitude: location.lng,
       };
     } else {
-      throw new Error('Location not found');
+      throw new Error("Location not found");
     }
   };
-  
-// Handle ReactQuill change event for the job description
-const handleDescriptionChange = (htmlContent) => {
-  console.log('Updated description (HTML):', htmlContent);  // Debugging
-  setFormData((prevState) => ({
-    ...prevState,
-    jobDescription: htmlContent,  // Store the HTML content
-  }));
-};
 
+  // Handle ReactQuill change event for the job description
+  const handleDescriptionChange = (htmlContent) => {
+    console.log("Updated description (HTML):", htmlContent); // Debugging
+    setFormData((prevState) => ({
+      ...prevState,
+      jobDescription: htmlContent, // Store the HTML content
+    }));
+  };
 
+  // Function to handle task field change
+  const handleTaskChange = (index, field, value) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[index][field] = value;
+    setTasks(updatedTasks);
+  };
 
+  // Function to handle checkbox change for priority and completion status
+  const handleCheckboxChange = (index, field) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[index][field] = !updatedTasks[index][field];
+    setTasks(updatedTasks);
+  };
 
-
-// Function to handle task field change
-const handleTaskChange = (index, field, value) => {
-  const updatedTasks = [...tasks];
-  updatedTasks[index][field] = value;
-  setTasks(updatedTasks);
-};
-
- // Function to handle checkbox change for priority and completion status
-const handleCheckboxChange = (index, field) => {
-  const updatedTasks = [...tasks];
-  updatedTasks[index][field] = !updatedTasks[index][field];
-  setTasks(updatedTasks);
-};
-
-// Function to delete a task
-const deleteTask = (index) => {
-  const updatedTasks = tasks.filter((_, i) => i !== index);
-  setTasks(updatedTasks);
-};
+  // Function to delete a task
+  const deleteTask = (index) => {
+    const updatedTasks = tasks.filter((_, i) => i !== index);
+    setTasks(updatedTasks);
+  };
 
   const handleWorkersChange = (selectedOptions) => {
     setSelectedWorkers(selectedOptions);
   };
+
+  // const handleCustomerChange = async (selectedOption) => {
+  //   setSelectedContact(null);
+  //   setSelectedLocation(null);
+  //   setSelectedCustomer(selectedOption);
+
+  //   const selectedCustomer = customers.find(
+  //     (option) => option.value === selectedOption.value
+  //   );
+
+  //   setFormData({
+  //     ...formData,
+  //     customerName: selectedCustomer ? selectedCustomer.label : "",
+  //   });
+
+  //   // Fetch related data for the selected customer
+  //   try {
+  //     // Fetch contacts for the customer
+  //     const contactsResponse = await fetch("/api/getContacts", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ cardCode: selectedOption.value }),
+  //     });
+
+  //     if (!contactsResponse.ok) {
+  //       throw new Error("Failed to fetch contacts");
+  //     }
+
+  //     const contactsData = await contactsResponse.json();
+  //     const formattedContacts = contactsData.map((item) => ({
+  //       value: item.contactId,
+  //       label: item.contactId,
+  //       ...item,
+  //     }));
+  //     setContacts(formattedContacts);
+
+  //     // Fetch locations for the customer
+  //     const locationsResponse = await fetch("/api/getLocation", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ cardCode: selectedOption.value }),
+  //     });
+
+  //     if (!locationsResponse.ok) {
+  //       throw new Error("Failed to fetch locations");
+  //     }
+
+  //     const locationsData = await locationsResponse.json();
+  //     const formattedLocations = locationsData.map((item) => ({
+  //       value: item.siteId,
+  //       label: item.siteId,
+  //       ...item,
+  //     }));
+  //     setLocations(formattedLocations);
+
+  //     // Fetch equipments for the customer
+  //     const equipmentsResponse = await fetch("/api/getEquipments", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ cardCode: selectedOption.value }),
+  //     });
+
+  //     if (!equipmentsResponse.ok) {
+  //       throw new Error("Failed to fetch equipments");
+  //     }
+
+  //     const equipmentsData = await equipmentsResponse.json();
+  //     const formattedEquipments = equipmentsData.map((item) => ({
+  //       value: item.ItemCode,
+  //       label: item.ItemCode,
+  //       ...item,
+  //     }));
+  //     setEquipments(formattedEquipments);
+
+  //     // Fetch service calls for the customer
+  //     const serviceCallResponse = await fetch("/api/getServiceCall", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ cardCode: selectedOption.value }),
+  //     });
+
+  //     if (!serviceCallResponse.ok) {
+  //       throw new Error("Failed to fetch service calls");
+  //     }
+
+  //     const serviceCallsData = await serviceCallResponse.json();
+  //     const formattedServiceCalls = serviceCallsData.map((item) => ({
+  //       value: item.serviceCallID,
+  //       label: item.serviceCallID + " - " + item.subject,
+  //     }));
+  //     setServiceCalls(formattedServiceCalls);
+
+  //     // Fetch sales orders for the customer
+  //     const salesOrderResponse = await fetch("/api/getSalesOrder", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ cardCode: selectedOption.value }),
+  //     });
+
+  //     if (!salesOrderResponse.ok) {
+  //       throw new Error("Failed to fetch sales orders");
+  //     }
+
+  //     const salesOrdersData = await salesOrderResponse.json();
+  //     const formattedSalesOrders = salesOrdersData.map((item) => ({
+  //       value: item.DocNum,
+  //       label: item.DocNum,
+  //     }));
+  //     setSalesOrders(formattedSalesOrders);
+  //   } catch (error) {
+  //     console.error("Error fetching related data:", error);
+  //     setContacts([]);
+  //     setLocations([]);
+  //     setEquipments([]);
+  //     setServiceCalls([]);
+  //     setSalesOrders([]);
+  //   }
+  // };
+
+  // const handleContactChange = (selectedOption) => {
+  //   setSelectedContact(selectedOption);
+  //   setFormData({
+  //     ...formData,
+  //     firstName: selectedOption.firstName || "",
+  //     middleName: selectedOption.middleName || "",
+  //     lastName: selectedOption.lastName || "",
+  //     phoneNumber: selectedOption.tel1 || "",
+  //     mobilePhone: selectedOption.tel2 || "",
+  //     email: selectedOption.email || "",
+  //   });
+  // };
+
+  // const handleContactChange = (selectedOption) => {
+  //   setSelectedContact(selectedOption);
+
+  //   // Combine firstName, middleName, and lastName into fullName
+  //   const contactFullname = `${selectedOption.firstName || ''} ${selectedOption.middleName || ''} ${selectedOption.lastName || ''}`.trim();
+
+  //   setFormData({
+  //     ...formData,
+  //     contact: {
+  //       contactID: selectedOption.value,
+  //       contactFullname: contactFullname,
+  //       contactPhoneNumber: selectedOption.tel1 || "",
+  //       contactMobilePhone: selectedOption.tel2 || "",
+  //       contactEmail: selectedOption.email || "",
+  //     },
+  //   });
+  // };
+
+  // const handleContactChange = (selectedOption) => {
+  //   setSelectedContact(selectedOption);
+  //   setFormData({
+  //     ...formData,
+  //     firstName: selectedOption.firstName || "",
+  //     middleName: selectedOption.middleName || "",
+  //     lastName: selectedOption.lastName || "",
+  //     phoneNumber: selectedOption.tel1 || "",
+  //     mobilePhone: selectedOption.tel2 || "",
+  //     email: selectedOption.email || "",
+  //   });
+  // };
 
   const handleCustomerChange = async (selectedOption) => {
     setSelectedContact(null);
@@ -415,6 +658,13 @@ const deleteTask = (index) => {
       }));
       setContacts(formattedContacts);
   
+      if (formattedContacts.length === 0) {
+        toast.warning("No contacts available for the selected customer.", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+  
       // Fetch locations for the customer
       const locationsResponse = await fetch("/api/getLocation", {
         method: "POST",
@@ -436,6 +686,13 @@ const deleteTask = (index) => {
       }));
       setLocations(formattedLocations);
   
+      if (formattedLocations.length === 0) {
+        toast.warning("No locations available for the selected customer.", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+  
       // Fetch equipments for the customer
       const equipmentsResponse = await fetch("/api/getEquipments", {
         method: "POST",
@@ -456,6 +713,13 @@ const deleteTask = (index) => {
         ...item,
       }));
       setEquipments(formattedEquipments);
+  
+      if (formattedEquipments.length === 0) {
+        toast.warning("No equipment available for the selected customer.", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
   
       // Fetch service calls for the customer
       const serviceCallResponse = await fetch("/api/getServiceCall", {
@@ -506,58 +770,15 @@ const deleteTask = (index) => {
     }
   };
   
-
-  // const handleContactChange = (selectedOption) => {
-  //   setSelectedContact(selectedOption);
-  //   setFormData({
-  //     ...formData,
-  //     firstName: selectedOption.firstName || "",
-  //     middleName: selectedOption.middleName || "",
-  //     lastName: selectedOption.lastName || "",
-  //     phoneNumber: selectedOption.tel1 || "",
-  //     mobilePhone: selectedOption.tel2 || "",
-  //     email: selectedOption.email || "",
-  //   });
-  // };
-
-  // const handleContactChange = (selectedOption) => {
-  //   setSelectedContact(selectedOption);
-  
-  //   // Combine firstName, middleName, and lastName into fullName
-  //   const contactFullname = `${selectedOption.firstName || ''} ${selectedOption.middleName || ''} ${selectedOption.lastName || ''}`.trim();
-  
-  //   setFormData({
-  //     ...formData,
-  //     contact: {
-  //       contactID: selectedOption.value,
-  //       contactFullname: contactFullname,
-  //       contactPhoneNumber: selectedOption.tel1 || "",
-  //       contactMobilePhone: selectedOption.tel2 || "",
-  //       contactEmail: selectedOption.email || "",
-  //     },
-  //   });
-  // };
-
-  // const handleContactChange = (selectedOption) => {
-  //   setSelectedContact(selectedOption);
-  //   setFormData({
-  //     ...formData,
-  //     firstName: selectedOption.firstName || "",
-  //     middleName: selectedOption.middleName || "",
-  //     lastName: selectedOption.lastName || "",
-  //     phoneNumber: selectedOption.tel1 || "",
-  //     mobilePhone: selectedOption.tel2 || "",
-  //     email: selectedOption.email || "",
-  //   });
-  // };
-
   const handleContactChange = (selectedOption) => {
     if (!selectedOption) return;
-  
-    const fullName = `${selectedOption.firstName || ""} ${selectedOption.middleName || ""} ${selectedOption.lastName || ""}`.trim();
-  
+
+    const fullName = `${selectedOption.firstName || ""} ${
+      selectedOption.middleName || ""
+    } ${selectedOption.lastName || ""}`.trim();
+
     setSelectedContact(selectedOption);
-  
+
     setFormData((prevFormData) => ({
       ...prevFormData,
       contact: {
@@ -570,19 +791,17 @@ const deleteTask = (index) => {
         phoneNumber: selectedOption.tel1 || "",
         mobilePhone: selectedOption.tel2 || "",
         email: selectedOption.email || "",
-      }
+      },
     }));
   };
-  
-  
 
   const handleLocationChange = async (selectedOption) => {
     const selectedLocation = locations.find(
       (location) => location.value === selectedOption.value
     );
-    
+
     setSelectedLocation(selectedLocation);
-  
+
     // Update nested `location` and `address` in `formData`
     setFormData((prevFormData) => ({
       ...prevFormData,
@@ -590,7 +809,7 @@ const deleteTask = (index) => {
         ...prevFormData.location, // Spread existing location object
         locationName: selectedLocation.siteId || "",
         address: {
-          ...prevFormData.location.address, 
+          ...prevFormData.location.address,
           streetNo: selectedLocation.streetNo || "",
           streetAddress: selectedLocation.streetAddress || "",
           block: selectedLocation.block || "",
@@ -599,10 +818,10 @@ const deleteTask = (index) => {
           stateProvince: selectedLocation.stateProvince || "",
           city: selectedLocation.city || "",
           postalCode: selectedLocation.zipCode || "",
-        }
-      }
+        },
+      },
     }));
-  
+
     try {
       const coordinates = await fetchCoordinates(selectedLocation.street);
       setFormData((prevFormData) => ({
@@ -619,9 +838,6 @@ const deleteTask = (index) => {
       console.error("Error fetching coordinates:", error);
     }
   };
-  
-  
-
 
   // const handleSelectedEquipmentsChange = (selectedEquipments) => {
   //   setFormData((prevFormData) => ({
@@ -632,8 +848,8 @@ const deleteTask = (index) => {
 
   const handleSelectedEquipmentsChange = (selectedEquipments) => {
     const formattedEquipments = selectedEquipments.map((equipment) => ({
-      itemCode: equipment.ItemCode || "", 
-      itemName: equipment.ItemName || "", 
+      itemCode: equipment.ItemCode || "",
+      itemName: equipment.ItemName || "",
       itemGroup: equipment.ItemGroup || "",
       brand: equipment.Brand || "",
       equipmentLocation: equipment.EquipmentLocation || "",
@@ -644,14 +860,12 @@ const deleteTask = (index) => {
       warrantyStartDate: equipment.WarrantyStartDate || null,
       warrantyEndDate: equipment.WarrantyEndDate || null,
     }));
-  
+
     setFormData((prevFormData) => ({
       ...prevFormData,
       equipments: formattedEquipments,
     }));
   };
-  
-  
 
   const handleNextClick = () => {
     if (activeKey === "summary") {
@@ -704,7 +918,6 @@ const deleteTask = (index) => {
     // SENT API THRU SAP
   };
 
-
   const handleSubmitClick = async () => {
     // Validation function to check required fields
     const isValid = () => {
@@ -715,22 +928,22 @@ const deleteTask = (index) => {
         formData.contact?.firstName,
         formData.location?.locationName,
       ];
-  
+
       // Check for empty fields
       for (const field of requiredFields) {
         if (!field || field.trim() === "") {
           return false;
         }
       }
-  
+
       // Check if there are any assigned workers
       if (selectedWorkers.length === 0) {
         return false;
       }
-  
+
       return true;
     };
-  
+
     if (!isValid()) {
       // If validation fails, show a SweetAlert message
       Swal.fire({
@@ -738,18 +951,23 @@ const deleteTask = (index) => {
         text: "Please fill in all required fields before submitting.",
         icon: "error",
       });
-      return; 
+      return;
     }
-  
+
     try {
-      const formattedStartDateTime = formatDateTime(formData.startDate, formData.startTime);
-      const formattedEndDateTime = formatDateTime(formData.endDate, formData.endTime);
-  
+      const formattedStartDateTime = formatDateTime(
+        formData.startDate,
+        formData.startTime
+      );
+      const formattedEndDateTime = formatDateTime(
+        formData.endDate,
+        formData.endTime
+      );
+
       const assignedWorkers = selectedWorkers.map((worker) => ({
         workerId: worker.value,
       }));
-  
-  
+
       const updatedFormData = {
         ...formData,
         jobID: jobNo,
@@ -787,7 +1005,7 @@ const deleteTask = (index) => {
           completionDate: task.completionDate || null,
         })),
         equipments: formData.equipments.map((equipment) => ({
-          itemCode: equipment.itemCode || "", 
+          itemCode: equipment.itemCode || "",
           itemName: equipment.itemName || "",
           itemGroup: equipment.itemGroup || "",
           brand: equipment.brand || "",
@@ -802,73 +1020,119 @@ const deleteTask = (index) => {
         customerSignature: {
           signatureURL: formData.customerSignature.signatureURL || "",
           signedBy: formData.contactFullname || "",
-          signatureTimestamp: formData.customerSignature.signatureTimestamp || null,
+          signatureTimestamp:
+            formData.customerSignature.signatureTimestamp || null,
         },
       };
-  
+
       // Save the job document
       const jobRef = doc(db, "jobs", jobNo);
       await setDoc(jobRef, updatedFormData);
-  
-    // Step 1: Get the authenticated user's UID
-    const auth = getAuth();
-    const currentUser = auth.currentUser;
-    const uid = currentUser?.uid || "anonymous";
 
-    console.log('Searching for workerId by matching uid in users collection:', uid);
+      // Step 1: Get the authenticated user's UID
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      const uid = currentUser?.uid || "anonymous";
 
-    // Step 2: Load all user documents
-    const usersCollectionRef = collection(db, 'users');
-    const usersSnapshot = await getDocs(usersCollectionRef);
+      console.log(
+        "Searching for workerId by matching uid in users collection:",
+        uid
+      );
 
-    let workerId = null;
-    let fullName = 'anonymous';  // Default value if no match is found
+      // Step 2: Load all user documents
+      const usersCollectionRef = collection(db, "users");
+      const usersSnapshot = await getDocs(usersCollectionRef);
 
-    // Step 3: Loop through each user document and check if `uid` matches
-    usersSnapshot.forEach((doc) => {
-      const userData = doc.data();
-      if (userData.uid === uid) {
-        workerId = userData.workerId;  // Get the workerId from the document where uid matches
-        console.log('Matching workerId found:', workerId);
-      }
-    });
+      let workerId = null;
+      let userId = null;
+      let fullName = "anonymous"; // Default value if no match is found
 
-    // Step 4: If a workerId was found, use it to get the user's full name
-    if (workerId) {
-      const workerDocRef = doc(db, 'users', workerId);  // Now fetch the document by workerId
-      const workerDoc = await getDoc(workerDocRef);
+      // Step 3: Loop through each user document and check if `uid` matches
+      usersSnapshot.forEach((doc) => {
+        const userData = doc.data();
+        if (userData.uid === uid) {
+          workerId = userData.workerId;
+          userId = userData.userId; // Get the workerId from the document where uid matches
+          console.log("Matching workerId found:", workerId);
+        }
+      });
 
-      if (workerDoc.exists()) {
-        const workerData = workerDoc.data();
-        if (workerData.fullName) {
-          fullName = workerData.fullName;  // Get the fullName from the worker document
-          console.log('Full name found:', fullName);
+      // Step 4: If a workerId was found, use it to get the user's full name
+      if (workerId) {
+        const workerDocRef = doc(db, "users", workerId); // Now fetch the document by workerId
+        const workerDoc = await getDoc(workerDocRef);
+
+        if (workerDoc.exists()) {
+          const workerData = workerDoc.data();
+          if (workerData.fullName) {
+            fullName = workerData.fullName; // Get the fullName from the worker document
+            console.log("Full name found:", fullName);
+          }
+        } else {
+          console.log(`No document found for workerId: ${workerId}`);
         }
       } else {
-        console.log(`No document found for workerId: ${workerId}`);
+        console.log("No matching user found for the current UID");
       }
-    } else {
-      console.log('No matching user found for the current UID');
-    }
 
-          // Step 5: Create a log entry for "Job Created" using `jobID` as the document ID
-        const logRef = doc(db, `jobs/${jobNo}/logs`, jobNo);  // Use `jobNo` as the document ID
+      const jobCreatedNotificationRef = collection(db, `notifications`);
 
-        const logEntry = {
-          logID: `${jobNo}`,  // Set logID to `jobNo` since it is now the document ID
+      const jobCreatedNotificationEntry = {
+        userID: "all", 
+        workerId: "all",
+        jobID: jobNo, 
+        notificationType: "Job Created", // Notification type for job creation
+        message: `Job ${formData.jobName} was created by ${fullName}.`, 
+        timestamp: Timestamp.now(), 
+        readBy: {},
+      };
+
+      const docRefCreated = await addDoc(
+        jobCreatedNotificationRef,
+        jobCreatedNotificationEntry
+      );
+      console.log(
+        `Job Created notification added with ID: ${docRefCreated.id}`
+      );
+
+      assignedWorkers.forEach(async (worker) => {
+        const notificationRef = collection(db, `notifications`);
+      
+        // Define the notification entry for each worker
+        const notificationEntry = {
+          userID: userId || "unknown",
+          workerId: worker.workerId,   
           jobID: jobNo,
-          workerId: workerId || 'unknown',
-          uid: uid,  
-          event: "Job Created",
-          details: `Job ${formData.jobName} was created by ${fullName}.`,  // Use the full name here
-          previousStatus: null,
-          newStatus: formData.jobStatus,
-          timestamp: Timestamp.now(),
-          relatedDocuments: {},
+          notificationType: "Job Assigned",
+          message: `You have been assigned to Job ${formData.jobName}.`,
+          timestamp: Timestamp.now(), // Current timestamp
+          read: false, // Initially unread
         };
+      
+        // Add the notification entry for the current worker using `addDoc` to generate an auto ID
+        const docRef = await addDoc(notificationRef, notificationEntry);
+        console.log(
+          `Notification created for worker ${worker.workerId} with ID: ${docRef.id}`
+        );
+      });
+      
 
-        // Use `setDoc` to save the document with `jobNo` as the ID
-        await setDoc(logRef, logEntry);
+      const logRef = doc(db, `jobs/${jobNo}/logs`, jobNo);
+      const logEntry = {
+        logID: `${jobNo}`,
+        jobID: jobNo,
+        workerId: workerId || "unknown",
+        uid: uid,
+        event: "Job Created",
+        details: `Job ${formData.jobName} was created by ${fullName}.`, // Use the full name here
+        previousStatus: null,
+        newStatus: formData.jobStatus,
+        timestamp: Timestamp.now(),
+        relatedDocuments: {},
+      };
+
+      // Use `setDoc` to save the document with `jobNo` as the ID
+      await setDoc(logRef, logEntry);
 
       // Show success SweetAlert and redirect after clicking OK
       Swal.fire({
@@ -876,24 +1140,22 @@ const deleteTask = (index) => {
         text: "Job created successfully.",
         icon: "success",
       }).then(() => {
-        // Redirect using window.location.replace() to avoid adding the current page to session history
-        window.location.replace("/dashboard/jobs/create-jobs");
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
       });
-      
-  
+
       // Clear the form data after submission
       setFormData(initialFormData);
-  
+
       // Increment jobNo for the UI
       setJobNo((prevJobNo) =>
         (parseInt(prevJobNo, 10) + 1).toString().padStart(6, "0")
       );
-
-  
     } catch (e) {
       console.error("Error adding document: ", e);
       toast.error("An error occurred while saving data.");
-  
+
       Swal.fire({
         title: "Error!",
         text: "An error occurred while saving data.",
@@ -901,12 +1163,6 @@ const deleteTask = (index) => {
       });
     }
   };
-  
-  
-  
-  
-  
-  
 
   const handleSubmit = (event) => {
     const form = event.currentTarget;
@@ -1064,93 +1320,92 @@ const deleteTask = (index) => {
                 </Form.Group>
               </Row>
               <Row className="mb-3">
-  <Form.Group as={Col} controlId="locationName">
-    <Form.Label>Location Name</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.locationName || ""} // Fallback to an empty string
-      readOnly
-    />
-  </Form.Group>
-  <Form.Group as={Col} controlId="streetNo">
-    <Form.Label>Street No.</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.streetNo || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-  <Form.Group as={Col} controlId="streetAddress">
-    <Form.Label>Street Address</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.streetAddress || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-</Row>
-<Row className="mb-3">
-  <Form.Group as={Col} controlId="block">
-    <Form.Label>Block</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.block || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-  <Form.Group as={Col} controlId="buildingNo">
-    <Form.Label>Building No.</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.buildingNo || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-</Row>
-<Row className="mb-3">
-  <Form.Group as={Col} md="3" controlId="country">
-    <Form.Label>Country</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.country || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-  <Form.Group as={Col} md="3" controlId="stateProvince">
-    <Form.Label>State/Province</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.stateProvince || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-  <Form.Group as={Col} md="3" controlId="city">
-    <Form.Label>City</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.city || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-  <Form.Group as={Col} md="3" controlId="postalCode">
-    <Form.Label>Zip/Postal Code</Form.Label>
-    <Form.Control
-      type="text"
-      disabled
-      value={formData.location?.address?.postalCode || ""} // Ensure fallback
-      readOnly
-    />
-  </Form.Group>
-</Row>
-
+                <Form.Group as={Col} controlId="locationName">
+                  <Form.Label>Location Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.locationName || ""} // Fallback to an empty string
+                    readOnly
+                  />
+                </Form.Group>
+                <Form.Group as={Col} controlId="streetNo">
+                  <Form.Label>Street No.</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.streetNo || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+                <Form.Group as={Col} controlId="streetAddress">
+                  <Form.Label>Street Address</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.streetAddress || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+              </Row>
+              <Row className="mb-3">
+                <Form.Group as={Col} controlId="block">
+                  <Form.Label>Block</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.block || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+                <Form.Group as={Col} controlId="buildingNo">
+                  <Form.Label>Building No.</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.buildingNo || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+              </Row>
+              <Row className="mb-3">
+                <Form.Group as={Col} md="3" controlId="country">
+                  <Form.Label>Country</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.country || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+                <Form.Group as={Col} md="3" controlId="stateProvince">
+                  <Form.Label>State/Province</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.stateProvince || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+                <Form.Group as={Col} md="3" controlId="city">
+                  <Form.Label>City</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.city || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+                <Form.Group as={Col} md="3" controlId="postalCode">
+                  <Form.Label>Zip/Postal Code</Form.Label>
+                  <Form.Control
+                    type="text"
+                    disabled
+                    value={formData.location?.address?.postalCode || ""} // Ensure fallback
+                    readOnly
+                  />
+                </Form.Group>
+              </Row>
             </>
           )}
 
@@ -1285,15 +1540,13 @@ const deleteTask = (index) => {
             </Form.Group>
           </Row>
           <Row className="mb-3">
-          <Form.Group controlId="description">
-          <Form.Label>Description</Form.Label>
-          <ReactQuillEditor 
-            initialValue={formData.jobDescription}  // Pass the initial value 
-            onDescriptionChange={handleDescriptionChange}  // Handle changes
-          />
-        </Form.Group>
-
-
+            <Form.Group controlId="description">
+              <Form.Label>Description</Form.Label>
+              <ReactQuillEditor
+                initialValue={formData.jobDescription} // Pass the initial value
+                onDescriptionChange={handleDescriptionChange} // Handle changes
+              />
+            </Form.Group>
           </Row>
           <Row className="mb-3">
             <Form.Group as={Col} md="4" controlId="jobCategory">
@@ -1316,7 +1569,7 @@ const deleteTask = (index) => {
               <Form.Label>Job Status</Form.Label>
               <Form.Select
                 name="jobStatus"
-                value={formData.jobStatus} 
+                value={formData.jobStatus}
                 onChange={handleInputChange}
                 aria-label="Select job status"
               >

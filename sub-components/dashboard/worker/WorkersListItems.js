@@ -32,22 +32,25 @@ const WorkersListItems = () => {
     const fetchWorkers = async () => {
       const usersRef = collection(db, "users");
       const snapshot = await getDocs(usersRef);
-      const workersData = snapshot.docs.map((doc, index) => ({
-        id: doc.id,
-        index: index + 1, // Index starting from 1
-        name: `${doc.data().firstName} ${doc.data().middleName} ${
-          doc.data().lastName
-        }`,
-        profilePicture: doc.data().profilePicture,
-        workerId: doc.data().workerId,
-        email: doc.data().email,
-        primaryPhone: doc.data().primaryPhone,
-        address: `${doc.data().streetAddress}, ${doc.data().stateProvince}, ${
-          doc.data().zipCode
-        }`,
-        skills: doc.data().skills,
-        isActive: doc.data().activeUser,
-      }));
+      const workersData = snapshot.docs.map((doc, index) => {
+        const address = doc.data().address || {}; // Access the address map safely
+
+        return {
+          id: doc.id,
+          index: index + 1, // Index starting from 1
+          name: doc.data().fullName,
+          profilePicture: doc.data().profilePicture,
+          workerId: doc.data().workerId,
+          email: doc.data().email,
+          primaryPhone: doc.data().primaryPhone,
+          address: `${address.streetAddress || ""}, ${
+            address.stateProvince || ""
+          }, ${address.postalCode || ""}`, // Concatenate address fields
+          skills: doc.data().skills,
+          isActive: doc.data().activeUser,
+        };
+      });
+
       setWorkers(workersData);
       setFilteredWorkers(workersData);
       setLoading(false);

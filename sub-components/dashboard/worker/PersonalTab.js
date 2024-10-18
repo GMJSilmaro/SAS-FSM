@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Container, Row, Col, Form, Button, Image } from "react-bootstrap";
+import { Container, Row, Col, Form, Button, Image, InputGroup } from "react-bootstrap";
 import { db, storage } from "../../../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs } from "firebase/firestore";
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
+
 
 export const PersonalTab = ({ onSubmit, initialValues }) => {
   const [profilePicture, setProfilePicture] = useState(
@@ -19,10 +21,32 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [email, setEmail] = useState("");
   const [workerId, setWorkerId] = useState("");
+  const [userId, setUserId] = useState(""); // Updated to be a running number
   const [password, setPassword] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
+  const [role, setRole] = useState("Worker");
   const [file, setFile] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+
   const fileInputRef = useRef(null);
+
+  // Fetch users and set running number for userId
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const usersRef = collection(db, "users");
+      const snapshot = await getDocs(usersRef);
+
+      // Find the highest userId and increment by 1
+      const highestUserId = snapshot.docs.reduce((max, doc) => {
+        const currentId = parseInt(doc.data().userId, 10);
+        return currentId > max ? currentId : max;
+      }, 0);
+
+      setUserId((highestUserId + 1).toString()); // Set the new userId as a running number
+    };
+
+    fetchUsers();
+  }, []); // Only run once when the component mounts
 
   // Set initial values when component mounts or when initialValues prop changes
   useEffect(() => {
@@ -43,8 +67,10 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
       setWorkerId(initialValues.workerId || "");
       setPassword(initialValues.password || "");
       setExpirationDate(initialValues.expirationDate || "");
+      setRole("Worker");
+      setUserId(initialValues.userId || userId); // Set userId from initial values or running number
     }
-  }, [initialValues]); // Re-run this effect if initialValues changes
+  }, [initialValues, userId]); // Re-run this effect if initialValues changes or userId is set
 
   const handleImageChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -75,6 +101,8 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
       }
     }
 
+    const fullName = `${firstName} ${middleName} ${lastName}`.trim();
+
     const formData = {
       profilePicture: profilePictureUrl,
       activeUser,
@@ -84,16 +112,19 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
       firstName,
       middleName,
       lastName,
+      fullName,
       gender,
       dateOfBirth,
       email,
       workerId,
+      userId, // Include the running number userId in the formData
       password,
+      role,
       expirationDate,
     };
 
     console.log(formData);
-    onSubmit(formData); // Don't need to pass workerId here; it's already in formData
+    onSubmit(formData);
   };
 
   const handleRemoveImage = () => {
@@ -271,16 +302,22 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
               placeholder="Enter Worker ID"
             />
           </Form.Group>
-          <Form.Group as={Col} controlId="formGridPassword">
-            <Form.Label>Password</Form.Label>
-            <Form.Control
-              type="password"
-              placeholder="Enter Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </Form.Group>
+            <Form.Group as={Col} controlId="formGridPassword">
+      <Form.Label>Password</Form.Label>
+      <InputGroup>
+        <Form.Control
+          type={showPassword ? "text" : "password"}
+          placeholder="Enter Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <InputGroup.Text onClick={() => setShowPassword(!showPassword)}>
+          {showPassword ? <FaEyeSlash /> : <FaEye />}
+        </InputGroup.Text>
+      </InputGroup>
+    </Form.Group>
+
           <Form.Group as={Col} controlId="formGridExpDate">
             <Form.Label>Expiration Date</Form.Label>
             <Form.Control

@@ -18,6 +18,7 @@ import DefaultMarketingLayout from 'layouts/marketing/DefaultLayout';
 import DefaultDashboardLayout from 'layouts/dashboard/DashboardIndexTop';
 import { Fragment } from 'react';
 import { registerLicense } from "@syncfusion/ej2-base";
+import { ToastContainer } from 'react-toastify';
 
 registerLicense(process.env.REACT_APP_SYNCFUSION_LICENSE_KEY);
 
@@ -72,6 +73,7 @@ useEffect(() => {
       />
       <Provider store={store}>
         <Layout>
+        <ToastContainer />
           <Component {...pageProps} />
         </Layout>
       </Provider>

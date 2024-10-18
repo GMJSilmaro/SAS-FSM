@@ -27,6 +27,7 @@ import {
   QuestionCircle,
 } from "react-bootstrap-icons";
 import { LoadScript, GoogleMap, Marker } from "@react-google-maps/api"; // Google Map import
+
 import {
   GridComponent,
   ColumnsDirective,
@@ -66,7 +67,7 @@ const JobDetails = () => {
             const jobData = jobDoc.data();
             setJob(jobData);
             console.log("Job Data:", jobData);
-
+  
             // Extract worker IDs from assignedWorkers array
             const assignedWorkers = jobData.assignedWorkers || [];
             if (Array.isArray(assignedWorkers)) {
@@ -78,18 +79,18 @@ const JobDetails = () => {
             } else {
               console.error("assignedWorkers is not an array");
             }
-
+  
             // Log the entire location object for debugging
             console.log("Location Object:", jobData.location);
-
-            // Access streetAddress from location.address
-            const streetAddress =
-              jobData.location?.address?.streetAddress || "";
-            if (streetAddress) {
-              console.log("Street Address Found:", streetAddress);
-              getLocationFromAddress(streetAddress);
+  
+            // Access coordinates (latitude, longitude) from location.coordinates
+            const coordinates = jobData.location?.coordinates;
+            if (coordinates) {
+              const { latitude, longitude } = coordinates;
+              console.log("Coordinates Found:", latitude, longitude);
+              setLocation({ latitude, longitude });
             } else {
-              console.error("No street address found for the given job");
+              console.error("No coordinates found for the given job");
             }
           } else {
             console.error("Job not found");
@@ -98,29 +99,22 @@ const JobDetails = () => {
           console.error("Error fetching job:", error);
         }
       };
-
+  
       fetchJob();
     }
   }, [id]);
+  
 
-  // Function to get the lat and long from an address using Geocoding API
-  const getLocationFromAddress = async (address) => {
-    try {
-      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-        address
-      )}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`;
-      const response = await fetch(geocodeUrl);
-      const data = await response.json();
-      if (data.results.length > 0) {
-        const location = data.results[0].geometry.location;
-        setLocation(location);
-      } else {
-        console.error("No location found for the given address");
-      }
-    } catch (error) {
-      console.error("Error fetching geolocation:", error);
-    }
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   };
+  
 
   const renderTaskList = () => {
     return (
@@ -215,18 +209,21 @@ const JobDetails = () => {
             </p>
 
             {location && (
-              <LoadScript
-                googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
-              >
-                <GoogleMap
-                  mapContainerStyle={{ width: "100%", height: "350px" }}
-                  center={location}
-                  zoom={15}
-                >
-                  <Marker position={location} />
-                </GoogleMap>
-              </LoadScript>
+          <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}>
+          <GoogleMap
+            mapContainerStyle={{ width: "100%", height: "350px" }}
+            center={{ lat: location.latitude, lng: location.longitude }}
+            zoom={15}
+          >
+          
+            <Marker
+              position={{ lat: location.latitude, lng: location.longitude }}
+            />
+          </GoogleMap>
+        </LoadScript>
+           
             )}
+
           </>
         );
       case "task":
@@ -426,36 +423,36 @@ const JobDetails = () => {
 
           {/* Schedule */}
           <Card className="mb-4">
-            <Card.Body className="py-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <Calendar4 size={16} className="text-primary" />
-                  <div className="ms-2">
-                    <h5 className="mb-0 text-body">Start Date</h5>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-dark mb-0 fw-semi-bold">
-                    {job.startDate || "N/A"}
-                  </p>
-                </div>
-              </div>
-            </Card.Body>
-            <Card.Body className="border-top py-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <Calendar4 size={16} className="text-primary" />
-                  <div className="ms-2">
-                    <h5 className="mb-0 text-body">End Date</h5>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-dark mb-0 fw-semi-bold">
-                    {job.endDate || "N/A"}
-                  </p>
-                </div>
-              </div>
-            </Card.Body>
+          <Card.Body className="py-3">
+    <div className="d-flex justify-content-between align-items-center">
+      <div className="d-flex align-items-center">
+        <Calendar4 size={16} className="text-primary" />
+        <div className="ms-2">
+          <h5 className="mb-0 text-body">Start Date</h5>
+        </div>
+      </div>
+      <div>
+        <p className="text-dark mb-0 fw-semi-bold">
+          {formatDate(job.startDate)}
+        </p>
+      </div>
+    </div>
+  </Card.Body>
+  <Card.Body className="border-top py-3">
+    <div className="d-flex justify-content-between align-items-center">
+      <div className="d-flex align-items-center">
+        <Calendar4 size={16} className="text-primary" />
+        <div className="ms-2">
+          <h5 className="mb-0 text-body">End Date</h5>
+        </div>
+      </div>
+      <div>
+        <p className="text-dark mb-0 fw-semi-bold">
+          {formatDate(job.endDate)}
+        </p>
+      </div>
+    </div>
+  </Card.Body>
             <Card.Body className="border-top py-3">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center">
@@ -466,9 +463,10 @@ const JobDetails = () => {
                 </div>
                 <div>
                   <p className="text-dark mb-0 fw-semi-bold">
-                  <p>{`${job.estimatedDurationHours || 0} hrs ${job.estimatedDurationMinutes || 0} mins`}</p>
+                    {`${job.estimatedDurationHours || 0} hrs ${job.estimatedDurationMinutes || 0} mins`}
                   </p>
                 </div>
+
               </div>
             </Card.Body>
             <Card.Body className="border-top py-3">

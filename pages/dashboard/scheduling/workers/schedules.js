@@ -1,473 +1,586 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
+  TimelineViews,
+  TimelineMonth,
+  Agenda,
   ScheduleComponent,
-  ResourcesDirective,
-  ResourceDirective,
   ViewsDirective,
   ViewDirective,
+  ResourcesDirective,
+  ResourceDirective,
   Inject,
-  TimelineViews,
   Resize,
   DragAndDrop,
-  TimelineMonth,
 } from "@syncfusion/ej2-react-schedule";
-import { closest, removeClass, addClass } from "@syncfusion/ej2-base";
-import { TreeViewComponent } from "@syncfusion/ej2-react-navigations";
-import { collection, getDocs, setDoc, doc, deleteDoc } from "firebase/firestore"; // Firebase Firestore functions
-import { db } from "../../../../firebase";
-import { Input } from "@syncfusion/ej2-react-inputs";
-import Head from "next/head";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css"; // Import toaster styles
+import { db, auth } from "../../../../firebase";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  setDoc,
+  doc,
+  arrayUnion,
+  updateDoc,
+  getDoc,
+  addDoc,
+  Timestamp,
+  onSnapshot,
+} from "firebase/firestore";
+import { ClipLoader } from "react-spinners";
+import { toast, ToastContainer } from "react-toastify";
+import { onAuthStateChanged } from "firebase/auth";
+import { ChevronDown } from "lucide-react";
+import { extend } from "@syncfusion/ej2-base";
+import { DropDownListComponent } from "@syncfusion/ej2-react-dropdowns";
+import { DateTimePickerComponent } from "@syncfusion/ej2-react-calendars";
+import styles from "./SchedulerStyles.module.css";
 
-const WorkerSchedules = () => {
-  const scheduleObj = useRef(null);
-  const treeObj = useRef(null);
-  const [workerData, setWorkerData] = useState([]);
-  const [eventData, setEventData] = useState([]);
-  const [toastShown, setToastShown] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
+const LoadingOverlay = () => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-8 shadow-lg flex flex-col items-center">
+      <ClipLoader color="#3498db" size={50} />
+      <p className="mt-4 text-lg font-semibold text-gray-700">
+        Loading schedules...
+      </p>
+      <p className="mt-2 text-sm text-gray-500">
+        Please wait while we fetch the latest data.
+      </p>
+    </div>
+  </div>
+);
 
-  const allowDragAndDrops = true;
+const FieldServiceSchedules = () => {
+  const [fieldWorkers, setFieldWorkers] = useState([]);
+  const [scheduleData, setScheduleData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [error, setError] = useState(null);
 
-  let isUpdating = false;
 
-  // Statuses to drag (Available, On Leave, etc.)
-  const fields = {
-    dataSource: [
-      { Id: 1, Name: "Available", StatusType: "Status" },
-      { Id: 2, Name: "Unavailable", StatusType: "Status" },
-      { Id: 3, Name: "On Leave", StatusType: "Status" },
-      { Id: 4, Name: "Sick Leave", StatusType: "Status" },
-      { Id: 5, Name: "Overtime", StatusType: "Status" },
-    ],
-    id: "Id",
-    text: "Name",
+  const statusColors = {
+    Available: "#28a745",
+    "Not Available": "#dc3545",
+    Break: "#ffc107",
+    "On Leave": "#17a2b8",
+    "Sick Leave": "#6c757d",
   };
-  
 
-  const showToastOnce = (message, type = 'success') => {
-    if (!toastShown) {
-      toast[type](message);
-      setToastShown(true);
-      setTimeout(() => setToastShown(false), 1500); // Reset flag after delay
-    }
+  const workDays = [0, 1, 2, 3, 4, 5];
+
+  const statusOptions = [
+    "Available",
+    "Unavailable",
+    "Absent",
+    "On Leave",
+    "Sick Leave",
+    "Work in Progress",
+    "Busy",
+    "Out of Office",
+    "Tentative",
+  ];
+
+  const getEventColor = (args) => {
+    return statusColors[args.Status] || "#1aaa55";
   };
 
-  const addNewEvent = (newEvent) => {
-    setEventData((prevEvents) => [...prevEvents, newEvent]); // Append new event
+  const formatDate = (date) => {
+    const d = new Date(date);
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const day = d.getDate().toString().padStart(2, "0");
+    const year = d.getFullYear();
+    return `${month}-${day}-${year}`;
   };
 
   useEffect(() => {
-    const fetchWorkers = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        const workers = querySnapshot.docs.map((doc) => ({
-          Id: doc.id,
-          Text: `${doc.data().firstName} ${doc.data().lastName}`,
-          Designation: doc.data().isFieldWorker ? "Field Worker" : "Technician",
-        }));
-        setWorkerData(workers);
-        console.log("Fetched Workers: ", workers); // Log the workers fetched
-      } catch (error) {
-        console.error("Error fetching workers: ", error); // Log any errors
+    console.log("Starting authentication process...");
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed. User:", user ? "exists" : "null");
+      if (user) {
+        try {
+          console.log("Attempting to fetch user document for UID:", user.uid);
+          const usersRef = collection(db, "users");
+          const q = query(usersRef, where("uid", "==", user.uid));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+            console.log("User document found. Data:", userData);
+            setCurrentUser({
+              uid: user.uid,
+              userId: userData.userId || userDoc.id,
+              role: userData.role,
+              workerId: userDoc.id,
+            });
+            console.log("Current user set:", {
+              uid: user.uid,
+              userId: userData.userId || userDoc.id,
+              role: userData.role,
+              workerId: userDoc.id,
+            });
+          } else {
+            console.error("No user document found for the authenticated user");
+            setError("User data not found. Please contact support.");
+          }
+        } catch (error) {
+          console.error("Error fetching user document:", error);
+          setError("Error fetching user data. Please try again later.");
+        }
+      } else {
+        console.log("No authenticated user found");
+        setCurrentUser(null);
+        setError("Please log in to access the schedule.");
       }
-    };
-    fetchWorkers();
-  }, []);
-  
+      setIsLoading(false);
+    });
 
+    return () => {
+      console.log("Unsubscribing from auth state changes");
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
-    const fetchSchedules = async () => {
-      const schedules = [];
-      try {
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        console.log(`Total Users Found: ${usersSnapshot.docs.length}`);
-    
-        for (const userDoc of usersSnapshot.docs) {
-          const userId = userDoc.id;
-          console.log(`Fetching schedules for User ID: ${userId}`);
-    
-          // Reference to workerSchedules subcollection for the user
-          const workerScheduleRef = collection(db, `users/${userId}/workerSchedules`);
-          const scheduleSnapshot = await getDocs(workerScheduleRef);
-          
-          console.log(`Worker ID: ${userId}, Worker Schedule Count: ${scheduleSnapshot.docs.length}`);
-    
-          // Iterate through each document in the worker's workerSchedules (each representing a date)
-          for (const scheduleDoc of scheduleSnapshot.docs) {
-            console.log(`Date Document ID: ${scheduleDoc.id}`);
-    
-            // Reference to dailySchedules subcollection under the specific date document
-            const dailyScheduleRef = collection(db, `users/${userId}/workerSchedules/${scheduleDoc.id}/dailySchedules`);
-            const dailyQuerySnapshot = await getDocs(dailyScheduleRef);
-            
-            console.log(`Daily Schedule Count for ${scheduleDoc.id}: ${dailyQuerySnapshot.docs.length}`);
-    
-            // Fetch each event in the dailySchedules subcollection
-            dailyQuerySnapshot.docs.forEach((eventDoc) => {
-              const data = eventDoc.data();
-              const startTime = data.StartTime ? new Date(data.StartTime) : null;
-              const endTime = data.EndTime ? new Date(data.EndTime) : null;
-              const categoryColor = getStatusColor(data.Subject || data.status || 'Default');
-              schedules.push({
-                ...data,
-                StartTime: startTime,
-                EndTime: endTime,
-                CategoryColor: categoryColor,
-                Id: eventDoc.id, // Store the document ID for updates
+    if (currentUser && !error) {
+      const unsubscribeWorkers = setupWorkersListener();
+      return () => {
+        if (unsubscribeWorkers) unsubscribeWorkers();
+      };
+    }
+  }, [currentUser, error]);
+
+  const setupWorkersListener = () => {
+    const workersQuery = query(
+      collection(db, "users"),
+      where("role", "==", "Worker")
+    );
+
+    return onSnapshot(
+      workersQuery,
+      (snapshot) => {
+        const workers = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          text: doc.data().fullName,
+        }));
+        console.log(`Fetched ${workers.length} workers:`, workers);
+        setFieldWorkers(workers);
+
+        // Set up listeners for each worker's schedules
+        workers.forEach(setupWorkerSchedulesListener);
+      },
+      (error) => {
+        console.error("Error fetching workers:", error);
+        setError("Error loading worker data. Please try again later.");
+      }
+    );
+  };
+
+  const setupWorkerSchedulesListener = (worker) => {
+    const scheduleQuery = query(
+      collection(db, "users", worker.id, "workerSchedules")
+    );
+
+    return onSnapshot(
+      scheduleQuery,
+      (snapshot) => {
+        const workerSchedules = [];
+        snapshot.forEach((scheduleDoc) => {
+          const data = scheduleDoc.data();
+          if (data.schedules && Array.isArray(data.schedules)) {
+            data.schedules.forEach((schedule) => {
+              workerSchedules.push({
+                Id: schedule.id,
+                Subject: schedule.status,
+                StartTime: new Date(schedule.startTime),
+                EndTime: new Date(schedule.endTime),
+                IsAllDay: schedule.isAllDay,
+                WorkerId: worker.id,
+                Status: schedule.status,
+                Day: data.day,
+                DayId: data.dayId,
               });
             });
           }
-        }
-        console.log("Current Schedules: ", schedules);
-        setEventData(schedules);
-      } catch (error) {
-        console.error("Error fetching schedules:", error);
-        toast.error("Failed to fetch schedules.");
+        });
+
+        console.log(`Updated schedules for ${worker.text}:`, workerSchedules);
+
+        setScheduleData((prevData) => {
+          // Remove existing schedules for this worker
+          const filteredData = prevData.filter(
+            (schedule) => schedule.WorkerId !== worker.id
+          );
+          // Add the new schedules
+          return [...filteredData, ...workerSchedules];
+        });
+      },
+      (error) => {
+        console.error(
+          `Error fetching schedules for worker ${worker.text}:`,
+          error
+        );
       }
+    );
+  };
+
+  const createNotification = useCallback(
+    async (workerId, status, startTime) => {
+      if (!currentUser) {
+        console.error("No authenticated user found");
+        toast.error("Error creating notification: No authenticated user");
+        return;
+      }
+
+      const notificationRef = collection(db, `notifications`);
+
+      const notificationEntry = {
+        userID: currentUser.userId,
+        workerId: workerId,
+        notificationType: "Schedule Update",
+        message: `Your schedule has been updated. New status: ${status} starting at ${new Date(
+          startTime
+        ).toLocaleString()}.`,
+        timestamp: Timestamp.now(),
+        read: false,
+      };
+
+      try {
+        const docRef = await addDoc(notificationRef, notificationEntry);
+        console.log(
+          `Notification created for worker ${workerId} with ID: ${docRef.id}`
+        );
+      } catch (error) {
+        console.error("Error creating notification:", error);
+        toast.error("Failed to send notification to worker.");
+      }
+    },
+    [currentUser]
+  );
+
+ // Custom QuickInfo content template
+ const quickInfoTemplatesContent = (props) => {
+  const [localSelectedStatus, setLocalSelectedStatus] = useState(
+    props.Subject || statusOptions[0]
+  );
+
+  const handleStatusChange = (e) => {
+    const newValue = e.itemData.value;
+    setLocalSelectedStatus(newValue);
+    addEvent(newValue);
+  };
+
+  const addEvent = (status) => {
+    const scheduleObj = scheduleRef.current?.ej2_instances?.[0];
+    if (!scheduleObj) {
+      console.error("Schedule component is not available.");
+      return;
+    }
+
+    const eventObj = {
+      Id: props.Id || Math.random().toString(36).substr(2, 9),
+      Subject: status,
+      StartTime: props.StartTime,
+      EndTime: props.EndTime,
+      IsAllDay: props.IsAllDay,
+      WorkerId: props.WorkerId || null,
     };
-  
-    fetchSchedules();
-  }, []);
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
 
-  const handleSearchChange = (e) => {
-    setSearchValue(e.target.value.toLowerCase());
-  };
-
-  // Filtered worker data based on search value
-  const filteredWorkerData = workerData.filter((worker) =>
-    worker.Text.toLowerCase().includes(searchValue)
-  );
-
-  const resourceHeaderTemplate = (props) => (
-    <div className="template-wrap">
-      <div className="worker-category">
-        <div className="worker-name"> {props.resourceData.Text}</div>
-        <div className="worker-designation">{props.resourceData.Designation}</div>
-      </div>
-    </div>
-  );
-
-  // Helper function to assign colors based on Subject/Status
-  const getStatusColor = (subject) => {
-    switch (subject) {
-      case "Available":
-        return "#28a745";
-      case "Unavailable":
-        return "#dc3545";
-      case "On Leave":
-        return "#ffc107";
-      case "Sick Leave":
-        return "#17a2b8";
-      case "Overtime":
-        return "#6f42c1";
-      default:
-        return "#ffffff";
-    }
-  };
-
-  const onItemDrag = (event) => {
-    if (event.name === "dragStart") {
-      if (event.data && event.data.Subject) {
-        console.log("Dragging existing event:", event.data.Subject);
-      }
-    }
-
-    if (event.name === "drag") {
-      if (previousEventTarget) {
-        removeClass([previousEventTarget], "highlight");
-      }
-      setPreviousEventTarget(event.event.target);
-      if (event.event.target.classList.contains("e-work-cells")) {
-        addClass([event.event.target], "highlight");
-      }
-    }
-  };
-
-
-  const onTreeDragStop = async (event) => {
-    const scheduleElement = closest(event.target, ".e-work-cells");
-    if (scheduleElement && event.target.classList.contains("e-work-cells") && event.draggedNodeData) {
-      const cellData = scheduleObj.current.getCellDetails(event.target);
-      const resourceDetails = scheduleObj.current.getResourcesByIndex(cellData.groupIndex);
-  
-      // Create a new event data object using the actual status name from the dragged node
-      const newEventData = {
-        Subject: event.draggedNodeData.text, // Use the actual status name directly
-        StartTime: cellData.startTime,
-        EndTime: cellData.endTime,
-        WorkerID: resourceDetails.resourceData.Id,
-      };
-  
-      // Ensure no fields are undefined before saving
-      if (!newEventData.Subject || !newEventData.StartTime || !newEventData.EndTime) {
-        console.error("Cannot save event: Missing required fields", newEventData);
-        toast.error("Failed to add new event. Missing required fields.");
-        return; // Stop execution if fields are missing
-      }
-  
-      // Format the date as MM-DD-YYYY for document ID
-      const dateDocId = `${cellData.startTime.getMonth() + 1}-${cellData.startTime.getDate()}-${cellData.startTime.getFullYear()}`;
-      console.log(`Saving new event for Worker ID: ${newEventData.WorkerID}, Date: ${dateDocId}`);
-  
-      try {
-        // Change to create a subcollection for multiple events on the same date
-        const workerScheduleRef = collection(db, `users/${newEventData.WorkerID}/workerSchedules/${dateDocId}/dailySchedules`);
-        console.log(`Worker Schedule Reference Path: ${workerScheduleRef.path}`);
-  
-        const newDocRef = doc(workerScheduleRef); // Create a new document reference for each event
-        console.log(`New Document Reference ID: ${newDocRef.id}`);
-  
-        await setDoc(newDocRef, newEventData); // Save the event
-        console.log(`Event saved successfully with ID: ${newDocRef.id}`, newEventData);
-  
-        scheduleObj.current.addEvent({ ...newEventData, Id: newDocRef.id });
-        addNewEvent({ ...newEventData, Id: newDocRef.id });
-        showToastOnce("New schedule added successfully!");
-      } catch (error) {
-        console.error("Error saving new event to Firestore:", error);
-        toast.error("Failed to add new event.");
-      }
-    }
-  };
-  
-
-  const onActionBegin = async (args) => {
-    if (args.requestType === "eventChange" && !isUpdating) {
-      const eventId = String(args.data.Id);
-      const updatedEvent = {
-        ...args.data,
-        StartTime: args.data.StartTime || null,
-        EndTime: args.data.EndTime || null,
-      };
-  
-      if (
-        updatedEvent.StartTime && updatedEvent.EndTime && 
-        updatedEvent.StartTime.getTime() === args.data.StartTime?.getTime() &&
-        updatedEvent.EndTime.getTime() === args.data.EndTime?.getTime()
-      ) {
-        console.log("No changes detected in event timing. Skipping update.");
-        return;
-      }
-  
-      if (!updatedEvent.StartTime || !updatedEvent.EndTime) {
-        console.error("Invalid StartTime or EndTime:", updatedEvent);
-        toast.error("Event has invalid StartTime or EndTime.");
-        return;
-      }
-  
-      try {
-        isUpdating = true;
-        console.log("Updating Firestore with changed event:", updatedEvent);
-        const docRef = doc(db, "workerSchedules", eventId);
-        await setDoc(docRef, updatedEvent, { merge: true });
-        scheduleObj.current.saveEvent(updatedEvent);
-        showToastOnce("Schedule updated successfully!");
-      } catch (error) {
-        console.error("Error updating event in Firestore:", error);
-        toast.error("Failed to update schedule.");
-      } finally {
-        isUpdating = false;
-      }
-    }
-  
-    // Handle delete event
-    if (args.requestType === "eventRemove") {
-      const eventData = args.data[0]; // Extract the first event being deleted
-  
-      if (!eventData || !eventData.Id) {
-        console.error("Failed to delete event: Invalid event data or undefined ID", eventData);
-        toast.error("Failed to delete event: Invalid data or undefined ID.");
-        return; // Stop if there's no valid ID
-      }
-  
-      const eventId = String(eventData.Id); // Get the event ID
-      try {
-        console.log("Deleting event with ID:", eventId);
-        const docRef = doc(db, "workerSchedules", eventId);
-        await deleteDoc(docRef); // Delete the event from Firebase
-        showToastOnce("Schedule deleted successfully!");
-      } catch (error) {
-        console.error("Error deleting event from Firestore:", error);
-        toast.error("Failed to delete schedule.");
-      }
-    }
-  };
-  
-  
-  const onDragStop = async (event) => {
-    if (!isUpdating) {
-      console.log("onDragStop triggered", event);
-      const eventId = String(event.data.Id); // Ensure event.data.Id is a string
-      const updatedEvent = {
-        ...event.data,
-        StartTime: event.event?.StartTime || event.data.StartTime,
-        EndTime: event.event?.EndTime || event.data.EndTime,
-      };
-  
-      if (!updatedEvent.StartTime || !updatedEvent.EndTime) {
-        console.error("StartTime or EndTime is undefined", updatedEvent);
-        toast.error("Invalid event data: StartTime or EndTime is missing.");
-        return;
-      }
-  
-      try {
-        isUpdating = true; // Prevent other event triggers
-        console.log("Updating Firestore with event:", updatedEvent);
-        const docRef = doc(db, "workerSchedules", eventId);
-        await setDoc(docRef, updatedEvent, { merge: true });
-        scheduleObj.current.saveEvent(updatedEvent);
-        showToastOnce("Schedule updated successfully!");
-      } catch (error) {
-        console.error("Error updating event in Firestore:", error);
-        toast.error("Failed to update schedule.");
-      } finally {
-        isUpdating = false; // Reset the flag
-      }
-    }
-  };
-  
-
-  const onPopupOpen = (args) => {
-    if (args.type === "QuickInfo" && args.target.classList.contains("e-work-cells")) {
-      args.cancel = true;
-    }
-    // if (args.type === "Editor") {
-    //   args.cancel = true;
-    // }
-  };
-
-  const onEventRendered = (args) => {
-    if (args.data.CategoryColor) {
-      args.element.style.backgroundColor = args.data.CategoryColor;
-      args.element.style.borderColor = args.data.CategoryColor;
-      args.element.style.color = "#ffffff";
-    }
+    scheduleObj.addEvent(eventObj);
+    scheduleObj.closeQuickInfoPopup();
   };
 
   return (
-    <>
-      <Head>
-        <title>Worker Schedule</title>
-      </Head>
-      <ToastContainer /> {/* Add ToastContainer for notifications */}
-      <div className="schedule-control-section">
-        <div className="col-lg-12 control-section">
-          <div className="drag-sample-wrapper">
-            <div className="schedule-container">
-              <div className="title-container">
-                <h1 className="title-text">Worker Schedule</h1>
-              </div>
-              <ScheduleComponent
-                ref={scheduleObj}
-                cssClass="schedule-drag-drop"
-                width="100%"
-                height="650px"
-                selectedDate={new Date()}
-                currentView="TimelineDay"
-                resourceHeaderTemplate={resourceHeaderTemplate}
-                eventSettings={{
-                  dataSource: eventData,
-                  fields: {
-                    Subject: { title: "Status", name: "Subject" },
-                    StartTime: { title: "From", name: "StartTime" },
-                    EndTime: { title: "To", name: "EndTime" },
-                    CategoryColor: { name: "CategoryColor" },
-                  },
-                }}
-                group={{ enableCompactView: false, resources: ["Workers"] }}
-                actionBegin={onActionBegin}
-                dragStop={onDragStop}
-                eventRendered={onEventRendered}
-                popupOpen={onPopupOpen}
-              >
-                <ResourcesDirective>
-                  <ResourceDirective
-                    field="WorkerID"
-                    title="Workers"
-                    name="Workers"
-                    allowMultiple={false}
-                    dataSource={workerData}
-                    textField="Text"
-                    idField="Id"
-                  />
-                </ResourcesDirective>
-                <ViewsDirective>
-                  <ViewDirective option="TimelineDay" />
-                  <ViewDirective
-                  option="TimelineWeek"
-                  timeScale={{ enable: true, interval: 180, slotCount: 3 }}
-                  interval={2}
-                  />
-                  <ViewDirective option="TimelineMonth" />
-                </ViewsDirective>
-                <Inject services={[TimelineViews, TimelineMonth, Resize, DragAndDrop]} />
-              </ScheduleComponent>
-            </div>
-
-            <div className="treeview-external-drag">
-              <div className="title-container">
-                <h1 className="title-text">Status List</h1>
-              </div>
-              <TreeViewComponent
-                ref={treeObj}
-                cssClass="treeview-external-drag"
-                dragArea=".drag-sample-wrapper"
-                fields={fields}
-                nodeTemplate={(data) => {
-                  // Dynamically assign class based on status
-                  let statusClass = "";
-                  switch (data.Name) {
-                    case "Available":
-                      statusClass = "available";
-                      break;
-                    case "Unavailable":
-                      statusClass = "unavailable";
-                      break;
-                    case "On Leave":
-                      statusClass = "onleave";
-                      break;
-                    case "Sick Leave":
-                      statusClass = "sickleave";
-                      break;
-                    case "Overtime":
-                      statusClass = "overtime";
-                      break;
-                    default:
-                      statusClass = "";
-                  }
-
-                  return (
-                    <div className={`e-list-text ${statusClass}`}>
-                      <div id="waitlist">{data.Name}</div>
-                      <div id="waitcategory">{data.StatusType}</div>
-                    </div>
-                  );
-                }}
-                nodeDragStop={onTreeDragStop}
-                nodeDragStart={onItemDrag}
-                allowDragAndDrop={allowDragAndDrops}
-              />
-            </div>
-          </div>
-        </div>
+    <div>
+      <div>{props.StartTime.toLocaleString()} - {props.EndTime.toLocaleString()}</div>
+      <div>
+        <DropDownListComponent
+          id="status"
+          dataSource={statusOptions}
+          placeholder="Select a status"
+          value={localSelectedStatus}
+          change={handleStatusChange}
+        />
       </div>
-    </>
+    </div>
   );
 };
 
-export default WorkerSchedules;
+// QuickInfo footer
+const quickInfoTemplatesFooter = () => {
+  return (
+    <div>
+      <button className="e-btn" onClick={() => alert("Event Saved")}>
+        Save Event
+      </button>
+    </div>
+  );
+};
+
+const scheduleRef = useRef(null);
+
+  const onActionComplete = useCallback(
+    async (args) => {
+      if (!currentUser) {
+        console.error("No authenticated user found");
+        toast.error("Error updating schedule: No authenticated user");
+        return;
+      }
+
+      console.log("onActionComplete triggered", args);
+
+      if (
+        args.data &&
+        (args.requestType === "eventCreated" ||
+          args.requestType === "eventChanged")
+      ) {
+        const eventData = args.data[0];
+        if (!eventData) {
+          console.error("Event data is missing.");
+          return;
+        }
+
+        const workerId = eventData.WorkerId;
+
+        if (!workerId) {
+          console.error("Worker ID is missing. Cannot save schedule.");
+          toast.error("Failed to update schedule. Worker ID is missing.");
+          return;
+        }
+
+        const dayId = formatDate(eventData.StartTime);
+        const newScheduleEntry = {
+          id: eventData.Id || Date.now().toString(),
+          status: eventData.Subject || statusOptions[0],
+          startTime: eventData.StartTime.toISOString(),
+          endTime: eventData.EndTime.toISOString(),
+          isAllDay: eventData.IsAllDay,
+        };
+
+        console.log(
+          `Attempting to save schedule for worker ${workerId} on ${dayId}:`,
+          newScheduleEntry
+        );
+
+        try {
+          const workerScheduleRef = doc(
+            db,
+            "users",
+            workerId,
+            "workerSchedules",
+            dayId
+          );
+          const docSnap = await getDoc(workerScheduleRef);
+
+          let existingSchedules = [];
+          if (docSnap.exists()) {
+            existingSchedules = docSnap.data().schedules || [];
+          }
+
+          const updatedSchedules = existingSchedules.filter(
+            (schedule) => schedule.id !== newScheduleEntry.id
+          );
+          updatedSchedules.push(newScheduleEntry);
+
+          await setDoc(
+            workerScheduleRef,
+            {
+              day: eventData.StartTime.toLocaleDateString("en-US", {
+                weekday: "long",
+              }),
+              dayId: dayId,
+              timestamp: new Date().toISOString(),
+              workerId: workerId,
+              schedules: updatedSchedules,
+            },
+            { merge: true }
+          );
+
+          console.log(
+            `Successfully saved schedule for worker ${workerId} on ${dayId}`
+          );
+          toast.success("Schedule updated successfully!");
+
+          await createNotification(
+            workerId,
+            newScheduleEntry.status,
+            newScheduleEntry.startTime
+          );
+        } catch (error) {
+          console.error(
+            `Error saving schedule for worker ${workerId} on ${dayId}:`,
+            error
+          );
+          toast.error("Failed to update schedule. Please try again.");
+        }
+      } else {
+        console.log("Event not created or changed:", args.requestType);
+      }
+    },
+    [currentUser, createNotification, statusOptions]
+  );
+
+  // const onActionComplete = useCallback(async (args) => {
+  //   if (!currentUser) {
+  //     console.error("No authenticated user found");
+  //     toast.error("Error updating schedule: No authenticated user");
+  //     return;
+  //   }
+
+  //   console.log("onActionComplete triggered", args);
+  //   if (args.requestType === 'eventCreated' || args.requestType === 'eventChanged') {
+  //     const eventData = args.data[0];
+  //     const workerId = eventData.WorkerId;
+  //     const dayId = formatDate(eventData.StartTime);
+
+  //     const newScheduleEntry = {
+  //       id: Date.now().toString(),
+  //       status: eventData.Subject || statusOptions[0],
+  //       startTime: eventData.StartTime.toISOString(),
+  //       endTime: eventData.EndTime.toISOString(),
+  //       isAllDay: eventData.IsAllDay,
+  //     };
+
+  //     console.log(`Attempting to save schedule for worker ${workerId} on ${dayId}:`, newScheduleEntry);
+
+  //     try {
+  //       const workerScheduleRef = doc(db, "users", workerId, "workerSchedules", dayId);
+
+  //       const docSnap = await getDoc(workerScheduleRef);
+  //       let existingSchedules = [];
+  //       if (docSnap.exists()) {
+  //         existingSchedules = docSnap.data().schedules || [];
+  //       }
+
+  //       const scheduleExists = existingSchedules.some(schedule =>
+  //         schedule.startTime === newScheduleEntry.startTime &&
+  //         schedule.endTime === newScheduleEntry.endTime &&
+  //         schedule.status === newScheduleEntry.status
+  //       );
+
+  //       if (!scheduleExists) {
+  //         const updatedSchedules = [...existingSchedules, newScheduleEntry];
+  //         await setDoc(workerScheduleRef, {
+  //           day: eventData.StartTime.toLocaleDateString('en-US', { weekday: 'long' }),
+  //           dayId: dayId,
+  //           timestamp: new Date().toISOString(),
+  //           workerId: workerId,
+  //           schedules: updatedSchedules
+  //         }, { merge: true });
+
+  //         console.log(`Successfully saved schedule for worker ${workerId} on ${dayId}`);
+  //         toast.success('Schedule updated successfully!');
+
+  //         await createNotification(workerId, newScheduleEntry.status, newScheduleEntry.startTime);
+  //       } else {
+  //         console.log("Schedule already exists, skipping save");
+  //         toast.info('This schedule already exists.');
+  //       }
+  //     } catch (error) {
+  //       console.error(`Error saving schedule for worker ${workerId} on ${dayId}:`, error);
+  //       toast.error('Failed to update schedule. Please try again.');
+  //     }
+  //   } else {
+  //     console.log("Event not created or changed:", args.requestType);
+  //   }
+  // }, [currentUser, createNotification, statusOptions]);
+
+  const onActionBegin = (args) => {
+    console.log("Action has started:", args);
+    if (
+      args.requestType === "eventCreate" ||
+      args.requestType === "eventChange"
+    ) {
+      // Validate or modify the event before it's added to the schedule
+      console.log("Modifying event before save:", args.data);
+    }
+  };
+
+  if (isLoading) {
+    return <LoadingOverlay />;
+  }
+
+  if (error) {
+    return <div className="text-center text-red-500 mt-4">{error}</div>;
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="text-center mt-4">
+        Please log in to access the schedule.
+      </div>
+    );
+  }
+
+  return (
+    <div className="schedule-control-section">
+      <ToastContainer position="top-right" autoClose={5000} />
+      <div className="col-lg-12 control-section">
+        <div className="control-wrapper">
+          <ScheduleComponent
+            ref={scheduleRef}
+            cssClass="timeline-resource-grouping"
+            width="100%"
+            height="650px"
+            currentView="TimelineDay"
+            selectedDate={new Date()}
+            startHour="06:00"
+            endHour="21:00"
+            workDays={workDays}
+            // quickInfoTemplates={{
+            //   content: quickInfoTemplatesContent,
+            //   footer: quickInfoTemplatesFooter,
+            // }}
+           // popupOpen={onPopupOpen}
+            eventSettings={{
+              dataSource: scheduleData,
+              fields: {
+                subject: { name: "Subject", title: "Status" },
+                startTime: { name: "StartTime" },
+                endTime: { name: "EndTime" },
+                description: { name: "Description" },
+              },
+            }}
+            group={{ resources: ["Workers"] }}
+            eventRendered={(args) => {
+              args.element.style.backgroundColor = getEventColor(args.data);
+            }}
+            actionComplete={onActionComplete} // Action complete callback
+            actionBegin={onActionBegin} // Action begin callback
+            
+          >
+            <ResourcesDirective>
+              <ResourceDirective
+                field="WorkerId"
+                title="Field Workers"
+                name="Workers"
+                allowMultiple={false}
+                dataSource={fieldWorkers}
+                textField="text"
+                idField="id"
+              />
+            </ResourcesDirective>
+            <ViewsDirective>
+              <ViewDirective option="TimelineDay" />
+              <ViewDirective option="TimelineWeek" />
+              <ViewDirective option="TimelineWorkWeek" />
+              <ViewDirective option="TimelineMonth" />
+              <ViewDirective option="Agenda" />
+            </ViewsDirective>
+            <Inject
+              services={[
+                TimelineViews,
+                TimelineMonth,
+                Agenda,
+                Resize,
+                DragAndDrop,
+              ]}
+            />
+          </ScheduleComponent>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FieldServiceSchedules;

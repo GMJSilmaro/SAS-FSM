@@ -273,7 +273,19 @@
     border-radius: 4px;  /* Optional: rounded corners for events */
 }
 
-
+.disabled-item {
+    pointer-events: none;    /* Prevent any interaction */
+    opacity: 0.5;            /* Make it visually appear disabled */
+    cursor: not-allowed;     /* Change the cursor to indicate it's not clickable */
+    background-color: #e9ecef; /* Light gray background to indicate disabled */
+    color: #6c757d;          /* Text color similar to disabled Bootstrap elements */
+  }
+  
+  .disabled-item:hover {
+    background-color: #e9ecef; /* Ensure hover doesn't change the background */
+  }
+  
+  
 
 // /// COLOR!
 
