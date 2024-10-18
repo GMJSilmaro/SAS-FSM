@@ -19,10 +19,6 @@ import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck } from "react-icon
 import styles from "./calendar.module.css"; // Import the CSS module
 import { useRouter } from 'next/router';
 
-import { registerLicense } from "@syncfusion/ej2-base";
-
-registerLicense(process.env.REACT_APP_SYNCFUSION_LICENSE_KEY);
-
 const Calendar = () => {
   const router = useRouter();
   const scheduleObj = useRef(null);

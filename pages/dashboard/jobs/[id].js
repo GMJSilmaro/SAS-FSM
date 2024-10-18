@@ -209,7 +209,7 @@ const JobDetails = () => {
             </p>
 
             {location && (
-          <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}>
+          <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
           <GoogleMap
             mapContainerStyle={{ width: "100%", height: "350px" }}
             center={{ lat: location.latitude, lng: location.longitude }}

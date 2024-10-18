@@ -44,7 +44,7 @@ const JobLocation = ({ jobId }) => {
     <Form noValidate>
       <p className="text-muted">Details about the Job Location.</p>
       <Row className="mb-3">
-        <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}>
+        <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={workersLocations.length > 0 ? workersLocations[0].origin : { lat: 0, lng: 0 }} 

@@ -1,7 +1,7 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export default async function handler(req, res) {
-  const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
+  const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const b1session = req.cookies.B1SESSION;
   const routeid = req.cookies.ROUTEID;
 
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   try {
     // Ensure the SAP base URL does not include `/b1s/v1/`
-    const url = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners`;
+    const url = `${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}BusinessPartners`;
 
     // Fetch the business partners using the session cookies
     const queryResponse = await fetch(url, {

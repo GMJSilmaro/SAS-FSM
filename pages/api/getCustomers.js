@@ -1,7 +1,7 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export default async function handler(req, res) {
-  const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
+  const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const b1session = req.cookies.B1SESSION;
   const routeid = req.cookies.ROUTEID;
 
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   try {
     // Fetch the BPCode list using the session cookies
-    const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql01')/List`, {
+    const queryResponse = await fetch(`${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql01')/List`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -64,13 +64,13 @@ export default async function handler(req, res) {
       return res.status(403).json({ message: 'Access denied. Admins only.' });
     }
 
-    const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
+    const sapLoginResponse = await fetch(`${process.env.NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}Login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        CompanyDB: process.env.SAP_B1_COMPANY_DB,
-        UserName: process.env.SAP_B1_USERNAME,
-        Password: process.env.SAP_B1_PASSWORD,
+        CompanyDB: process.env.NEXT_PUBLIC_SAP_B1_COMPANY_DB,
+        UserName: process.env.NEXT_PUBLIC_SAP_B1_USERNAME,
+        Password: process.env.NEXT_PUBLIC_SAP_B1_PASSWORD,
       }),
       agent: new https.Agent({ rejectUnauthorized: false }),
     });
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
       isAdmin: userData.isAdmin,
       expirationDate: userData.expirationDate ? new Date(userData.expirationDate).toISOString() : null
     };
-    const secretKey = process.env.JWT_SECRET_KEY || 'kdaJLPhRtGKGTLiAThdvHnVR0H544DOGM3Q2OBerQk4L0z1zzcaOVqU0afHK6ab';
+    const secretKey = 'kdaJLPhRtGKGTLiAThdvHnVR0H544DOGM3Q2OBerQk4L0z1zzcaOVqU0afHK6ab';
     const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
     
     return res.status(200).json({

@@ -2,7 +2,7 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export default async function handler(req, res) {
-  const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
+  const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const { cardCode } = req.body; // Get cardCode from the request body
 
   const b1session = req.cookies.B1SESSION;
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       ParamList: `CardCode='${cardCode}'`
     });
 
-    const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql05')/List`, {
+    const queryResponse = await fetch(`${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql05')/List`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

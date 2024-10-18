@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
+  const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const { cardCode } = req.body;
 
   console.log('Request body:', req.body); // Debugging line
@@ -26,10 +26,10 @@ export default async function handler(req, res) {
     const requestBody = JSON.stringify({
       ParamList: `CardCode='${cardCode}'`
     });
-    console.log('Sending request to:', `${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql03')/List`);
+    console.log('Sending request to:', `${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql03')/List`);
     console.log('With body:', requestBody);
 
-    const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql03')/List`, {
+    const queryResponse = await fetch(`${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql03')/List`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

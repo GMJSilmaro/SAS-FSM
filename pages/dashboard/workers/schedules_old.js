@@ -14,15 +14,12 @@ import {
 } from "@syncfusion/ej2-react-schedule";
 import { closest, removeClass, addClass } from "@syncfusion/ej2-base";
 import { TreeViewComponent } from "@syncfusion/ej2-react-navigations";
-import { registerLicense } from "@syncfusion/ej2-base";
 import { collection, getDocs, setDoc, doc, deleteDoc } from "firebase/firestore"; // Firebase Firestore functions
 import { db } from "../../../firebase";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css"; // Import toaster styles
 import Head from "next/head";
 
-// Register Syncfusion license
-registerLicense(process.env.REACT_APP_SYNCFUSION_LICENSE_KEY);
 
 // Styled components for event colors
 const AvailableEvent = styled.div`
