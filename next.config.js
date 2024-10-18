@@ -16,7 +16,7 @@ const nextConfig = {
     includePaths: [path.join(__dirname, 'styles')],
   },
   images: {
-    domains: ['firebasestorage.googleapis.com'], 
+    domains: ['firebasestorage.googleapis.com'],
   },
   async headers() {
     return [
@@ -52,6 +52,15 @@ const nextConfig = {
       {
         source: '/dashboard',
         destination: '/dashboard/overview',
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/dashboard/overview', // Force this as the starting page
+        permanent: true,
       },
     ];
   },

@@ -15,7 +15,7 @@ const DefaultLayout = (props) => {
 			<main>
 				{props.children}
 			</main>
-			<Footer bgColor="bg-light" />
+			{/* <Footer bgColor="bg-light" /> */}
 		</Fragment>
 	);
 };
