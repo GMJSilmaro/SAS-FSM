@@ -258,11 +258,11 @@ const FieldServiceSchedules = () => {
     [currentUser]
   );
 
- // Custom QuickInfo content template
- const quickInfoTemplatesContent = (props) => {
-  const [localSelectedStatus, setLocalSelectedStatus] = useState(
-    props.Subject || statusOptions[0]
-  );
+//  // Custom QuickInfo content template
+//  const quickInfoTemplatesContent = (props) => {
+//   const [localSelectedStatus, setLocalSelectedStatus] = useState(
+//     props.Subject || statusOptions[0]
+//   );
 
   const handleStatusChange = (e) => {
     const newValue = e.itemData.value;
