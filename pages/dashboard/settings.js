@@ -94,7 +94,7 @@ const Settings = () => {
                 </ListGroup.Item>
               </ListGroup>
           
-              <h6 className="mt-4">List Management</h6>
+              {/* <h6 className="mt-4">List Management</h6>
               <ListGroup variant="flush">
                 <ListGroup.Item action onClick={() => handleMenuClick('list-management/job-categories')}>
                   <i data-feather="briefcase"></i> Job Categories
@@ -120,37 +120,46 @@ const Settings = () => {
                   <i data-feather="cpu"></i> Equipment Models
                   <p className="text-muted small mb-0">Maintain a list of equipment models</p>
                 </ListGroup.Item>
-              </ListGroup>
+              </ListGroup> */}
             </Card.Body>
           </Card>
         );
-      case 'users':
+      case 'notifications':
         return (
           <Card className="shadow-sm">
             <Card.Body>
-              <h5>Users</h5>
-              <p>Manage users, add new users, and assign roles.</p>
+              <h5>Notifications</h5>
+              <p>Manage Text Message/Mail notifications .</p>
             </Card.Body>
           </Card>
         );
-      case 'teams':
+      case 'email':
         return (
           <Card className="shadow-sm">
             <Card.Body>
-              <h5>Teams</h5>
-              <p>Manage your teams and team members.</p>
+              <h5>Email</h5>
+              <p>Manage your Automated Email to sent for Workers.</p>
             </Card.Body>
           </Card>
         );
-      case 'job-types':
+      case 'scheduling':
         return (
           <Card className="shadow-sm">
             <Card.Body>
-              <h5>Job Types</h5>
-              <p>Configure different job types for your system.</p>
+              <h5>Scheduling Window</h5>
+              <p>Set default scheduling windows for jobs (Morning, Afternoon, etc.).</p>
             </Card.Body>
           </Card>
         );
+        case 'email':
+          return (
+            <Card className="shadow-sm">
+              <Card.Body>
+                <h5>Scheduling</h5>
+                <p>Set Work Hours and Scheduling Hours.</p>
+              </Card.Body>
+            </Card>
+          );
       default:
         return null;
     }
@@ -181,14 +190,15 @@ const Settings = () => {
               <ListGroup.Item action onClick={() => handleNavigation('options')}>
                 <FaCog className="me-2" /> Options
               </ListGroup.Item>
-              <ListGroup.Item action onClick={() => handleNavigation('users')}>
-                <FaUser className="me-2" /> Users
+              <ListGroup.Item action onClick={() => handleNavigation('notifications')}>
+                <FaUser className="me-2" /> Notifications
               </ListGroup.Item>
-              <ListGroup.Item action onClick={() => handleNavigation('teams')}>
-                <FaTools className="me-2" /> Teams
+              <ListGroup.Item action onClick={() => handleNavigation('email')}>
+                <FaUser className="me-2" /> Email
               </ListGroup.Item>
-              <ListGroup.Item action onClick={() => handleNavigation('job-types')}>
-                <FaClipboardList className="me-2" /> Job Types
+              <Card.Header className="bg-primary text-white">Jobs and Projects</Card.Header>
+              <ListGroup.Item action onClick={() => handleNavigation('scheduling')}>
+                <FaTools className="me-2" /> Scheduling 
               </ListGroup.Item>
             </ListGroup>
           </Card>
