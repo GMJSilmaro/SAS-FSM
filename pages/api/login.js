@@ -76,20 +76,22 @@ export default async function handler(req, res) {
     //   agent: new https.Agent({ rejectUnauthorized: false }),
     // });
 
-    const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        CompanyDB: process.env.SAP_B1_COMPANY_DB,
-        UserName: process.env.SAP_B1_USERNAME,
-        Password: process.env.SAP_B1_PASSWORD,
-      }),
-      agent: new https.Agent({ rejectUnauthorized: false }),
-    });
 
-    if (!sapLoginResponse.ok) {
-      throw new Error('SAP B1 Service Layer login failed');
-    }
+      const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          CompanyDB: process.env.SAP_B1_COMPANY_DB,
+          UserName: process.env.SAP_B1_USERNAME,
+          Password: process.env.SAP_B1_PASSWORD,
+        }),
+        agent: new https.Agent({ rejectUnauthorized: false }),
+      });
+    
+      if (!sapLoginResponse.ok) {
+        const errorText = await sapLoginResponse.text();
+        throw new Error(`SAP B1 Service Layer login failed: ${sapLoginResponse.status} - ${errorText}`);
+      }
 
     const sapLoginData = await sapLoginResponse.json();
     const sessionId = sapLoginData.SessionId;
