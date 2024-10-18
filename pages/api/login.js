@@ -37,7 +37,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
-  
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -54,7 +53,6 @@ export default async function handler(req, res) {
     }
 
     if (userData.expirationDate) {
-      // Check if expirationDate is a Firestore Timestamp or already a Date
       const expirationDate = userData.expirationDate.toDate 
         ? userData.expirationDate.toDate() 
         : new Date(userData.expirationDate); 
@@ -69,47 +67,27 @@ export default async function handler(req, res) {
       return res.status(403).json({ message: 'Access denied. Admins only.' });
     }
 
-    // const sapLoginResponse = await fetch(`${process.env.NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}Login`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     CompanyDB: process.env.NEXT_PUBLIC_SAP_B1_COMPANY_DB,
-    //     UserName: process.env.NEXT_PUBLIC_SAP_B1_USERNAME,
-    //     Password: process.env.NEXT_PUBLIC_SAP_B1_PASSWORD,
-    //   }),
-    //   agent: new https.Agent({ rejectUnauthorized: false }),
-    // });
+    console.log('Attempting SAP B1 connection test');
+    const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        CompanyDB: process.env.SAP_B1_COMPANY_DB,
+        UserName: process.env.SAP_B1_USERNAME,
+        Password: process.env.SAP_B1_PASSWORD
+      }),
+      agent: agent
+    });
 
-
-    try {
-      console.log('Attempting SAP B1 connection test');
-      const response = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          CompanyDB: process.env.SAP_B1_COMPANY_DB,
-          UserName: process.env.SAP_B1_USERNAME,
-          Password: process.env.SAP_B1_PASSWORD
-        }),
-        agent: agent
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`SAP B1 responded with status: ${response.status}, message: ${errorText}`);
-      }
-  
-      const data = await response.json();
-      console.log('SAP B1 connection successful');
-      res.status(200).json({ message: 'SAP B1 connection successful', data });
-    } catch (error) {
-      console.error('SAP B1 Connection Error:', error);
-      res.status(500).json({ message: 'SAP B1 connection failed', error: error.message });
+    if (!sapLoginResponse.ok) {
+      const errorText = await sapLoginResponse.text();
+      throw new Error(`SAP B1 responded with status: ${sapLoginResponse.status}, message: ${errorText}`);
     }
 
     const sapLoginData = await sapLoginResponse.json();
-    const sessionId = sapLoginData.SessionId;
+    console.log('SAP B1 connection successful');
 
+    const sessionId = sapLoginData.SessionId;
     const sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
     
     res.setHeader('Set-Cookie', [
@@ -118,34 +96,12 @@ export default async function handler(req, res) {
       `B1SESSION_EXPIRY=${sessionExpiryTime.toISOString()}; HttpOnly; Secure; SameSite=None`
     ]);
 
-    if (req.cookies.RENEW_SESSION === 'true') {
-      try {
-        const renewResponse = await fetch(`${process.env.VERCEL_URL}/api/renew-session`, {
-          method: 'POST',
-          headers: {
-            Cookie: req.headers.cookie
-          }
-        });
-        if (!renewResponse.ok) {
-          throw new Error('Failed to renew session');
-        }
-        // Update cookies from the renew response
-        const cookies = renewResponse.headers.get('set-cookie');
-        if (cookies) {
-          res.setHeader('Set-Cookie', cookies);
-        }
-      } catch (error) {
-        console.error('Error renewing session:', error);
-        return res.status(401).json({ message: 'Session renewal failed' });
-      }
-    }
-    
     const token = { 
       uid: user.uid, 
       isAdmin: userData.isAdmin,
       expirationDate: userData.expirationDate ? new Date(userData.expirationDate).toISOString() : null
     };
-    const secretKey = 'kdaJLPhRtGKGTLiAThdvHnVR0H544DOGM3Q2OBerQk4L0z1zzcaOVqU0afHK6ab';
+    const secretKey = process.env.JWT_SECRET_KEY || 'your_fallback_secret_key';
     const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
     
     return res.status(200).json({
@@ -163,6 +119,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Login error:', error);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ message: 'An error occurred during login', error: error.message, stack: error.stack });
+    return res.status(500).json({ message: 'An error occurred during login', error: error.message, stack: error.stack });
   }
 }
