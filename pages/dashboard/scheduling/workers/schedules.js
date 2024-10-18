@@ -459,7 +459,7 @@ const FieldServiceSchedules = () => {
       <div className="col-lg-12 control-section">
         <div className="control-wrapper">
           <ScheduleComponent
-            ref={scheduleRef}
+            // ref={scheduleRef}
             cssClass="timeline-resource-grouping"
             width="100%"
             height="650px"
