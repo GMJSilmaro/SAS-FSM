@@ -27,12 +27,13 @@ async function fetchUserDataByEmail(email) {
   }
 }
 
-export default async function handler(req, res) {
+export default async function handler(req, res) { 
   const { email, password } = req.body;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
+  
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -64,13 +65,24 @@ export default async function handler(req, res) {
       return res.status(403).json({ message: 'Access denied. Admins only.' });
     }
 
-    const sapLoginResponse = await fetch(`${process.env.NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}Login`, {
+    // const sapLoginResponse = await fetch(`${process.env.NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}Login`, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({
+    //     CompanyDB: process.env.NEXT_PUBLIC_SAP_B1_COMPANY_DB,
+    //     UserName: process.env.NEXT_PUBLIC_SAP_B1_USERNAME,
+    //     Password: process.env.NEXT_PUBLIC_SAP_B1_PASSWORD,
+    //   }),
+    //   agent: new https.Agent({ rejectUnauthorized: false }),
+    // });
+
+    const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        CompanyDB: process.env.NEXT_PUBLIC_SAP_B1_COMPANY_DB,
-        UserName: process.env.NEXT_PUBLIC_SAP_B1_USERNAME,
-        Password: process.env.NEXT_PUBLIC_SAP_B1_PASSWORD,
+        CompanyDB: process.env.SAP_B1_COMPANY_DB,
+        UserName: process.env.SAP_B1_USERNAME,
+        Password: process.env.SAP_B1_PASSWORD,
       }),
       agent: new https.Agent({ rejectUnauthorized: false }),
     });
