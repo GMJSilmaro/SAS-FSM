@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
+  const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const { cardCode } = req.body;
 
   if (!cardCode) {
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       ParamList: `CardCode='${cardCode}'`
     });
 
-    const queryResponse = await fetch(`${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql10')/List`, {
+    const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql10')/List`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

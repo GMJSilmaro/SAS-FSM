@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
   try {
     // Ensure the SAP base URL does not include `/b1s/v1/`
-    const url = `${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}BusinessPartners`;
+    const url = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners`;
 
     // Fetch the business partners using the session cookies
     const queryResponse = await fetch(url, {

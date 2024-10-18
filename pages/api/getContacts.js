@@ -3,24 +3,6 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { renewSAPSession } from '../../utils/renewSAPSession';
 
 export default async function handler(req, res) {
-  // if (req.method !== 'POST') {
-  //   return res.status(405).json({ error: 'Method not allowed' });
-  // }
-
-  // const { NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL } = process.env;
-  // const { cardCode } = req.body;
-
-  // if (!cardCode) {
-  //   return res.status(400).json({ error: 'CardCode is required' });
-  // }
-
-  // const b1session = req.cookies.B1SESSION;
-  // const routeid = req.cookies.ROUTEID;
-
-  // if (!b1session || !routeid) {
-  //   return res.status(401).json({ error: 'Unauthorized' });
-  // }
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -67,7 +49,7 @@ export default async function handler(req, res) {
       ParamList: `CardCode='${cardCode}'`
     });
 
-    const queryResponse = await fetch(`${NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql02')/List`, {
+    const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql02')/List`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
