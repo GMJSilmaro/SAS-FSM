@@ -85,12 +85,14 @@ const JobDetails = () => {
 
             // Access coordinates (latitude, longitude) from location.coordinates
             const coordinates = jobData.location?.coordinates;
-            if (coordinates) {
-              const { latitude, longitude } = coordinates;
-              console.log("Coordinates Found:", latitude, longitude);
-              setLocation({ latitude, longitude });
+            if (coordinates && coordinates.latitude && coordinates.longitude) {
+              console.log("Coordinates Found:", coordinates.latitude, coordinates.longitude);
+              setLocation({ 
+                lat: parseFloat(coordinates.latitude), 
+                lng: parseFloat(coordinates.longitude) 
+              });
             } else {
-              console.error("No coordinates found for the given job");
+              console.error("No valid coordinates found for the given job");
             }
           } else {
             console.error("Job not found");
@@ -208,19 +210,14 @@ const JobDetails = () => {
 
             {location && (
               <LoadScript
-                googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                googleMapsApiKey={process.env.GOOGLE_MAPS_API_KEY}
               >
                 <GoogleMap
                   mapContainerStyle={{ width: "100%", height: "350px" }}
-                  center={{ lat: location.latitude, lng: location.longitude }}
+                  center={location}
                   zoom={15}
                 >
-                  <Marker
-                    position={{
-                      lat: location.latitude,
-                      lng: location.longitude,
-                    }}
-                  />
+                  <Marker position={location} />
                 </GoogleMap>
               </LoadScript>
             )}
