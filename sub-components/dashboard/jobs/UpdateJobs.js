@@ -188,12 +188,12 @@ const UpdateJobForm = () => {
           handleSubmit={handleSubmit}
         />
       </Tab>
-      <Tab eventKey="location" title="Job Location">
+      {/* <Tab eventKey="location" title="Job Location">
         <JobLocation jobId={jobId} />
       </Tab>
       <Tab eventKey="images" title="Job Images">
         <JobImages jobId={jobId} assignedWorkers={selectedWorkers} />
-      </Tab>
+      </Tab> */}
     </Tabs>
   );
 };
