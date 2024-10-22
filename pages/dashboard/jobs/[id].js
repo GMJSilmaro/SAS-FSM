@@ -50,6 +50,17 @@ const fetchWorkerDetails = async (workerIds) => {
   return workersData;
 };
 
+// Helper function to geocode address
+const geocodeAddress = async (address) => {
+  const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`);
+  const data = await response.json();
+  if (data.results && data.results.length > 0) {
+    const { lat, lng } = data.results[0].geometry.location;
+    return { lat, lng };
+  }
+  return null;
+};
+
 const JobDetails = () => {
   const router = useRouter();
   const { id } = router.query; // Extract job ID from URL
@@ -83,16 +94,21 @@ const JobDetails = () => {
             // Log the entire location object for debugging
             console.log("Location Object:", jobData.location);
 
-            // Access coordinates (latitude, longitude) from location.coordinates
-            const coordinates = jobData.location?.coordinates;
-            if (coordinates && coordinates.latitude && coordinates.longitude) {
-              console.log("Coordinates Found:", coordinates.latitude, coordinates.longitude);
-              setLocation({ 
-                lat: parseFloat(coordinates.latitude), 
-                lng: parseFloat(coordinates.longitude) 
-              });
+            // Use the street address to get coordinates
+            const streetAddress = jobData.location?.address?.streetAddress;
+            if (streetAddress) {
+              const coordinates = await geocodeAddress(streetAddress);
+              if (coordinates) {
+                console.log("Coordinates Found:", coordinates.lat, coordinates.lng);
+                setLocation({ 
+                  lat: coordinates.lat, 
+                  lng: coordinates.lng 
+                });
+              } else {
+                console.error("No valid coordinates found for the given address");
+              }
             } else {
-              console.error("No valid coordinates found for the given job");
+              console.error("No valid street address found for the given job");
             }
           } else {
             console.error("Job not found");
