@@ -19,7 +19,7 @@ const UpdateJobForm = () => {
     jobNo: "",
     jobName: "",
     description: "",
-    jobPriority: "",
+    priority: "",
     jobStatus: "",
     startDate: "",
     endDate: "",
@@ -50,22 +50,25 @@ const UpdateJobForm = () => {
           console.log("Job Data from Firestore:", jobData);
           setJobData(jobData);
 
+          // Extract worker IDs from assignedWorkers
+          const workers =
+            jobData.assignedWorkers?.map((worker) => worker) || [];
+          setSelectedWorkers(workers); // Set the selected workers based on workerId
+
           setFormData((prevState) => ({
             ...prevState,
             jobNo: jobData.jobNo || "",
             jobName: jobData.jobName || "",
             description: jobData.description || "",
-            jobPriority: jobData.jobPriority || "",
+            priority: jobData.priority || "",
             jobStatus: jobData.jobStatus || "",
-            startDate: jobData.startDate || "",
-            endDate: jobData.endDate || "",
+            startDate: formatDateForInput(jobData.startDate) || "",
+            endDate: formatDateForInput(jobData.endDate) || "",
             startTime: jobData.startTime || "",
             endTime: jobData.endTime || "",
             estimatedDurationHours: jobData.estimatedDurationHours || "",
             estimatedDurationMinutes: jobData.estimatedDurationMinutes || "",
           }));
-
-          setSelectedWorkers(jobData.assignedWorkers || []);
         } else {
           console.error("No such document!");
         }
@@ -82,6 +85,15 @@ const UpdateJobForm = () => {
   useEffect(() => {
     console.log("Updated formData:", formData);
   }, [formData]);
+
+  const formatDateForInput = (dateString) => {
+    const date = new Date(dateString);
+    if (isNaN(date)) return ""; // Handle invalid dates
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   const toggleServiceLocation = () => {
     setShowServiceLocation(!showServiceLocation);
@@ -106,11 +118,14 @@ const UpdateJobForm = () => {
 
   // Add the handleWorkersChange function
   const handleWorkersChange = (selectedOptions) => {
-    const selectedWorkerIds = selectedOptions.map((option) => option.value);
-    setSelectedWorkers(selectedWorkerIds);
-    console.log("Updated Selected Workers:", selectedWorkerIds); // Debug log
-  };
+    // Map the selected options to the required format
+    const selectedWorkersData = selectedOptions.map((option) => ({
+      workerId: option.value, // Create an object with workerId property
+    }));
 
+    setSelectedWorkers(selectedWorkersData); // Update state with the new structure
+    console.log("Updated Selected Workers:", selectedWorkersData); // Debug log
+  };
   const handleSubmit = async () => {
     try {
       const jobDocRef = doc(db, "jobs", jobId);

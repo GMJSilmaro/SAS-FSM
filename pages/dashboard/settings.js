@@ -14,8 +14,18 @@ import {
 import { useRouter } from "next/router";
 import Cookies from "js-cookie";
 import { FaCog, FaUser, FaTools } from "react-icons/fa";
-import Image from 'next/image';
-import { setDoc, doc, getDoc, storage } from "firebase/firestore";
+import Image from "next/image";
+import {
+  setDoc,
+  doc,
+  getDoc,
+  storage,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
 import { db } from "../../firebase";
 
@@ -24,7 +34,7 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState("company-info");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(true); 
+  const [isDisabled, setIsDisabled] = useState(true);
 
   const [showFieldWorkerSettingsModal, setShowFieldWorkerSettingsModal] =
     useState(false); // New state for Field Worker Settings modal
@@ -42,26 +52,42 @@ const Settings = () => {
   const [userDetails, setUserDetails] = useState(null);
   const storage = getStorage();
 
-  const [schedulingWindows, setSchedulingWindows] = useState([
-    {
-      label: "After Morning",
-      timeStart: "03:00 AM",
-      timeEnd: "07:00 PM",
-      isPublic: true,
-    },
-    {
-      label: "Morning",
-      timeStart: "08:00 AM",
-      timeEnd: "12:00 PM",
-      isPublic: true,
-    },
-    {
-      label: "Afternoon",
-      timeStart: "01:00 PM",
-      timeEnd: "05:00 PM",
-      isPublic: false,
-    },
-  ]);
+  const [schedulingWindows, setSchedulingWindows] = useState([]);
+
+  const formatTimeTo12Hour = (time) => {
+    const [hours, minutes] = time.split(":");
+    const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+    const ampm = hours >= 12 ? "PM" : "AM"; // Determine AM/PM
+    return `${formattedHours}:${minutes} ${ampm}`; // Return formatted time
+  };
+
+  // Function to add a scheduling window to the Firestore collection
+  const addSchedulingWindowToFirestore = async (newWindow) => {
+    try {
+      // Check for empty or null values
+      if (!newWindow.label || !newWindow.timeStart || !newWindow.timeEnd) {
+        console.error(
+          "Cannot add scheduling window. All fields must be filled."
+        );
+        return; // Exit the function if any required field is empty
+      }
+
+      // Reference to the "schedulingWindows" collection in Firestore
+      const schedulingWindowsRef = collection(db, "schedulingWindows");
+
+      // Add the new window data to the collection
+      await addDoc(schedulingWindowsRef, {
+        label: newWindow.label,
+        timeStart: newWindow.timeStart,
+        timeEnd: newWindow.timeEnd,
+        isPublic: newWindow.isPublic,
+      });
+
+      console.log("Scheduling window added successfully");
+    } catch (error) {
+      console.error("Error adding scheduling window to Firestore:", error);
+    }
+  };
 
   const [editIndex, setEditIndex] = useState(null);
   const [tempWindow, setTempWindow] = useState({
@@ -71,21 +97,54 @@ const Settings = () => {
     isPublic: true,
   });
 
+  const updateSchedulingWindowInFirestore = async (windowId, updatedWindow) => {
+    try {
+      const windowRef = doc(db, "schedulingWindows", windowId);
+      await updateDoc(windowRef, {
+        label: updatedWindow.label,
+        timeStart: updatedWindow.timeStart,
+        timeEnd: updatedWindow.timeEnd,
+        isPublic: updatedWindow.isPublic,
+      });
+      console.log("Scheduling window updated successfully");
+    } catch (error) {
+      console.error("Error updating scheduling window in Firestore:", error);
+    }
+  };
+
+  const handleSaveClick = async (index) => {
+    const updatedWindow = { ...tempWindow };
+    const windowId = schedulingWindows[index].id; // Get the ID of the window being edited
+
+    // Call the update function
+    await updateSchedulingWindowInFirestore(windowId, updatedWindow);
+
+    // Update local state
+    setSchedulingWindows((prev) =>
+      prev.map((window, i) =>
+        i === index ? { id: windowId, ...updatedWindow } : window
+      )
+    );
+
+    setEditIndex(null); // Reset edit index
+  };
+
   const handleEditClick = (index) => {
     setEditIndex(index);
-    setTempWindow(schedulingWindows[index]);
+    setTempWindow(schedulingWindows[index]); // Populate the tempWindow with the current window data
   };
 
-  const handleSaveClick = (index) => {
-    const updatedWindows = [...schedulingWindows];
-    updatedWindows[index] = tempWindow;
-    setSchedulingWindows(updatedWindows);
-    setEditIndex(null);
-  };
-
-  const handleRemoveClick = (index) => {
-    const updatedWindows = schedulingWindows.filter((_, i) => i !== index);
-    setSchedulingWindows(updatedWindows);
+  const handleRemoveClick = async (index) => {
+    const windowIdToDelete = schedulingWindows[index].id;
+    try {
+      const docRef = doc(db, "schedulingWindows", windowIdToDelete);
+      await deleteDoc(docRef);
+      console.log("Scheduling window removed successfully:", windowIdToDelete);
+      // Update local state after deletion
+      setSchedulingWindows((prev) => prev.filter((_, i) => i !== index));
+    } catch (error) {
+      console.error("Error removing scheduling window:", error);
+    }
   };
 
   const [fieldWorkerSettings, setFieldWorkerSettings] = useState({
@@ -93,6 +152,61 @@ const Settings = () => {
     sendDailyReports: false,
     // Add more settings as needed
   });
+
+  // Function to fetch scheduling windows from Firestore
+  const fetchSchedulingWindows = async () => {
+    try {
+      // Reference to the "schedulingWindows" collection
+      const schedulingWindowsRef = collection(db, "schedulingWindows");
+
+      // Fetch documents from the collection
+      const querySnapshot = await getDocs(schedulingWindowsRef);
+
+      // Helper function to format time to 12-hour format
+      const formatTimeTo12Hour = (time) => {
+        const [hours, minutes] = time.split(":").map(Number);
+        const period = hours >= 12 ? "PM" : "AM";
+        const formattedHours = hours % 12 || 12; // Convert 0 to 12 for midnight
+        return `${formattedHours}:${minutes
+          .toString()
+          .padStart(2, "0")} ${period}`;
+      };
+
+      // Map through the documents and extract data
+      const windows = querySnapshot.docs.map((doc) => ({
+        id: doc.id, // Include the document ID for future reference (e.g., for editing or deleting)
+        label: doc.data().label,
+        timeStart: doc.data().timeStart, // Keep time in 24-hour format for sorting
+        timeEnd: doc.data().timeEnd, // Keep time in 24-hour format for sorting
+        isPublic: doc.data().isPublic,
+      }));
+
+      // Sort windows by timeStart in ascending order
+      windows.sort((a, b) => {
+        const [aHours, aMinutes] = a.timeStart.split(":").map(Number);
+        const [bHours, bMinutes] = b.timeStart.split(":").map(Number);
+        return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+      });
+
+      // Format times to 12-hour format after sorting
+      const formattedWindows = windows.map((window) => ({
+        id: window.id,
+        label: window.label,
+        timeStart: formatTimeTo12Hour(window.timeStart), // Convert timeStart to 12-hour format
+        timeEnd: formatTimeTo12Hour(window.timeEnd), // Convert timeEnd to 12-hour format
+        isPublic: window.isPublic,
+      }));
+
+      // Update the local state with fetched and formatted data
+      setSchedulingWindows(formattedWindows);
+      console.log(
+        "Scheduling windows retrieved successfully:",
+        formattedWindows
+      );
+    } catch (error) {
+      console.error("Error fetching scheduling windows:", error);
+    }
+  };
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -116,6 +230,7 @@ const Settings = () => {
     };
 
     fetchUserDetails();
+    fetchSchedulingWindows();
   }, []);
 
   const handleFieldWorkerSettingsModalShow = () =>
@@ -125,10 +240,6 @@ const Settings = () => {
 
   const handleNavigation = (tab) => {
     setActiveTab(tab);
-  };
-
-  const addSchedulingWindow = (newWindow) => {
-    setSchedulingWindows([...schedulingWindows, newWindow]);
   };
 
   const handleShowScheduleModal = () => setShowScheduleModal(true);
@@ -152,7 +263,6 @@ const Settings = () => {
 
   const handleMenuClick = (menu) => {
     console.log(`Navigating to: ${menu}`);
-
   };
 
   const handleEditModalShow = () => setShowEditModal(true);
@@ -300,7 +410,7 @@ const Settings = () => {
                   /> */}
 
                   <Image
-                    src={companyInfo.logo || "/images/NoImage.png"} 
+                    src={companyInfo.logo || "/images/NoImage.png"}
                     className="rounded-circle"
                     alt="Company Logo"
                     width={120}
@@ -400,32 +510,31 @@ const Settings = () => {
             </Card.Body>
           </Card>
         );
-        case "notifications":
-          return (
-            <Card
-              className={`shadow-sm ${isDisabled ? 'disabled-card' : ''}`}
-              onClick={!isDisabled ? () => handleNotifications() : null} // Disable click if isDisabled is true
-            >
-              <Card.Body>
-                <h5>Notifications</h5>
-                <p>Manage Text Message/Mail notifications.</p>
-              </Card.Body>
-            </Card>
-          );
-        case "email":
-          return (
-            <Card
-              className={`shadow-sm ${isDisabled ? 'disabled-card' : ''}`}
-              onClick={!isDisabled ? () => handleEmail() : null} 
-            >
-              <Card.Body>
-                <h5>Email</h5>
-                <p>Manage your Automated Email to send for Workers.</p>
-              </Card.Body>
-            </Card>
-          );
-        
-        
+      case "notifications":
+        return (
+          <Card
+            className={`shadow-sm ${isDisabled ? "disabled-card" : ""}`}
+            onClick={!isDisabled ? () => handleNotifications() : null} // Disable click if isDisabled is true
+          >
+            <Card.Body>
+              <h5>Notifications</h5>
+              <p>Manage Text Message/Mail notifications.</p>
+            </Card.Body>
+          </Card>
+        );
+      case "email":
+        return (
+          <Card
+            className={`shadow-sm ${isDisabled ? "disabled-card" : ""}`}
+            onClick={!isDisabled ? () => handleEmail() : null}
+          >
+            <Card.Body>
+              <h5>Email</h5>
+              <p>Manage your Automated Email to send for Workers.</p>
+            </Card.Body>
+          </Card>
+        );
+
       case "schedulingwindows":
         return (
           <Card className="shadow-sm">
@@ -490,21 +599,22 @@ const Settings = () => {
                 <FaCog className="me-2" /> Options
               </ListGroup.Item>
               <ListGroup.Item
-  action
-  onClick={!isDisabled ? () => handleNavigation("notifications") : null} 
-  className={isDisabled ? "disabled-item" : ""} 
->
-  <FaUser className="me-2" /> Notifications (Not Available)
-</ListGroup.Item>
+                action
+                onClick={
+                  !isDisabled ? () => handleNavigation("notifications") : null
+                }
+                className={isDisabled ? "disabled-item" : ""}
+              >
+                <FaUser className="me-2" /> Notifications (Not Available)
+              </ListGroup.Item>
 
-<ListGroup.Item
-  action
-  onClick={!isDisabled ? () => handleNavigation("email") : null} 
-  className={isDisabled ? "disabled-item" : ""} 
->
-  <FaUser className="me-2" /> Email (Not Available)
-</ListGroup.Item>
-
+              <ListGroup.Item
+                action
+                onClick={!isDisabled ? () => handleNavigation("email") : null}
+                className={isDisabled ? "disabled-item" : ""}
+              >
+                <FaUser className="me-2" /> Email (Not Available)
+              </ListGroup.Item>
 
               <Card.Header className="bg-primary text-white">
                 Jobs and Projects
@@ -539,7 +649,7 @@ const Settings = () => {
               <Col xs={12} className="mb-3 d-flex align-items-center">
                 <div className="me-3">
                   <Image
-                    src={logoPreview || "/images/NoImage.png"} 
+                    src={logoPreview || "/images/NoImage.png"}
                     className="rounded-circle"
                     alt="Company Logo"
                     width={120}
@@ -784,7 +894,7 @@ const Settings = () => {
               </thead>
               <tbody>
                 {schedulingWindows.map((window, index) => (
-                  <tr key={index}>
+                  <tr key={window.id}>
                     <td>
                       {editIndex === index ? (
                         <Form.Control
@@ -858,15 +968,15 @@ const Settings = () => {
                         <>
                           <Button
                             variant="success"
-                            size="sm" // Make button smaller
+                            size="sm"
                             onClick={() => handleSaveClick(index)}
-                            className="me-2" // Add margin to the right
+                            className="me-2"
                           >
                             Save
                           </Button>
                           <Button
                             variant="secondary"
-                            size="sm" // Make button smaller
+                            size="sm"
                             onClick={() => setEditIndex(null)}
                           >
                             Cancel
@@ -877,18 +987,16 @@ const Settings = () => {
                           <Button
                             variant="link"
                             onClick={() => handleEditClick(index)}
-                            className="p-0 me-2" // Remove padding for a cleaner look and add margin
+                            className="p-0 me-2"
                           >
-                            <i className="fas fa-edit"></i>{" "}
-                            {/* FontAwesome edit icon */}
+                            <i className="fas fa-edit"></i>
                           </Button>
                           <Button
                             variant="link"
                             onClick={() => handleRemoveClick(index)}
-                            className="p-0" // Remove padding for a cleaner look
+                            className="p-0"
                           >
-                            <i className="fas fa-trash-alt"></i>{" "}
-                            {/* FontAwesome trash icon */}
+                            <i className="fas fa-trash-alt"></i>
                           </Button>
                         </>
                       )}
@@ -901,18 +1009,10 @@ const Settings = () => {
                     <Form.Control type="text" placeholder="Label" id="label" />
                   </td>
                   <td>
-                    <Form.Control
-                      type="time"
-                      placeholder="Time Start"
-                      id="timeStart"
-                    />
+                    <Form.Control type="time" id="timeStart" />
                   </td>
                   <td>
-                    <Form.Control
-                      type="time"
-                      placeholder="Time End"
-                      id="timeEnd"
-                    />
+                    <Form.Control type="time" id="timeEnd" />
                   </td>
                   <td>
                     <Form.Select id="isPublic">
@@ -930,14 +1030,21 @@ const Settings = () => {
             </Button>
             <Button
               variant="primary"
-              onClick={() => {
+              onClick={async () => {
                 const newWindow = {
                   label: document.getElementById("label").value,
                   timeStart: document.getElementById("timeStart").value,
                   timeEnd: document.getElementById("timeEnd").value,
                   isPublic: document.getElementById("isPublic").value === "yes",
+                  userId: Cookies.get("workerId"), // Associate the new scheduling window with the user ID
                 };
-                addSchedulingWindow(newWindow);
+
+                // Add the scheduling window to Firestore
+                await addSchedulingWindowToFirestore(newWindow);
+
+                // Update the local state with the new window
+                setSchedulingWindows((prev) => [...prev, newWindow]);
+
                 // Clear the input fields after adding a new window
                 document.getElementById("label").value = "";
                 document.getElementById("timeStart").value = "";

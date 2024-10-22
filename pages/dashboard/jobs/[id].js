@@ -67,7 +67,7 @@ const JobDetails = () => {
             const jobData = jobDoc.data();
             setJob(jobData);
             console.log("Job Data:", jobData);
-  
+
             // Extract worker IDs from assignedWorkers array
             const assignedWorkers = jobData.assignedWorkers || [];
             if (Array.isArray(assignedWorkers)) {
@@ -79,10 +79,10 @@ const JobDetails = () => {
             } else {
               console.error("assignedWorkers is not an array");
             }
-  
+
             // Log the entire location object for debugging
             console.log("Location Object:", jobData.location);
-  
+
             // Access coordinates (latitude, longitude) from location.coordinates
             const coordinates = jobData.location?.coordinates;
             if (coordinates) {
@@ -99,22 +99,20 @@ const JobDetails = () => {
           console.error("Error fetching job:", error);
         }
       };
-  
+
       fetchJob();
     }
   }, [id]);
-  
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
-  
 
   const renderTaskList = () => {
     return (
@@ -128,8 +126,8 @@ const JobDetails = () => {
           </tr>
         </thead>
         <tbody>
-          {job.TaskList &&
-            job.TaskList.map((task, index) => (
+          {job.taskList &&
+            job.taskList.map((task, index) => (
               <tr key={index}>
                 <td>{index + 1}</td>
                 <td>{task.taskName || "N/A"}</td>
@@ -209,21 +207,23 @@ const JobDetails = () => {
             </p>
 
             {location && (
-          <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
-          <GoogleMap
-            mapContainerStyle={{ width: "100%", height: "350px" }}
-            center={{ lat: location.latitude, lng: location.longitude }}
-            zoom={15}
-          >
-          
-            <Marker
-              position={{ lat: location.latitude, lng: location.longitude }}
-            />
-          </GoogleMap>
-        </LoadScript>
-           
+              <LoadScript
+                googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+              >
+                <GoogleMap
+                  mapContainerStyle={{ width: "100%", height: "350px" }}
+                  center={{ lat: location.latitude, lng: location.longitude }}
+                  zoom={15}
+                >
+                  <Marker
+                    position={{
+                      lat: location.latitude,
+                      lng: location.longitude,
+                    }}
+                  />
+                </GoogleMap>
+              </LoadScript>
             )}
-
           </>
         );
       case "task":
@@ -308,7 +308,9 @@ const JobDetails = () => {
         <h1 className="mb-1 h2 fw-bold">Job Details</h1>
         <Breadcrumb>
           <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
-          <Breadcrumb.Item href="/dashboard/jobs/list-jobs">Jobs</Breadcrumb.Item>
+          <Breadcrumb.Item href="/dashboard/jobs/list-jobs">
+            Jobs
+          </Breadcrumb.Item>
           <Breadcrumb.Item active>{id}</Breadcrumb.Item>
         </Breadcrumb>
 
@@ -423,36 +425,36 @@ const JobDetails = () => {
 
           {/* Schedule */}
           <Card className="mb-4">
-          <Card.Body className="py-3">
-    <div className="d-flex justify-content-between align-items-center">
-      <div className="d-flex align-items-center">
-        <Calendar4 size={16} className="text-primary" />
-        <div className="ms-2">
-          <h5 className="mb-0 text-body">Start Date</h5>
-        </div>
-      </div>
-      <div>
-        <p className="text-dark mb-0 fw-semi-bold">
-          {formatDate(job.startDate)}
-        </p>
-      </div>
-    </div>
-  </Card.Body>
-  <Card.Body className="border-top py-3">
-    <div className="d-flex justify-content-between align-items-center">
-      <div className="d-flex align-items-center">
-        <Calendar4 size={16} className="text-primary" />
-        <div className="ms-2">
-          <h5 className="mb-0 text-body">End Date</h5>
-        </div>
-      </div>
-      <div>
-        <p className="text-dark mb-0 fw-semi-bold">
-          {formatDate(job.endDate)}
-        </p>
-      </div>
-    </div>
-  </Card.Body>
+            <Card.Body className="py-3">
+              <div className="d-flex justify-content-between align-items-center">
+                <div className="d-flex align-items-center">
+                  <Calendar4 size={16} className="text-primary" />
+                  <div className="ms-2">
+                    <h5 className="mb-0 text-body">Start Date</h5>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-dark mb-0 fw-semi-bold">
+                    {formatDate(job.startDate)}
+                  </p>
+                </div>
+              </div>
+            </Card.Body>
+            <Card.Body className="border-top py-3">
+              <div className="d-flex justify-content-between align-items-center">
+                <div className="d-flex align-items-center">
+                  <Calendar4 size={16} className="text-primary" />
+                  <div className="ms-2">
+                    <h5 className="mb-0 text-body">End Date</h5>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-dark mb-0 fw-semi-bold">
+                    {formatDate(job.endDate)}
+                  </p>
+                </div>
+              </div>
+            </Card.Body>
             <Card.Body className="border-top py-3">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center">
@@ -463,10 +465,11 @@ const JobDetails = () => {
                 </div>
                 <div>
                   <p className="text-dark mb-0 fw-semi-bold">
-                    {`${job.estimatedDurationHours || 0} hrs ${job.estimatedDurationMinutes || 0} mins`}
+                    {`${job.estimatedDurationHours || 0} hrs ${
+                      job.estimatedDurationMinutes || 0
+                    } mins`}
                   </p>
                 </div>
-
               </div>
             </Card.Body>
             <Card.Body className="border-top py-3">
@@ -486,10 +489,23 @@ const JobDetails = () => {
             </Card.Body>
           </Card>
         </Col>
+        <Row>
+          <Col xs={12} className="mb-4">
+            <div className="d-flex justify-content-end">
+              {" "}
+              {/* Flexbox container for right alignment */}
+              <button
+                className="btn btn-primary" // Bootstrap button styles
+                onClick={() => router.push(`/dashboard/jobs/update-jobs/${id}`)} // Redirect to edit page
+              >
+                Edit Job
+              </button>
+            </div>
+          </Col>
+        </Row>
       </Row>
     </div>
   );
 };
 
 export default JobDetails;
-

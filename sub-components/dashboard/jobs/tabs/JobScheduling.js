@@ -33,12 +33,12 @@ const JobScheduling = ({
         console.error("Error fetching users:", error);
       }
     };
-
+    console.log(formData);
     fetchUsers();
   }, []);
 
   const assignedWorkersOptions = workers.filter((worker) =>
-    selectedWorkers.includes(worker.value)
+    selectedWorkers.map((sw) => sw.workerId).includes(worker.value)
   );
 
   return (
@@ -89,16 +89,16 @@ const JobScheduling = ({
           <Form.Label>Job Priority</Form.Label>
           <Form.Select
             name="jobPriority"
-            value={formData.jobPriority}
+            value={formData.priority}
             onChange={handleInputChange}
             aria-label="Select job category"
           >
             <option value="" disabled>
               Select Priority
             </option>
-            <option value="L">Low</option>
-            <option value="M">Mid</option>
-            <option value="H">High</option>
+            <option value="Low">Low</option>
+            <option value="Mid">Mid</option>
+            <option value="High">High</option>
           </Form.Select>
         </Form.Group>
         <Form.Group as={Col} md="4" controlId="jobStatus">

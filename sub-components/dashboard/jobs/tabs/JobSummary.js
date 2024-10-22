@@ -3,7 +3,7 @@ import { Row, Col, Form, Button } from "react-bootstrap";
 import Select from "react-select";
 import EquipmentsTable from "pages/dashboard/tables/datatable-equipments";
 import { db } from "../../../../firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 
 const JobSummary = ({
   jobId,
@@ -14,25 +14,36 @@ const JobSummary = ({
   setActiveTab,
 }) => {
   const [formData, setFormData] = useState({
-    customerName: "",
-    firstName: "",
-    middleName: "",
-    lastName: "",
-    phoneNumber: "",
-    mobilePhone: "",
-    email: "",
-    locationName: "",
-    streetNo: "",
-    streetAddress: "",
-    block: "",
-    buildingNo: "",
-    country: "",
-    stateProvince: "",
-    city: "",
-    zipCode: "",
-    equipments: [],
-  });
+    customerID: "", // Added to align with Firestore
+    customerName: "", // Already present
 
+    contact: {
+      contactID: "", // Already present
+      contactFullName: "", // Adjusted to match your Firestore field
+      firstName: "", // Already present
+      middleName: "", // Already present
+      lastName: "", // Already present
+      phoneNumber: "", // Already present
+      mobilePhone: "", // Already present
+      email: "", // Already present
+    },
+
+    location: {
+      address: {
+        streetNo: "", // Already present
+        streetAddress: "", // Adjusted to match your Firestore field
+        block: "", // Already present
+        buildingNo: "", // Not included in your Firestore structure
+        country: "", // Not included in your Firestore structure
+        stateProvince: "", // Already present
+        city: "", // Already present
+        postalCode: "", // Adjusted to match Firestore field
+      },
+
+      locationName: "", // Already present
+    },
+    equipments: [], // Already present
+  });
   const [customers, setCustomers] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -49,7 +60,33 @@ const JobSummary = ({
 
         if (jobSnap.exists()) {
           const jobData = jobSnap.data();
-          setFormData(jobData);
+
+          // Map nested contact data
+          const contactData = jobData.contact || {};
+          const locationData = jobData.location || {};
+          const addressData = locationData.address || {};
+
+          // Set formData with mapped values
+          setFormData({
+            ...jobData,
+            contactId: contactData.contactID || "",
+            firstName: contactData.firstName || "",
+            middleName: contactData.middleName || "",
+            lastName: contactData.lastName || "",
+            phoneNumber: contactData.phoneNumber || "",
+            mobilePhone: contactData.mobilePhone || "",
+            email: contactData.email || "",
+            locationName: locationData.locationName || "",
+            streetNo: addressData.streetNo || "",
+            streetAddress: addressData.streetAddress || "",
+            block: addressData.block || "",
+            buildingNo: addressData.buildingNo || "",
+            country: addressData.country || "",
+            stateProvince: addressData.stateProvince || "",
+            city: addressData.city || "",
+            zipCode: addressData.zipCode || "",
+            equipments: jobData.equipments || [],
+          });
 
           // Find the customer object that matches the customerName from jobData
           const selectedCustomer = customers.find(
@@ -68,7 +105,6 @@ const JobSummary = ({
       fetchJobData();
     }
   }, [jobId, customers]);
-
   useEffect(() => {
     if (selectedCustomer) {
       const fetchRelatedData = async () => {
@@ -121,8 +157,16 @@ const JobSummary = ({
           const selectedLocation = formattedLocations.find(
             (location) => location.label === formData.locationName
           );
+
+          // Log the selected location
           console.log("Selected location:", selectedLocation);
-          setSelectedLocation(selectedLocation);
+
+          // If selectedLocation is found, set it
+          if (selectedLocation) {
+            setSelectedLocation(selectedLocation);
+          } else {
+            setSelectedLocation(null); // Or handle as needed if not found
+          }
         } catch (error) {
           console.error("Error fetching locations:", error);
           setLocations([]);
@@ -180,58 +224,89 @@ const JobSummary = ({
     setFormData((prevFormData) => ({
       ...prevFormData,
       customerName: selectedOption ? selectedOption.label : "",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      phoneNumber: "",
-      mobilePhone: "",
-      email: "",
-      locationName: "",
-      streetNo: "",
-      streetAddress: "",
-      block: "",
-      buildingNo: "",
-      country: "",
-      stateProvince: "",
-      city: "",
-      zipCode: "",
+      contact: {
+        contactID: "",
+        contactFullName: "",
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        phoneNumber: "",
+        mobilePhone: "",
+        email: "",
+      },
+      location: {
+        address: {
+          streetNo: "",
+          streetAddress: "",
+          block: "",
+          buildingNo: "",
+          country: "",
+          stateProvince: "",
+          city: "",
+          zipCode: "",
+        },
+        locationName: "",
+      },
+
       equipments: [], // Clear selected equipments
-      contactId: "",
     }));
     setSelectedCustomer(selectedOption);
   };
 
   const handleContactChange = (selectedOption) => {
+    console.log("Selected contact:", selectedOption); // Debugging log
+    if (!selectedOption) return; // Check if selectedOption is valid
+
+    const fullName = `${selectedOption.firstName || ""} ${
+      selectedOption.middleName || ""
+    } ${selectedOption.lastName || ""}`.trim();
+
+    // Update selected contact
     setSelectedContact(selectedOption);
+
+    // Update formData with the new contact details
     setFormData((prevFormData) => ({
       ...prevFormData,
-      contactId: selectedOption.contactId || "", // Update this line to include contactId
-      firstName: selectedOption.firstName || "",
-      middleName: selectedOption.middleName || "",
-      lastName: selectedOption.lastName || "",
-      phoneNumber: selectedOption.tel1 || "",
-      mobilePhone: selectedOption.tel2 || "",
-      email: selectedOption.email || "",
+      contact: {
+        contactID: selectedOption.contactId || "",
+        contactFullname: fullName,
+        firstName: selectedOption.firstName || "",
+        middleName: selectedOption.middleName || "",
+        lastName: selectedOption.lastName || "",
+        phoneNumber: selectedOption.tel1 || "",
+        mobilePhone: selectedOption.tel2 || "",
+        email: selectedOption.email || "",
+      },
     }));
   };
 
   const handleLocationChange = (selectedOption) => {
+    console.log("Selected location:", selectedOption); // Debugging log
+    if (!selectedOption) return; // Check if selectedOption is valid
+
     const selectedLocation = locations.find(
       (location) => location.value === selectedOption.value
     );
-    setSelectedLocation(selectedLocation);
-    setFormData({
-      ...formData,
-      locationName: selectedLocation.siteId,
-      streetNo: selectedLocation.streetNo || "",
-      streetAddress: selectedLocation.street || "",
-      block: selectedLocation.block || "",
-      buildingNo: selectedLocation.building || "",
-      country: selectedLocation.countryName || "",
-      stateProvince: "",
-      city: selectedLocation.city || "",
-      zipCode: selectedLocation.zipCode || "",
-    });
+
+    if (!selectedLocation) return; // Handle if location is not found
+
+    // Update formData with the new location details
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      location: {
+        locationName: selectedLocation.siteId,
+        address: {
+          streetNo: selectedLocation.streetNo || "",
+          streetAddress: selectedLocation.street || "",
+          block: selectedLocation.block || "",
+          buildingNo: selectedLocation.building || "",
+          country: selectedLocation.countryName || "",
+          stateProvince: "",
+          city: selectedLocation.city || "",
+          zipCode: selectedLocation.zipCode || "",
+        },
+      },
+    }));
   };
 
   const handleSelectedEquipmentsChange = (selectedEquipments) => {
@@ -252,7 +327,67 @@ const JobSummary = ({
   const handleSubmit = async () => {
     try {
       const jobRef = doc(db, "jobs", jobId);
-      await updateDoc(jobRef, formData);
+
+      // Fetch the current document data to retain existing fields
+      const jobDoc = await getDoc(jobRef);
+      const currentData = jobDoc.data() || {}; // Ensure currentData is not null
+
+      // Prepare the data to be updated
+      const updatedData = {
+        customerName: formData.customerName || currentData.customerName,
+        contact: {
+          contactID:
+            formData.contact.contactID || currentData.contact.contactID,
+          contactFullname:
+            formData.contact.contactFullname ||
+            currentData.contact.contactFullname,
+          firstName:
+            formData.contact.firstName || currentData.contact.firstName,
+          middleName:
+            formData.contact.middleName || currentData.contact.middleName,
+          lastName: formData.contact.lastName || currentData.contact.lastName,
+          phoneNumber:
+            formData.contact.phoneNumber || currentData.contact.phoneNumber,
+          mobilePhone:
+            formData.contact.mobilePhone || currentData.contact.mobilePhone,
+          email: formData.contact.email || currentData.contact.email,
+        },
+        location: {
+          address: {
+            streetNo:
+              formData.location.address.streetNo ||
+              currentData.location.address.streetNo,
+            streetAddress:
+              formData.location.address.streetAddress ||
+              currentData.location.address.streetAddress,
+            block:
+              formData.location.address.block ||
+              currentData.location.address.block,
+            city:
+              formData.location.address.city ||
+              currentData.location.address.city,
+            stateProvince:
+              formData.location.address.stateProvince ||
+              currentData.location.address.stateProvince,
+            postalCode:
+              formData.location.address.postalCode ||
+              currentData.location.address.postalCode,
+          },
+          locationName:
+            formData.location.locationName || currentData.location.locationName,
+          coordinates: currentData.location.coordinates || {}, // Retain existing coordinates
+        },
+        equipments: formData.equipments || currentData.equipments || [],
+        // Include any other fields from the currentData that should be retained
+        // For example: assignedWorkers, adminWorkerNotify, etc.
+        assignedWorkers: currentData.assignedWorkers || [],
+        adminWorkerNotify: currentData.adminWorkerNotify || false,
+        jobStatus: currentData.jobStatus || "Created", // Default value if not provided
+        // Add any other necessary fields here...
+      };
+
+      // Update the document in Firestore
+      await setDoc(jobRef, updatedData, { merge: true });
 
       setActiveTab("scheduling");
     } catch (error) {
@@ -301,7 +436,7 @@ const JobSummary = ({
               required
               type="text"
               name="firstName"
-              value={formData.firstName}
+              value={formData.contact.firstName}
               onChange={handleInputChange}
               readOnly={false}
             />
@@ -313,7 +448,7 @@ const JobSummary = ({
               required
               type="text"
               name="middleName"
-              value={formData.middleName}
+              value={formData.contact.middleName}
               onChange={handleInputChange}
               readOnly={false}
             />
@@ -325,7 +460,7 @@ const JobSummary = ({
               required
               type="text"
               name="lastName"
-              value={formData.lastName}
+              value={formData.contact.lastName}
               onChange={handleInputChange}
               readOnly={false}
             />
@@ -337,7 +472,7 @@ const JobSummary = ({
             <Form.Label>Phone Number</Form.Label>
             <Form.Control
               name="phoneNumber"
-              value={formData.phoneNumber}
+              value={formData.contact.phoneNumber}
               onChange={handleInputChange}
               type="text"
               readOnly={false}
@@ -350,7 +485,7 @@ const JobSummary = ({
             <Form.Label>Mobile Phone</Form.Label>
             <Form.Control
               name="mobilePhone"
-              value={formData.mobilePhone}
+              value={formData.contact.mobilePhone}
               onChange={handleInputChange}
               type="text"
               readOnly={false}
@@ -363,7 +498,7 @@ const JobSummary = ({
             <Form.Label>Email</Form.Label>
             <Form.Control
               name="email"
-              value={formData.email}
+              value={formData.contact.email}
               onChange={handleInputChange}
               type="email"
               readOnly={false}
@@ -403,7 +538,7 @@ const JobSummary = ({
                 <Form.Control
                   name="locationName"
                   type="text"
-                  value={formData.locationName}
+                  value={formData.location.locationName}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -413,7 +548,7 @@ const JobSummary = ({
                 <Form.Control
                   name="streetNo"
                   type="text"
-                  value={formData.streetNo}
+                  value={formData.location.address.streetNo}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -423,7 +558,7 @@ const JobSummary = ({
                 <Form.Control
                   name="streetAddress"
                   type="text"
-                  value={formData.streetAddress}
+                  value={formData.location.address.streetAddress}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -435,7 +570,7 @@ const JobSummary = ({
                 <Form.Control
                   name="block"
                   type="text"
-                  value={formData.block}
+                  value={formData.location.address.block}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -445,7 +580,7 @@ const JobSummary = ({
                 <Form.Control
                   name="buildingNo"
                   type="text"
-                  value={formData.buildingNo}
+                  value={formData.location.address.buildingNo}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -457,7 +592,7 @@ const JobSummary = ({
                 <Form.Control
                   name="country"
                   type="text"
-                  value={formData.country}
+                  value={formData.location.address.country}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -467,7 +602,7 @@ const JobSummary = ({
                 <Form.Control
                   name="stateProvince"
                   type="text"
-                  value={formData.stateProvince}
+                  value={formData.location.address.stateProvince}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -477,7 +612,7 @@ const JobSummary = ({
                 <Form.Control
                   name="city"
                   type="text"
-                  value={formData.city}
+                  value={formData.location.address.city}
                   onChange={handleInputChange}
                   readOnly={false}
                 />
@@ -487,7 +622,7 @@ const JobSummary = ({
                 <Form.Control
                   name="zipCode"
                   type="text"
-                  value={formData.zipCode}
+                  value={formData.location.address.zipCode}
                   onChange={handleInputChange}
                   readOnly={false}
                 />

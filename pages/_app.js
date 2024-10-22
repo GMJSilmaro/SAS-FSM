@@ -1,49 +1,53 @@
 // import node module libraries
-import Head from 'next/head';
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { NextSeo } from 'next-seo';
+import Head from "next/head";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
+import { NextSeo } from "next-seo";
 
-import Cookies from 'js-cookie';
+import Cookies from "js-cookie";
 
 // import provider and store from redux state management
-import { Provider } from 'react-redux';
-import { store } from 'store/store';
+import { Provider } from "react-redux";
+import { store } from "store/store";
 
 // import theme style scss file
-import '../styles/theme.scss'; 
+import "../styles/theme.scss";
 
 // import default layouts
-import DefaultMarketingLayout from 'layouts/marketing/DefaultLayout';
-import DefaultDashboardLayout from 'layouts/dashboard/DashboardIndexTop';
-import { Fragment } from 'react';
+import DefaultMarketingLayout from "layouts/marketing/DefaultLayout";
+import DefaultDashboardLayout from "layouts/dashboard/DashboardIndexTop";
+import { Fragment } from "react";
 import { registerLicense } from "@syncfusion/ej2-base";
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer } from "react-toastify";
 
-registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY);
+registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pageURL = process.env.baseURL + router.pathname;
   const title = "SAS - SAP B1 Portal";
-  const description = "Discover SAS, your ultimate SAP B1 portal. Utilize the portal with ease!";
-  const keywords = "SAP B1, Service Layer, Admin dashboard, Portal, web apps, bootstrap 5, Pixelcare Consulting";
+  const description =
+    "Discover SAS, your ultimate SAP B1 portal. Utilize the portal with ease!";
+  const keywords =
+    "SAP B1, Service Layer, Admin dashboard, Portal, web apps, bootstrap 5, Pixelcare Consulting";
 
   // Choose layout based on route
   // const Layout = Component.Layout || (router.pathname.includes('dashboard') ? (router.pathname.includes('instructor') || router.pathname.includes('student') ? DefaultMarketingLayout : DefaultDashboardLayout) : DefaultMarketingLayout);
-  const Layout = Component.Layout || (router.pathname.includes('dashboard') ? DefaultDashboardLayout : DefaultMarketingLayout);
+  const Layout =
+    Component.Layout ||
+    (router.pathname.includes("dashboard")
+      ? DefaultDashboardLayout
+      : DefaultMarketingLayout);
 
+  // Check token for protected routes
+  useEffect(() => {
+    const token = Cookies.get("customToken");
 
-// Check token for protected routes
-useEffect(() => {
-  const token = Cookies.get('customToken');
-
-  // If no token and trying to access protected routes, redirect to sign-in
-  if (!token && router.pathname.startsWith('/dashboard')) {
-    router.push('/authentication/sign-in');
-  }
-}, [router.pathname]); // Trigger on path change
-
+    // If no token and trying to access protected routes, redirect to sign-in
+    if (!token && router.pathname.startsWith("/dashboard")) {
+      router.push("/authentication/sign-in");
+    }
+  }, [router.pathname]); // Trigger on path change
 
   return (
     <Fragment>
@@ -65,7 +69,7 @@ useEffect(() => {
       />
       <Provider store={store}>
         <Layout>
-        <ToastContainer />
+          <ToastContainer />
           <Component {...pageProps} />
         </Layout>
       </Provider>
@@ -74,7 +78,6 @@ useEffect(() => {
 }
 
 export default MyApp;
-
 
 // // import node module libraries
 // import Head from 'next/head';
@@ -87,7 +90,6 @@ export default MyApp;
 
 // // import theme style scss file
 // import 'styles/theme.scss';
-
 
 // // import default layouts
 // import DefaultMarketingLayout from 'layouts/marketing/DefaultLayout';
@@ -102,7 +104,6 @@ export default MyApp;
 //   const keywords = "SAP B1, Service Layer, Admin dashboard, Portal, web apps, bootstrap 5, Pixelcare Consulting"
 
 //   const Layout = Component.Layout || (router.pathname.includes('dashboard') ? (router.pathname.includes('instructor') || router.pathname.includes('student') ? DefaultMarketingLayout : DefaultDashboardLayout) : DefaultMarketingLayout)
-
 
 //   return (
 //     <Fragment>

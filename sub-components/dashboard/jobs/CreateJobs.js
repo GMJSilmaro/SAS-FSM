@@ -23,6 +23,7 @@ import {
   doc,
   Timestamp,
   getDoc,
+  where,
 } from "firebase/firestore";
 import Swal from "sweetalert2";
 import styles from "./CreateJobs.module.css";
@@ -32,10 +33,11 @@ import { useRouter } from "next/router";
 import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from "widgets";
 import { getAuth } from "firebase/auth";
 
-
 const AddNewJobs = () => {
   const router = useRouter();
   const timestamp = Timestamp.now();
+
+  const [schedulingWindows, setSchedulingWindows] = useState([]); // State for scheduling windows
 
   const [workers, setWorkers] = useState([]);
   const [selectedWorkers, setSelectedWorkers] = useState([]);
@@ -129,7 +131,7 @@ const AddNewJobs = () => {
     ],
     customerSignature: {
       signatureURL: "", // URL for the signature image
-      signedBy: "", 
+      signedBy: "",
       signatureTimestamp: "", // Initialize as empty string instead of null
     },
   });
@@ -209,7 +211,7 @@ const AddNewJobs = () => {
     ],
     customerSignature: {
       signatureURL: "", // URL for the signature image
-      signedBy: "", 
+      signedBy: "",
       signatureTimestamp: "", // Initialize as empty string instead of null
     },
   };
@@ -265,23 +267,49 @@ const AddNewJobs = () => {
       toast.error("Failed to logout. Please try again.");
     }
   };
-  
+
+  const fetchSchedulingWindows = async () => {
+    try {
+      const schedulingWindowsRef = collection(db, "schedulingWindows");
+      const querySnapshot = await getDocs(schedulingWindowsRef);
+
+      const windows = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        label: doc.data().label,
+        timeStart: doc.data().timeStart, // Keep time in 24-hour format for storage and display
+        timeEnd: doc.data().timeEnd, // Keep time in 24-hour format for storage and display
+        isPublic: doc.data().isPublic,
+      }));
+
+      // Sort windows by timeStart in ascending order
+      windows.sort((a, b) => {
+        const [aHours, aMinutes] = a.timeStart.split(":").map(Number);
+        const [bHours, bMinutes] = b.timeStart.split(":").map(Number);
+        return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+      });
+
+      setSchedulingWindows(windows); // Use the windows directly without formatting
+    } catch (error) {
+      console.error("Error fetching scheduling windows:", error);
+    }
+  };
+
   const fetchCustomers = async () => {
     try {
       const response = await fetch("/api/getCustomers");
-  
+
       // Check if the response is redirected to login page
       if (response.redirected) {
         toast.error("Session expired. Redirecting to login...");
         forceLogout();
         return;
       }
-  
+
       // Check if the response is OK
       if (!response.ok) {
         throw new Error("Failed to fetch customers");
       }
-  
+
       // Check content type to ensure it's JSON
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
@@ -289,41 +317,39 @@ const AddNewJobs = () => {
         console.error("Unexpected content type, raw response:", responseText);
         throw new Error("Received non-JSON response");
       }
-  
+
       // Parse the response to JSON
       const data = await response.json();
-  
+
       // Validate if the response is an array
       if (!Array.isArray(data)) {
         throw new Error("Unexpected response format. Expected an array.");
       }
-  
+
       // Format the fetched customer data into options
       const formattedOptions = data.map((item) => ({
         value: item.cardCode,
         label: item.cardCode + " - " + item.cardName,
         cardName: item.cardName,
       }));
-  
+
       // Set the formatted data in state
       setCustomers(formattedOptions);
-  
+
       // Update the toast to show success
       toast.success("Customers fetched successfully");
     } catch (error) {
       console.error("Error fetching customers:", error);
-      setCustomers([]); 
+      setCustomers([]);
       toast.error(`Error fetching customers: ${error.message}`);
     } finally {
-   
     }
   };
-  
+
   useEffect(() => {
+    fetchSchedulingWindows();
     fetchCustomers();
   }, []);
-  
-  
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -625,16 +651,16 @@ const AddNewJobs = () => {
     setSelectedContact(null);
     setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
-  
+
     const selectedCustomer = customers.find(
       (option) => option.value === selectedOption.value
     );
-  
+
     setFormData({
       ...formData,
       customerName: selectedCustomer ? selectedCustomer.label : "",
     });
-  
+
     // Fetch related data for the selected customer
     try {
       // Fetch contacts for the customer
@@ -645,11 +671,11 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!contactsResponse.ok) {
         throw new Error("Failed to fetch contacts");
       }
-  
+
       const contactsData = await contactsResponse.json();
       const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
@@ -657,14 +683,14 @@ const AddNewJobs = () => {
         ...item,
       }));
       setContacts(formattedContacts);
-  
+
       if (formattedContacts.length === 0) {
         toast.warning("No contacts available for the selected customer.", {
           position: "top-right",
           autoClose: 3000,
         });
       }
-  
+
       // Fetch locations for the customer
       const locationsResponse = await fetch("/api/getLocation", {
         method: "POST",
@@ -673,11 +699,11 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!locationsResponse.ok) {
         throw new Error("Failed to fetch locations");
       }
-  
+
       const locationsData = await locationsResponse.json();
       const formattedLocations = locationsData.map((item) => ({
         value: item.siteId,
@@ -685,14 +711,14 @@ const AddNewJobs = () => {
         ...item,
       }));
       setLocations(formattedLocations);
-  
+
       if (formattedLocations.length === 0) {
         toast.warning("No locations available for the selected customer.", {
           position: "top-right",
           autoClose: 3000,
         });
       }
-  
+
       // Fetch equipments for the customer
       const equipmentsResponse = await fetch("/api/getEquipments", {
         method: "POST",
@@ -701,11 +727,11 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!equipmentsResponse.ok) {
         throw new Error("Failed to fetch equipments");
       }
-  
+
       const equipmentsData = await equipmentsResponse.json();
       const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
@@ -713,14 +739,14 @@ const AddNewJobs = () => {
         ...item,
       }));
       setEquipments(formattedEquipments);
-  
+
       if (formattedEquipments.length === 0) {
         toast.warning("No equipment available for the selected customer.", {
           position: "top-right",
           autoClose: 3000,
         });
       }
-  
+
       // Fetch service calls for the customer
       const serviceCallResponse = await fetch("/api/getServiceCall", {
         method: "POST",
@@ -729,18 +755,18 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!serviceCallResponse.ok) {
         throw new Error("Failed to fetch service calls");
       }
-  
+
       const serviceCallsData = await serviceCallResponse.json();
       const formattedServiceCalls = serviceCallsData.map((item) => ({
         value: item.serviceCallID,
         label: item.serviceCallID + " - " + item.subject,
       }));
       setServiceCalls(formattedServiceCalls);
-  
+
       // Fetch sales orders for the customer
       const salesOrderResponse = await fetch("/api/getSalesOrder", {
         method: "POST",
@@ -749,11 +775,11 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!salesOrderResponse.ok) {
         throw new Error("Failed to fetch sales orders");
       }
-  
+
       const salesOrdersData = await salesOrderResponse.json();
       const formattedSalesOrders = salesOrdersData.map((item) => ({
         value: item.DocNum,
@@ -769,7 +795,7 @@ const AddNewJobs = () => {
       setSalesOrders([]);
     }
   };
-  
+
   const handleContactChange = (selectedOption) => {
     if (!selectedOption) return;
 
@@ -876,36 +902,50 @@ const AddNewJobs = () => {
   };
 
   const handleScheduleSessionChange = (e) => {
-    const { name, value } = e.target;
-    let updatedFormData = { ...formData, [name]: value };
+    const selectedSessionLabel = e.target.value;
+    const selectedWindow = schedulingWindows.find(
+      (window) => window.label === selectedSessionLabel
+    );
 
-    if (value === "morning") {
-      updatedFormData = {
-        ...updatedFormData,
-        startTime: "09:30",
-        endTime: "13:00",
-        estimatedDurationHours: 3,
-        estimatedDurationMinutes: 30,
-      };
-    } else if (value === "afternoon") {
-      updatedFormData = {
-        ...updatedFormData,
-        startTime: "13:00",
-        endTime: "17:30",
-        estimatedDurationHours: 4,
-        estimatedDurationMinutes: 30,
-      };
+    if (selectedWindow) {
+      // Parse the start and end times
+      const startTimeParts = selectedWindow.timeStart.split(":");
+      const endTimeParts = selectedWindow.timeEnd.split(":");
+
+      const startHours = parseInt(startTimeParts[0], 10);
+      const startMinutes = parseInt(startTimeParts[1], 10);
+      const endHours = parseInt(endTimeParts[0], 10);
+      const endMinutes = parseInt(endTimeParts[1], 10);
+
+      // Calculate total minutes
+      const totalStartMinutes = startHours * 60 + startMinutes;
+      const totalEndMinutes = endHours * 60 + endMinutes;
+
+      // Calculate duration in minutes
+      const durationInMinutes = totalEndMinutes - totalStartMinutes;
+
+      // Calculate hours and minutes
+      const estimatedDurationHours = Math.floor(durationInMinutes / 60);
+      const estimatedDurationMinutes = durationInMinutes % 60;
+
+      setFormData({
+        ...formData,
+        scheduleSession: selectedWindow.label,
+        startTime: selectedWindow.timeStart,
+        endTime: selectedWindow.timeEnd,
+        estimatedDurationHours,
+        estimatedDurationMinutes,
+      });
     } else {
-      updatedFormData = {
-        ...updatedFormData,
+      setFormData({
+        ...formData,
+        scheduleSession: "custom",
         startTime: "",
         endTime: "",
         estimatedDurationHours: "",
         estimatedDurationMinutes: "",
-      };
+      });
     }
-
-    setFormData(updatedFormData);
   };
 
   const handleInputChange = (e) => {
@@ -949,6 +989,80 @@ const AddNewJobs = () => {
       Swal.fire({
         title: "Validation Error!",
         text: "Please fill in all required fields before submitting.",
+        icon: "error",
+      });
+      return;
+    }
+
+    // Function to check for overlapping jobs for assigned workers
+    const checkForOverlappingJobs = async () => {
+      const existingJobsRef = collection(db, "jobs");
+
+      const promises = selectedWorkers.map(async (worker) => {
+        console.log(`Checking for overlaps for worker: ${worker.label}`);
+
+        const existingJobsQuery = query(
+          existingJobsRef,
+          where("assignedWorkers", "array-contains", { workerId: worker.value })
+        );
+
+        const querySnapshot = await getDocs(existingJobsQuery);
+
+        const formattedStartDateTime = new Date(
+          `${formData.startDate}T${formData.startTime}`
+        ).getTime(); // Convert to timestamp
+        const formattedEndDateTime = new Date(
+          `${formData.endDate}T${formData.endTime}`
+        ).getTime(); // Convert to timestamp
+
+        console.log(`Formatted Start Time: ${formattedStartDateTime}`);
+        console.log(`Formatted End Time: ${formattedEndDateTime}`);
+
+        for (const doc of querySnapshot.docs) {
+          const jobData = doc.data();
+          const jobStartDateTime = new Date(jobData.startDate).getTime();
+          const jobEndDateTime = new Date(jobData.endDate).getTime();
+
+          console.log(`Checking job: ${jobData.jobName || "Unnamed Job"}`);
+          console.log(
+            `Job Start Time: ${jobStartDateTime}, Job End Time: ${jobEndDateTime}`
+          );
+
+          // Check for overlap
+          if (
+            (formattedStartDateTime < jobEndDateTime &&
+              formattedEndDateTime > jobStartDateTime) || // New job starts before existing job ends
+            (jobStartDateTime < formattedEndDateTime &&
+              jobEndDateTime > formattedStartDateTime) // Existing job starts before new job ends
+          ) {
+            console.log(`Overlap found for worker: ${worker.label}`);
+            return {
+              workerId: worker.value,
+              message: `Worker ${worker.label} is already assigned to another job during this schedule.`,
+            };
+          }
+        }
+
+        console.log(`No overlap found for worker: ${worker.label}`);
+      });
+
+      const results = await Promise.all(promises);
+      const errors = results.filter((result) => result !== undefined);
+
+      console.log(`Overlap checking completed. Found ${errors.length} errors.`);
+      return errors; // Return any overlap errors found
+    };
+
+    // Check for overlaps before creating the job
+    const overlapErrors = await checkForOverlappingJobs();
+    if (overlapErrors.length > 0) {
+      // If there are any overlap errors, display them
+      const errorMessages = overlapErrors
+        .map((error) => error.message)
+        .join("\n");
+      Swal.fire({
+        title: "Overlap Error!",
+        text: errorMessages,
         icon: "error",
       });
       return;
@@ -1078,12 +1192,12 @@ const AddNewJobs = () => {
       const jobCreatedNotificationRef = collection(db, `notifications`);
 
       const jobCreatedNotificationEntry = {
-        userID: "all", 
+        userID: "all",
         workerId: "all",
-        jobID: jobNo, 
+        jobID: jobNo,
         notificationType: "Job Created", // Notification type for job creation
-        message: `Job ${formData.jobName} was created by ${fullName}.`, 
-        timestamp: Timestamp.now(), 
+        message: `Job ${formData.jobName} was created by ${fullName}.`,
+        timestamp: Timestamp.now(),
         readBy: {},
       };
 
@@ -1097,25 +1211,24 @@ const AddNewJobs = () => {
 
       assignedWorkers.forEach(async (worker) => {
         const notificationRef = collection(db, `notifications`);
-      
+
         // Define the notification entry for each worker
         const notificationEntry = {
           userID: userId || "unknown",
-          workerId: worker.workerId,   
+          workerId: worker.workerId,
           jobID: jobNo,
           notificationType: "Job Assigned",
           message: `You have been assigned to Job ${formData.jobName}.`,
           timestamp: Timestamp.now(), // Current timestamp
           read: false, // Initially unread
         };
-      
+
         // Add the notification entry for the current worker using `addDoc` to generate an auto ID
         const docRef = await addDoc(notificationRef, notificationEntry);
         console.log(
           `Notification created for worker ${worker.workerId} with ID: ${docRef.id}`
         );
       });
-      
 
       const logRef = doc(db, `jobs/${jobNo}/logs`, jobNo);
       const logEntry = {
@@ -1626,9 +1739,13 @@ const AddNewJobs = () => {
                 onChange={handleScheduleSessionChange}
                 aria-label="Select schedule session"
               >
-                <option value="custom">Custom</option>
-                <option value="morning">Morning (9:30am to 1:00pm)</option>
-                <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
+                <option value="">Select a session</option>{" "}
+                <option value="">Custom</option> {/* Placeholder option */}
+                {schedulingWindows.map((window) => (
+                  <option key={window.id} value={window.label}>
+                    {window.label} ({window.timeStart} to {window.timeEnd})
+                  </option>
+                ))}
               </Form.Select>
             </Form.Group>
           </Row>

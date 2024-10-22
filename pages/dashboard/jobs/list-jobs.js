@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useMemo, Fragment } from "react";
-import { Row, Col, Card, Badge, Dropdown, Button, Breadcrumb, OverlayTrigger, Tooltip } from "react-bootstrap";
+import {
+  Row,
+  Col,
+  Card,
+  Badge,
+  Dropdown,
+  Button,
+  Breadcrumb,
+  OverlayTrigger,
+  Tooltip,
+} from "react-bootstrap";
 import { MoreVertical, Trash, Edit } from "react-feather";
 import { FaUser } from "react-icons/fa";
 import { useRouter } from "next/router";
@@ -10,8 +20,7 @@ import Swal from "sweetalert2";
 import styles from "./ViewJobs.module.css";
 import { GeeksSEO } from "widgets";
 import JobStats from "sub-components/dashboard/projects/single/task/JobStats";
-import DOMPurify from 'dompurify';
-
+import DOMPurify from "dompurify";
 
 const ViewJobs = () => {
   const router = useRouter();
@@ -22,37 +31,41 @@ const ViewJobs = () => {
 
   // Custom Styles for DataTable
   const customStyles = {
-    headCells: { 
-      style: { 
-        fontWeight: "bold", 
-        fontSize: "14px", 
-        backgroundColor: "#F1F5FC" 
-      } 
+    headCells: {
+      style: {
+        fontWeight: "bold",
+        fontSize: "14px",
+        backgroundColor: "#F1F5FC",
+      },
     },
-    cells: { 
-      style: { 
-        color: "#64748b", 
-        fontSize: "14px", 
-        textAlign: "left" 
-      } 
+    cells: {
+      style: {
+        color: "#64748b",
+        fontSize: "14px",
+        textAlign: "left",
+      },
     },
-    rows: { 
-      style: { 
+    rows: {
+      style: {
         minHeight: "72px",
-        cursor: 'pointer', // Add this line
-      }, 
-      highlightOnHoverStyle: { 
-        backgroundColor: "#f1f5fc" 
-      } 
+        cursor: "pointer", // Add this line
+      },
+      highlightOnHoverStyle: {
+        backgroundColor: "#f1f5fc",
+      },
     },
   };
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
-      case "Low": return <Badge bg="success">Low</Badge>;
-      case "Mid": return <Badge bg="warning">Mid</Badge>;
-      case "High": return <Badge bg="danger">High</Badge>;
-      default: return priority;
+      case "Low":
+        return <Badge bg="success">Low</Badge>;
+      case "Mid":
+        return <Badge bg="warning">Mid</Badge>;
+      case "High":
+        return <Badge bg="danger">High</Badge>;
+      default:
+        return priority;
     }
   };
 
@@ -70,11 +83,11 @@ const ViewJobs = () => {
     const getStyle = (backgroundColor) => ({
       backgroundColor,
       color: "#fff",
-      padding: '0.5em 0.75em',
-      borderRadius: '0.25rem',
-      fontWeight: 'normal'
+      padding: "0.5em 0.75em",
+      borderRadius: "0.25rem",
+      fontWeight: "normal",
     });
-  
+
     switch (status) {
       case "Created":
         return <Badge style={getStyle("#9e9e9e")}>Created</Badge>;
@@ -98,7 +111,11 @@ const ViewJobs = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   const formatTime = (time) => {
@@ -110,8 +127,54 @@ const ViewJobs = () => {
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
-    const handleRowClick = (row) => {
-    router.push(`/dashboard/jobs/${row.id}`);
+  const handleRowClick = (row) => {
+    Swal.fire({
+      title: "Choose an action",
+      text: "Do you want to view, edit, or remove this job?",
+      icon: "question",
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: "View",
+      denyButtonText: "Edit",
+      cancelButtonText: "Remove",
+      backdrop: true, // Enables backdrop clicking to close the alert
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        // Navigate to the view page
+        router.push(`/dashboard/jobs/${row.id}`);
+      } else if (result.isDenied) {
+        // Navigate to the edit page
+        router.push(`./update-jobs/${row.id}`);
+      } else if (result.isDismissed) {
+        // Confirm before deletion
+        const deleteResult = await Swal.fire({
+          title: "Are you sure?",
+          text: "This action cannot be undone.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          cancelButtonColor: "#3085d6",
+          confirmButtonText: "Yes, remove it!",
+        });
+
+        if (deleteResult.isConfirmed) {
+          try {
+            const jobRef = doc(db, "jobs", row.id);
+            await deleteDoc(jobRef);
+            Swal.fire("Deleted!", "The job has been removed.", "success");
+            // Update state after deletion
+            setJobs(jobs.filter((job) => job.id !== row.id));
+            setFilteredJobs(filteredJobs.filter((job) => job.id !== row.id));
+          } catch (error) {
+            Swal.fire(
+              "Error!",
+              "There was a problem removing the job.",
+              "error"
+            );
+          }
+        }
+      }
+    });
   };
 
   const ActionMenu = ({ jobId }) => {
@@ -157,10 +220,16 @@ const ViewJobs = () => {
       </Dropdown>
     );
   };
-  
 
   const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
-    <Button ref={ref} onClick={(e) => { e.preventDefault(); onClick(e); }} className="btn-icon btn btn-ghost btn-sm rounded-circle">
+    <Button
+      ref={ref}
+      onClick={(e) => {
+        e.preventDefault();
+        onClick(e);
+      }}
+      className="btn-icon btn btn-ghost btn-sm rounded-circle"
+    >
       {children}
     </Button>
   ));
@@ -168,47 +237,51 @@ const ViewJobs = () => {
 
   const HTMLCell = ({ html, maxLength = 100 }) => {
     const sanitizedHTML = DOMPurify.sanitize(html);
-    const textContent = sanitizedHTML.replace(/<[^>]+>/g, '');
-    const truncatedText = textContent.length > maxLength ? `${textContent.substring(0, maxLength)}...` : textContent;
-  
+    const textContent = sanitizedHTML.replace(/<[^>]+>/g, "");
+    const truncatedText =
+      textContent.length > maxLength
+        ? `${textContent.substring(0, maxLength)}...`
+        : textContent;
+
     return (
-      <div title={textContent} style={{ cursor: 'pointer' }}>
+      <div title={textContent} style={{ cursor: "pointer" }}>
         <div dangerouslySetInnerHTML={{ __html: truncatedText }} />
       </div>
     );
   };
 
   const TooltipCell = ({ text, maxLength = 50 }) => {
-    const truncatedText = text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
-    
+    const truncatedText =
+      text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+
     return (
-      <div title={text} style={{ cursor: 'pointer' }}>
+      <div title={text} style={{ cursor: "pointer" }}>
         {truncatedText}
       </div>
     );
   };
 
   const AssignedWorkerCell = ({ workerFullName }) => {
-    const workers = workerFullName.split(', ');
+    const workers = workerFullName.split(", ");
     const displayName = workers[0];
     const remainingCount = workers.length - 1;
-  
+
     return (
       <OverlayTrigger
         placement="top"
         overlay={
-          <Tooltip id={`tooltip-${displayName}`}>
-            {workerFullName}
-          </Tooltip>
+          <Tooltip id={`tooltip-${displayName}`}>{workerFullName}</Tooltip>
         }
       >
         <div className="d-flex align-items-center">
           <FaUser className="me-2" />
-          <span className="text-truncate" style={{ maxWidth: '120px' }}>
+          <span className="text-truncate" style={{ maxWidth: "120px" }}>
             {displayName}
           </span>
           {remainingCount > 0 && (
-            <Badge bg="secondary" className="ms-2">+{remainingCount}</Badge>
+            <Badge bg="secondary" className="ms-2">
+              +{remainingCount}
+            </Badge>
           )}
         </div>
       </OverlayTrigger>
@@ -231,19 +304,19 @@ const ViewJobs = () => {
       name: "Job Name",
       cell: (row) => <TooltipCell text={row.jobName} />,
       sortable: true,
-      width: "200px",  
+      width: "200px",
     },
     {
       name: "Customer Name",
       cell: (row) => <TooltipCell text={row.customerName} />,
       sortable: true,
-      width: "200px",  
+      width: "200px",
     },
     {
-      name: "Location Name", 
+      name: "Location Name",
       cell: (row) => <TooltipCell text={row.locationName} />,
       sortable: true,
-      width: "200px",  
+      width: "200px",
     },
     {
       name: "Job Description",
@@ -294,49 +367,49 @@ const ViewJobs = () => {
       width: "120px",
     },
   ];
-  
 
   useEffect(() => {
     const fetchJobs = async () => {
       const jobsSnapshot = await getDocs(collection(db, "jobs"));
       const usersSnapshot = await getDocs(collection(db, "users"));
-    
+
       const jobsData = jobsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(), // Ensure that customerName and locationName are part of job data
       }));
-    
+
       const usersData = usersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-    
+
       const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
-    
+
       const mergedData = sortedJobsData.map((job) => {
         console.log("Job:", job); // Log the entire job object
         const workerNames = job.assignedWorkers
           .map((workerObj) => {
-            // console.log("Searching for workerId:", workerObj); 
+            // console.log("Searching for workerId:", workerObj);
             const workerId = workerObj.workerId; // Extract the workerId from the object
             const worker = usersData.find((user) => user.workerId === workerId);
             //console.log("Found worker:", worker); // Log the found worker (or undefined)
-            return worker ? `${worker.fullName}` : `Unknown Worker (ID: ${workerId})`;
+            return worker
+              ? `${worker.fullName}`
+              : `Unknown Worker (ID: ${workerId})`;
           })
           .join(", ");
-      
+
         return {
           ...job,
           workerFullName: workerNames || "No workers assigned",
           locationName: job.location?.locationName || "No location name",
         };
       });
-    
+
       setJobs(mergedData);
       setFilteredJobs(mergedData);
       setLoading(false);
     };
-    
 
     fetchJobs();
   }, []);
@@ -346,51 +419,54 @@ const ViewJobs = () => {
       setFilteredJobs(jobs);
       return;
     }
-  
+
     const searchLower = search.toLowerCase().trim();
-  
+
     const result = jobs.filter((job) => {
       // Function to check if any value in the job object matches the search term
       const isMatch = (value) => {
         if (value == null) return false;
-        
-        if (typeof value === 'string') {
+
+        if (typeof value === "string") {
           return value.toLowerCase().includes(searchLower);
         }
-        
-        if (typeof value === 'number') {
+
+        if (typeof value === "number") {
           return value.toString().includes(searchLower);
         }
-        
+
         if (value instanceof Date) {
           return value.toLocaleDateString().toLowerCase().includes(searchLower);
         }
-        
-        if (typeof value === 'object') {
+
+        if (typeof value === "object") {
           return Object.values(value).some(isMatch);
         }
-        
+
         return false;
       };
-  
+
       // Check all properties of the job object
       return Object.values(job).some(isMatch);
     });
-  
+
     setFilteredJobs(result);
   }, [search, jobs]);
 
-  const subHeaderComponentMemo = useMemo(() => (
-    <Fragment>
-      <input 
-        type="text" 
-        className="form-control me-4 mb-4" 
-        placeholder="Search Jobs..." 
-        value={search} 
-        onChange={(e) => setSearch(e.target.value)} 
-      />
-    </Fragment>
-  ), [search]);
+  const subHeaderComponentMemo = useMemo(
+    () => (
+      <Fragment>
+        <input
+          type="text"
+          className="form-control me-4 mb-4"
+          placeholder="Search Jobs..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </Fragment>
+    ),
+    [search]
+  );
 
   return (
     <Fragment>
