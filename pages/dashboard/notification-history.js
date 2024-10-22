@@ -1,127 +1,196 @@
 // import node module libraries
-import React, { Fragment } from "react";
-import { Col, Row, Card, ListGroup, CloseButton, Image } from "react-bootstrap";
-import { ThumbsUp, Award, MessageSquare } from "react-feather";
-import Link from "next/link";
-
-// import widget/custom components
+import React, { useState, useEffect } from "react";
+import { Col, Row, Card, ListGroup, Form, InputGroup, Pagination } from "react-bootstrap";
+import { Bell, Briefcase, CheckCircle, ExclamationCircle, Search } from "react-feather";
+import { format } from "date-fns";
 import { GKTippy } from "widgets";
-
-// import custom components
 import DotBadge from "components/bootstrap/DotBadge";
+import { db } from "../../firebase";
+import { collection, query, where, getDocs, updateDoc, doc, orderBy, limit, startAfter } from "firebase/firestore";
+import Cookies from "js-cookie";
 
-// import data files
-import NotificationData from "data/dashboard/NotificationData";
+const ITEMS_PER_PAGE = 10;
 
 const Notifications = () => {
-  function NotificationsIcon(icon, color) {
-    if (icon === "ThumbsUp") {
-      return <ThumbsUp className={`text-${color} me-1`} size="12px" />;
-    }
-    if (icon === "Award") {
-      return <Award className={`text-${color} me-1`} size="12px" />;
-    }
-    if (icon === "MessageSquare") {
-      return <MessageSquare className={`text-${color} me-1`} size="12px" />;
-    }
-  }
-  function MarkAsRead(removable) {
-    if (removable) {
-      return (
-        <Fragment>
-          <GKTippy content="Mark as read" placement="left">
-            <Link href="#">
-              <DotBadge bg="info" className="mx-1"></DotBadge>
-            </Link>
-          </GKTippy>
-          <GKTippy content="Remove" placement="left">
-            <Link href="#">
-              <CloseButton className="btn-close fs-6 d-block me-1" />
-            </Link>
-          </GKTippy>
-        </Fragment>
+  const [notifications, setNotifications] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [lastVisible, setLastVisible] = useState(null);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [currentPage]);
+
+  const fetchNotifications = async () => {
+    const workerId = Cookies.get("workerId");
+    console.log("Fetching notifications for workerId:", workerId);
+
+    if (workerId) {
+      const notificationsRef = collection(db, "notifications");
+      let q = query(
+        notificationsRef,
+        where("workerId", "in", [workerId, "all"]),
+        orderBy("timestamp", "desc"),
+        limit(ITEMS_PER_PAGE)
       );
+
+      if (lastVisible && currentPage > 1) {
+        q = query(q, startAfter(lastVisible));
+      }
+
+      try {
+        const querySnapshot = await getDocs(q);
+        const notificationsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setNotifications(notificationsData);
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+
+        // Get total count for pagination
+        const countQuery = query(notificationsRef, where("workerId", "in", [workerId, "all"]));
+        const countSnapshot = await getDocs(countQuery);
+        setTotalPages(Math.ceil(countSnapshot.size / ITEMS_PER_PAGE));
+
+        console.log("Fetched notifications:", notificationsData);
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
     } else {
-      return (
-        <GKTippy content="Mark as read" placement="left">
-          <Link href="#">
-            <DotBadge bg="secondary" className="mx-1"></DotBadge>
-          </Link>
-        </GKTippy>
-      );
+      console.log("No workerId found in cookies");
     }
-  }
+  };
+
+  const markAsRead = async (notificationId) => {
+    console.log("Marking as read:", notificationId);
+    const notificationRef = doc(db, "notifications", notificationId);
+    await updateDoc(notificationRef, { read: true });
+    setNotifications(prevNotifications =>
+      prevNotifications.map(notification =>
+        notification.id === notificationId ? { ...notification, read: true } : notification
+      )
+    );
+    console.log("Marked as read successfully");
+  };
+
+  const markAllAsRead = async () => {
+    console.log("Marking all as read");
+    const updatePromises = notifications.map(notification => {
+      if (!notification.read) {
+        const notificationRef = doc(db, "notifications", notification.id);
+        return updateDoc(notificationRef, { read: true });
+      }
+      return Promise.resolve();
+    });
+
+    await Promise.all(updatePromises);
+    setNotifications(prevNotifications =>
+      prevNotifications.map(notification => ({ ...notification, read: true }))
+    );
+    console.log("All notifications marked as read");
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const filteredNotifications = notifications.filter(notification =>
+    (notification.title?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (notification.message?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+  );
+
+  const NotificationIcon = ({ type }) => {
+    switch (type) {
+      case "general": return <Bell className="text-primary" size={20} />;
+      case "task": return <Briefcase className="text-warning" size={20} />;
+      case "approval": return <CheckCircle className="text-success" size={20} />;
+      case "alert": return <ExclamationCircle className="text-danger" size={20} />;
+      default: return <Bell className="text-primary" size={20} />;
+    }
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    setLastVisible(null);  // Reset lastVisible when changing pages
+  };
 
   return (
-    <Fragment>
-      <Row>
-        <Col lg={12} md={12} sm={12}>
-          <div className="border-bottom pb-4 mb-4 d-md-flex align-items-center justify-content-between">
-            <div className="mb-3 mb-md-0">
-              <h1 className="mb-1 h2 font-weight-bold">Notification History</h1>
-              <p className="mb-0">Check your all notification and read it.</p>
-            </div>
-            <div>
-              <Link href="#" className="btn btn-white">
-                Mark all as read
-              </Link>
-            </div>
-          </div>
-        </Col>
-      </Row>
-      <Row>
-        <Col lg={12} md={12} sm={12}>
-          <Card className="rounded-3">
-            <Card.Body className="rounded-3 p-0">
-              <ListGroup>
-                {NotificationData.map((item, index) => {
-                  return (
-                    <ListGroup.Item className="py-4" key={index}>
-                      <Row className="align-items-center">
-                        <Col>
-                          <div className="d-flex align-items-center">
-                            <Link href="#">
-                              <Image
-                                src={item.image}
-                                alt=""
-                                className="avatar-lg rounded-circle"
-                              />
-                            </Link>
-                            <div className="ms-3">
-                              <Link href="#">
-                                <p className="mb-0 text-body">
-                                  <span className="fw-bold mb-0 h5">
-                                    {item.name}:
-                                  </span>{" "}
-                                  {item.notification}
-                                </p>
-                              </Link>
-                              <span className="fs-6 text-muted">
-                                <span>
-                                  {NotificationsIcon(
-                                    item.icon,
-                                    item.colorClass
-                                  )}
-                                  {item.date},
-                                </span>
-                                <span className="ms-1">{item.time}</span>
-                              </span>
-                            </div>
-                          </div>
-                        </Col>
-                        <Col xs="auto" className="text-center p-2">
-                          {MarkAsRead(item.removable)}
-                        </Col>
-                      </Row>
-                    </ListGroup.Item>
-                  );
-                })}
-              </ListGroup>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Fragment>
+    <Row className="g-3">
+      <Col xs={12}>
+        <Card>
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <h4 className="mb-0">Notification History</h4>
+            <button onClick={markAllAsRead} className="btn btn-primary btn-sm">
+              Mark all as read
+            </button>
+          </Card.Header>
+          <Card.Body>
+            <Form className="mb-3">
+              <InputGroup>
+                <InputGroup.Text><Search size={18} /></InputGroup.Text>
+                <Form.Control
+                  type="text"
+                  placeholder="Search notifications..."
+                  value={searchTerm}
+                  onChange={handleSearch}
+                />
+              </InputGroup>
+            </Form>
+            <ListGroup variant="flush">
+              {filteredNotifications.map((notification, index) => (
+                <ListGroup.Item key={index} className="py-3 px-0 border-bottom">
+                  <div className="d-flex">
+                    <div className="me-3">
+                      <NotificationIcon type={notification.type} />
+                    </div>
+                    <div className="flex-grow-1">
+                      <h6 className="mb-1">{notification.title}</h6>
+                      <p className="mb-1 text-muted">{notification.message}</p>
+                      <small className="text-muted">
+                        {format(new Date(notification.timestamp.toDate()), "MMM d, yyyy h:mm a")}
+                      </small>
+                      <small className="text-muted ms-2">
+                        Worker ID: {notification.workerId}
+                      </small>
+                    </div>
+                    {!notification.read && (
+                      <GKTippy content="Mark as read">
+                        <button onClick={() => markAsRead(notification.id)} className="btn btn-link p-0">
+                          <DotBadge bg="info"></DotBadge>
+                        </button>
+                      </GKTippy>
+                    )}
+                  </div>
+                </ListGroup.Item>
+              ))}
+            </ListGroup>
+          </Card.Body>
+          <Card.Footer>
+            <Pagination className="justify-content-center">
+              <Pagination.Prev
+                onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                disabled={currentPage === 1}
+              />
+              {[...Array(totalPages).keys()].map(number => (
+                <Pagination.Item
+                  key={number + 1}
+                  active={number + 1 === currentPage}
+                  onClick={() => handlePageChange(number + 1)}
+                >
+                  {number + 1}
+                </Pagination.Item>
+              ))}
+              <Pagination.Next
+                onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              />
+            </Pagination>
+          </Card.Footer>
+        </Card>
+      </Col>
+    </Row>
   );
 };
 

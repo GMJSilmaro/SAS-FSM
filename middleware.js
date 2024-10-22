@@ -18,7 +18,7 @@ export async function middleware(request) {
 
     if (timeUntilExpiry <= fiveMinutesInMilliseconds) {
       try {
-        // Renew the SAP B1 session
+        // Renew the SAP B1 session using fetch
         const renewalResult = await renewSAPSession(b1Session.value, routeId?.value);
         
         if (renewalResult) {
