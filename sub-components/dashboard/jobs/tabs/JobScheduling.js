@@ -3,6 +3,9 @@ import { Row, Col, Form, InputGroup, Button } from "react-bootstrap";
 import Select from "react-select";
 import { db } from "../../../../firebase";
 import { collection, getDocs } from "firebase/firestore";
+import DatePicker from "react-datepicker"; // Import DatePicker
+import "react-datepicker/dist/react-datepicker.css"; // Import the CSS for DatePicker
+import { format, parse } from "date-fns";
 
 const JobScheduling = ({
   formData,
@@ -33,13 +36,19 @@ const JobScheduling = ({
         console.error("Error fetching users:", error);
       }
     };
-    console.log(formData);
     fetchUsers();
   }, []);
 
   const assignedWorkersOptions = workers.filter((worker) =>
     selectedWorkers.map((sw) => sw.workerId).includes(worker.value)
   );
+
+  // Convert dates to DD/MM/YYYY format for display
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return format(date, "dd/MM/yyyy");
+  };
 
   return (
     <Form
@@ -138,23 +147,43 @@ const JobScheduling = ({
       <Row className="mb-3">
         <Form.Group as={Col} md="4" controlId="startDate">
           <Form.Label>Start Date</Form.Label>
-          <Form.Control
-            type="date"
-            name="startDate"
-            value={formData.startDate}
-            onChange={handleInputChange}
-            placeholder="Enter start date"
-          />
+          <div>
+            <DatePicker
+              selected={
+                formData.startDate ? new Date(formData.startDate) : null
+              }
+              onChange={(date) => {
+                handleInputChange({
+                  target: {
+                    name: "startDate",
+                    value: date ? date.toISOString().split("T")[0] : "", // Store date in YYYY-MM-DD format for Firebase
+                  },
+                });
+              }}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="DD/MM/YYYY"
+              className="form-control" // Use Bootstrap styling
+            />
+          </div>
         </Form.Group>
+
         <Form.Group as={Col} md="4" controlId="endDate">
           <Form.Label>End Date</Form.Label>
-          <Form.Control
-            type="date"
-            name="endDate"
-            value={formData.endDate}
-            onChange={handleInputChange}
-            placeholder="Enter end date"
-          />
+          <div>
+            <DatePicker
+              selected={formData.endDate ? new Date(formData.endDate) : null}
+              onChange={(date) => {
+                handleInputChange({
+                  target: {
+                    name: "endDate",
+                    value: date ? date.toISOString().split("T")[0] : "", // Store date in YYYY-MM-DD format for Firebase
+                  },
+                });
+              }}
+              dateFormat="dd/MM/yyyy"
+              className="form-control" // Use Bootstrap styling
+            />
+          </div>
         </Form.Group>
       </Row>
       <Row className="mb-3">
@@ -226,11 +255,10 @@ const JobScheduling = ({
         <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-4">
           <Button type="submit" variant="primary" className="float-end">
             Submit
-          </Button>
-        </Col>
-      </Row>
+          </Button>{" "}
+        </Col>{" "}
+      </Row>{" "}
     </Form>
   );
 };
-
 export default JobScheduling;

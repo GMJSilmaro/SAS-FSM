@@ -399,7 +399,11 @@ const QuickMenu = () => {
             >
               <i className="fe fe-settings me-2"></i> Settings
             </Dropdown.Item>
+
             <Dropdown.Divider />
+            <Dropdown.Item className="mb-3" onClick={handleSignOut}>
+              <i className="fe fe-power me-2"></i> Sign Out
+            </Dropdown.Item>
           </Dropdown.Menu>
         </Dropdown>
       </ListGroup>
