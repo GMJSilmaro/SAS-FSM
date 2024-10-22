@@ -265,6 +265,8 @@ const JobDetails = () => {
         return "Job Started";
       case "Job Complete":
         return "Job Complete";
+      case "In Progress":
+        return "In Progress";
       case "Validate":
         return "Validate";
       case "Scheduled":
@@ -281,6 +283,8 @@ const JobDetails = () => {
       case "Confirmed":
         return { backgroundColor: "#2196f3", color: "#fff" };
       case "Cancelled":
+        return { backgroundColor: "#f44336", color: "#fff" };
+        case "In Progress":
         return { backgroundColor: "#f44336", color: "#fff" };
       case "Job Started":
         return { backgroundColor: "#FFA500", color: "#fff" };
