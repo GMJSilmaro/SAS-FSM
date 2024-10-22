@@ -5,12 +5,12 @@ const nextConfig = {
   reactStrictMode: false,
   swcMinify: true,
   env: {
-    NEXT_PUBLIC_SAP_SERVICE_LAYER_BASE_URL: process.env.SAP_SERVICE_LAYER_BASE_URL,
-    NEXT_PUBLIC_SAP_B1_COMPANY_DB: process.env.SAP_B1_COMPANY_DB,
-    NEXT_PUBLIC_SAP_B1_USERNAME: process.env.SAP_B1_USERNAME,
-    NEXT_PUBLIC_SAP_B1_PASSWORD: process.env.SAP_B1_PASSWORD,
-    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY,
-    NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY: process.env.SYNCFUSION_LICENSE_KEY,
+    SAP_SERVICE_LAYER_BASE_URL: process.env.SAP_SERVICE_LAYER_BASE_URL,
+    SAP_B1_COMPANY_DB: process.env.SAP_B1_COMPANY_DB,
+    SAP_B1_USERNAME: process.env.SAP_B1_USERNAME,
+    SAP_B1_PASSWORD: process.env.SAP_B1_PASSWORD,
+    GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY,
+    SYNCFUSION_LICENSE_KEY: process.env.SYNCFUSION_LICENSE_KEY,
   },
   sassOptions: {
     includePaths: [path.join(__dirname, "styles")],
