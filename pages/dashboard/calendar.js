@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { getDocs, collection } from "firebase/firestore"; // Firebase Firestore imports
-import { db } from "../../firebase"; 
+import { db } from "../../firebase";
 import {
   ScheduleComponent,
   ViewsDirective,
@@ -15,13 +15,17 @@ import {
 import { ButtonComponent } from "@syncfusion/ej2-react-buttons";
 import { Internationalization } from "@syncfusion/ej2-base";
 import { TextBoxComponent } from "@syncfusion/ej2-react-inputs";
-import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck } from "react-icons/bs"; // Import icons
+import {
+  BsClock,
+  BsFillPersonFill,
+  BsGeoAlt,
+  BsCalendarCheck,
+} from "react-icons/bs"; // Import icons
 import styles from "./calendar.module.css"; // Import the CSS module
-import { useRouter } from 'next/router';
+import { useRouter } from "next/router";
 
 const Calendar = () => {
   const router = useRouter();
-  const scheduleObj = useRef(null);
   const [events, setEvents] = useState([]); // Store events from Firebase
   const [searchTerm, setSearchTerm] = useState(""); // Search term state
   const [filteredEvents, setFilteredEvents] = useState([]); // Filtered events
@@ -80,7 +84,10 @@ const Calendar = () => {
 
   const headerTemplate = (props) => (
     <div className={styles["quick-info-header"]}>
-      <div className={styles["quick-info-header-content"]} style={getStatusColor(props.JobStatus)}>
+      <div
+        className={styles["quick-info-header-content"]}
+        style={getStatusColor(props.JobStatus)}
+      >
         <div className={styles["quick-info-title"]}>
           {props.elementType === "cell" ? "Add Job" : "Job Details"}
         </div>
@@ -112,11 +119,12 @@ const Calendar = () => {
           <div className={styles["notes-wrap"]}>
             <BsCalendarCheck /> <strong>Customer:</strong> {props.Customer}
           </div>
-          
+
           <div className={styles["notes-wrap"]}>
-            <BsGeoAlt /> <strong>Service Location:</strong> {props.ServiceLocation} 
+            <BsGeoAlt /> <strong>Service Location:</strong>{" "}
+            {props.ServiceLocation}
           </div>
-         
+
           <div className={styles["notes-wrap"]}>
             <BsFillPersonFill /> <strong>Assigned Workers:</strong>{" "}
             {props.AssignedWorkers.join(", ")}
@@ -129,20 +137,25 @@ const Calendar = () => {
     </div>
   );
 
-const footerTemplate = (props) => {
+  const footerTemplate = (props) => {
     return (
       <div className={styles["quick-info-footer"]}>
         {props.elementType === "cell" ? (
           <div className="cell-footer">
-            <ButtonComponent id="add" cssClass="e-flat" content="Add" isPrimary={true} />
+            <ButtonComponent
+              id="add"
+              cssClass="e-flat"
+              content="Add"
+              isPrimary={true}
+            />
           </div>
         ) : (
           <div className="event-footer">
-            <ButtonComponent 
-              id="more-details" 
-              cssClass="e-flat" 
-              content="More Details" 
-              isPrimary={true} 
+            <ButtonComponent
+              id="more-details"
+              cssClass="e-flat"
+              content="More Details"
+              isPrimary={true}
               onClick={() => router.push(`/dashboard/jobs/${props.Id}`)} // Navigate to dynamic job page
             />
           </div>
@@ -153,7 +166,10 @@ const footerTemplate = (props) => {
 
   const onPopupOpen = (args) => {
     // Disable the quick info for cell clicks
-    if (args.type === "QuickInfo" && args.target.classList.contains("e-work-cells")) {
+    if (
+      args.type === "QuickInfo" &&
+      args.target.classList.contains("e-work-cells")
+    ) {
       args.cancel = true; // This will hide the quick info popup when a cell is clicked
     }
   };
@@ -165,7 +181,7 @@ const footerTemplate = (props) => {
 
   const onEventDoubleClick = (args) => {
     args.cancel = true; // Prevent the default event editor from opening
-    
+
     console.log(args.data); // You can access the event details here
   };
 
@@ -176,7 +192,7 @@ const footerTemplate = (props) => {
     { status: "Job Started", color: getStatusColor("JS").backgroundColor },
     { status: "Job Complete", color: getStatusColor("JC").backgroundColor },
     { status: "Validate", color: getStatusColor("V").backgroundColor },
-    { status: "Scheduled", color: getStatusColor("S").backgroundColor }
+    { status: "Scheduled", color: getStatusColor("S").backgroundColor },
   ];
 
   const handleSearch = (args) => {
@@ -199,11 +215,11 @@ const footerTemplate = (props) => {
 
   return (
     <div style={{ display: "flex" }}>
-      
-  
       {/* Left side: Calendar */}
-      <div style={{ flex: 8, marginRight: '20px' }}> {/* Increase the flex to 3 */}
-      <TextBoxComponent
+      <div style={{ flex: 8, marginRight: "20px" }}>
+        {" "}
+        {/* Increase the flex to 3 */}
+        <TextBoxComponent
           placeholder="Search via Job Name, Job Number, Customer, Location..."
           value={searchTerm}
           input={handleSearch} // Syncfusion uses `input` event instead of `onChange`
@@ -212,10 +228,10 @@ const footerTemplate = (props) => {
         <ScheduleComponent
           ref={scheduleObj}
           height="650px"
-          style={{ marginTop: '15px' }}
+          style={{ marginTop: "15px" }}
           width="100%"
           selectedDate={new Date(2024, 9, 15)}
-          eventSettings={{ dataSource: filteredEvents }} 
+          eventSettings={{ dataSource: filteredEvents }}
           eventRendered={(args) => {
             const colorStyle = getStatusColor(args.data.JobStatus);
             args.element.style.backgroundColor = colorStyle.backgroundColor;
@@ -239,9 +255,11 @@ const footerTemplate = (props) => {
           <Inject services={[Day, Week, Month, Resize, DragAndDrop]} />
         </ScheduleComponent>
       </div>
-  
+
       {/* Right side: Legend */}
-      <div style={{ flex: 1 }}> {/* Decrease the flex to 1 */}
+      <div style={{ flex: 1 }}>
+        {" "}
+        {/* Decrease the flex to 1 */}
         <h4>Legend</h4>
         <ul style={{ listStyle: "none", paddingLeft: 0 }}>
           {legendItems.map((item) => (
@@ -252,7 +270,7 @@ const footerTemplate = (props) => {
                   width: "20px",
                   height: "20px",
                   backgroundColor: item.color,
-                  marginRight: "10px"
+                  marginRight: "10px",
                 }}
               ></span>
               {item.status}
@@ -262,11 +280,9 @@ const footerTemplate = (props) => {
       </div>
     </div>
   );
-  
 };
 
 export default Calendar;
-
 
 // const Calendar = () => {
 //   const router = useRouter();
@@ -354,7 +370,6 @@ export default Calendar;
 //         return { backgroundColor: "#9e9e9e", color: "#fff" }; // Default (Gray)
 //     }
 //   };
-  
 
 //   const headerTemplate = (props) => (
 //     <div className={styles["quick-info-header"]}>
@@ -390,11 +405,11 @@ export default Calendar;
 //           <div className={styles["notes-wrap"]}>
 //             <BsCalendarCheck /> <strong>Customer:</strong> {props.Customer}
 //           </div>
-          
+
 //           <div className={styles["notes-wrap"]}>
-//             <BsGeoAlt /> <strong>Service Location:</strong> {props.ServiceLocation} 
+//             <BsGeoAlt /> <strong>Service Location:</strong> {props.ServiceLocation}
 //           </div>
-         
+
 //           <div className={styles["notes-wrap"]}>
 //             <BsFillPersonFill /> <strong>Assigned Workers:</strong>{" "}
 //             {props.AssignedWorkers.join(", ")}
@@ -416,11 +431,11 @@ export default Calendar;
 //           </div>
 //         ) : (
 //           <div className="event-footer">
-//             <ButtonComponent 
-//               id="more-details" 
-//               cssClass="e-flat" 
-//               content="More Details" 
-//               isPrimary={true} 
+//             <ButtonComponent
+//               id="more-details"
+//               cssClass="e-flat"
+//               content="More Details"
+//               isPrimary={true}
 //               onClick={() => router.push(`/dashboard/jobs/${props.Id}`)} // Navigate to dynamic job page
 //             />
 //           </div>
@@ -429,42 +444,42 @@ export default Calendar;
 //     );
 //   };
 
-  // const onPopupOpen = (args) => {
-  //   // Disable the quick info for cell clicks
-  //   if (args.type === "QuickInfo" && args.target.classList.contains("e-work-cells")) {
-  //     args.cancel = true; // This will hide the quick info popup when a cell is clicked
-  //   }
-  // };
+// const onPopupOpen = (args) => {
+//   // Disable the quick info for cell clicks
+//   if (args.type === "QuickInfo" && args.target.classList.contains("e-work-cells")) {
+//     args.cancel = true; // This will hide the quick info popup when a cell is clicked
+//   }
+// };
 
-  // const onCellDoubleClick = (args) => {
-  //   args.cancel = true; // This cancels the default editor popup
-  //   window.location.href = "/dashboard/jobs/create-jobs"; // Custom redirect action
-  // };
+// const onCellDoubleClick = (args) => {
+//   args.cancel = true; // This cancels the default editor popup
+//   window.location.href = "/dashboard/jobs/create-jobs"; // Custom redirect action
+// };
 
-  // const onEventDoubleClick = (args) => {
-  //   args.cancel = true; // Prevent the default event editor from opening
-    
-  //   console.log(args.data); // You can access the event details here
-  // };
-  
-  // const handleSearch = (args) => {
-  //   const term = args.value.toLowerCase(); // Access value directly from args
-  //   setSearchTerm(term);
-  //   if (term !== "") {
-  //     const filtered = events.filter((event) => {
-  //       return (
-  //         event.Subject.toLowerCase().includes(term) ||
-  //         event.JobNo.toLowerCase().includes(term) ||
-  //         event.Customer.toLowerCase().includes(term) ||
-  //         event.ServiceLocation.toLowerCase().includes(term)
-  //       );
-  //     });
-  //     setFilteredEvents(filtered);
-  //   } else {
-  //     setFilteredEvents(events); // Reset to original events if search is cleared
-  //   }
-  // };
-  
+// const onEventDoubleClick = (args) => {
+//   args.cancel = true; // Prevent the default event editor from opening
+
+//   console.log(args.data); // You can access the event details here
+// };
+
+// const handleSearch = (args) => {
+//   const term = args.value.toLowerCase(); // Access value directly from args
+//   setSearchTerm(term);
+//   if (term !== "") {
+//     const filtered = events.filter((event) => {
+//       return (
+//         event.Subject.toLowerCase().includes(term) ||
+//         event.JobNo.toLowerCase().includes(term) ||
+//         event.Customer.toLowerCase().includes(term) ||
+//         event.ServiceLocation.toLowerCase().includes(term)
+//       );
+//     });
+//     setFilteredEvents(filtered);
+//   } else {
+//     setFilteredEvents(events); // Reset to original events if search is cleared
+//   }
+// };
+
 //   return (
 //     <div>
 //   <TextBoxComponent
