@@ -1,65 +1,85 @@
-import React, { Fragment, useMemo, useState, useEffect } from 'react';
+import React, { Fragment, useMemo, useState, useEffect, useCallback } from 'react';
 import { Col, Row, Card, Button, Modal, Form } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
+import PropTypes from 'prop-types';
 
-const fetchCustomers = async () => {
+const fetchCustomers = async (page = 1, limit = 10, search = '') => {
   try {
-    const response = await fetch('/api/getCustomersList');
-    
-    // Log the response status and text to the console
-    console.log('Response status:', response.status);
-    const responseText = await response.text(); // Read response as text first
-    console.log('Response text:', responseText);
+    const response = await fetch(`/api/getCustomersList?page=${page}&limit=${limit}&search=${search}`);
     
     if (!response.ok) throw new Error('Failed to fetch customers');
     
-    const data = JSON.parse(responseText); // Parse the response text as JSON
+    const data = await response.json();
     return data;
   } catch (error) {
     console.error('Error fetching customers:', error);
-    return [];
+    return { customers: [], totalCount: 0 };
   }
 };
 
+const customPropTypes = {
+  ...DataTable.propTypes,
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string.isRequired,
+      selector: PropTypes.func,
+      sortable: PropTypes.bool,
+      width: PropTypes.string,
+      cell: PropTypes.func,
+      ignoreRowClick: PropTypes.bool,
+      allowOverflow: PropTypes.bool,
+      button: PropTypes.bool,
+    })
+  ),
+};
 
 const ViewCustomers = () => {
-  // State to manage data and modal visibility
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true); // Loading state
-  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [totalRows, setTotalRows] = useState(0);
+  const [perPage, setPerPage] = useState(10);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  useEffect(() => {
-    const getCustomers = async () => {
-      setLoading(true); // Set loading to true before fetching data
-      const customerData = await fetchCustomers();
-      setData(customerData);
-      setFilteredData(customerData); // Initialize filtered data
-      setLoading(false); // Set loading to false after data is fetched
-    };
-    getCustomers();
-  }, []);
+  const fetchData = useCallback(async (page) => {
+    setLoading(true);
+    const response = await fetchCustomers(page, perPage, search);
+    setData(response.customers);
+    setTotalRows(response.totalCount);
+    setLoading(false);
+  }, [perPage, search]);
 
-  // Filter customers based on search input
   useEffect(() => {
-    const result = data.filter(item => {
-      return (
-        (item.CardName && item.CardName.toLowerCase().includes(search.toLowerCase())) ||
-        (item.CardCode && item.CardCode.toLowerCase().includes(search.toLowerCase()))
-      );
-    });
-    setFilteredData(result);
-  }, [search, data]);
+    fetchData(1); // Fetch initial data when component mounts
+  }, [fetchData]);
 
-  // Handle opening modal with customer details
+  const handlePageChange = (page) => {
+    fetchData(page);
+  };
+
+  const handlePerRowsChange = async (newPerPage, page) => {
+    setPerPage(newPerPage);
+    fetchData(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchData(1); // Reset to first page when search changes
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, fetchData]);
+
   const handleViewDetails = (customer) => {
     setSelectedCustomer(customer);
     setShowModal(true);
   };
 
-  // Helper to render BP addresses
   const renderBPAddresses = (addresses) => {
     if (!addresses || addresses.length === 0) {
       return <p>No addresses available</p>;
@@ -75,7 +95,6 @@ const ViewCustomers = () => {
     ));
   };
 
-  // Helper to render Contact Employees
   const renderContactEmployees = (contacts) => {
     if (!contacts || contacts.length === 0) {
       return <p>No contact employees available</p>;
@@ -90,9 +109,8 @@ const ViewCustomers = () => {
     ));
   };
 
-  // Table columns definition, adding more fields to be displayed
   const columns = [
-    { name: '#', selector: (row, index) => index + 1, width: '50px' }, // Auto index
+    { name: '#', selector: (row, index) => index + 1, width: '50px' },
     { name: 'Customer Code', selector: row => row.CardCode, sortable: true, width: '150px' },
     { name: 'Customer Name', selector: row => row.CardName, sortable: true, width: '250px' },
     { name: 'Phone 1', selector: row => row.Phone1, sortable: true, width: '150px' },
@@ -107,12 +125,10 @@ const ViewCustomers = () => {
         </Button>
       ),
       ignoreRowClick: true,
-      allowOverflow: true,
-      button: true,
+      style: { overflow: 'visible' },
     },
   ];
 
-  // Custom styles for the DataTable
   const customStyles = {
     headCells: {
       style: {
@@ -129,22 +145,26 @@ const ViewCustomers = () => {
     },
   };
 
-  // Search component in the table header
   const subHeaderComponentMemo = useMemo(() => {
     return (
       <input
         type="text"
         className="form-control me-4 mb-4"
-        placeholder="Search by Customer Code or Name"
+        placeholder="Search by Customer Code, Name, Phone, Email, Country, or Currency"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={handleSearch}
       />
     );
   }, [search]);
 
-  if (loading) {
-    return <div>Loading customers...</div>; // Display loading state while fetching data
-  }
+  const filteredData = data.filter(item =>
+    (item.CardCode && item.CardCode.toLowerCase().includes(search.toLowerCase())) ||
+    (item.CardName && item.CardName.toLowerCase().includes(search.toLowerCase())) ||
+    (item.Phone1 && item.Phone1.toLowerCase().includes(search.toLowerCase())) ||
+    (item.EmailAddress && item.EmailAddress.toLowerCase().includes(search.toLowerCase())) ||
+    (item.Country && item.Country.toLowerCase().includes(search.toLowerCase())) ||
+    (item.Currency && item.Currency.toLowerCase().includes(search.toLowerCase()))
+  );
 
   return (
     <Fragment>
@@ -170,17 +190,22 @@ const ViewCustomers = () => {
                 columns={columns}
                 data={filteredData}
                 pagination
+                paginationServer
+                paginationTotalRows={totalRows}
+                onChangePage={handlePageChange}
+                onChangeRowsPerPage={handlePerRowsChange}
                 highlightOnHover
                 subHeader
                 subHeaderComponent={subHeaderComponentMemo}
-                paginationRowsPerPageOptions={[3, 5, 10]}
+                progressPending={loading}
+                progressComponent={<div>Loading customers...</div>}
+                noDataComponent={<div>No matching records found</div>}
               />
             </Card.Body>
           </Card>
         </Col>
       </Row>
 
-      {/* Modal for Customer Details */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Customer Details</Modal.Title>
@@ -236,167 +261,3 @@ const ViewCustomers = () => {
 };
 
 export default ViewCustomers;
-
-
-
-
-// import React, { Fragment, useMemo, useState, useEffect } from 'react';
-// import { Col, Row, Card, Button, Modal, Form } from 'react-bootstrap';
-// import DataTable from 'react-data-table-component';
-
-// const fetchCustomers = async () => {
-//   try {
-//     const response = await fetch('/api/getCustomers');
-//     if (!response.ok) throw new Error('Failed to fetch customers');
-//     const data = await response.json();
-//     return data;
-//   } catch (error) {
-//     console.error('Error fetching customers:', error);
-//     return [];
-//   }
-// };
-
-// const ViewCustomers = () => {
-//   // State to manage data and modal visibility
-//   const [data, setData] = useState([]);
-//   const [filteredData, setFilteredData] = useState([]);
-//   const [search, setSearch] = useState('');
-//   const [showModal, setShowModal] = useState(false);
-//   const [selectedCustomer, setSelectedCustomer] = useState(null);
-
-//   useEffect(() => {
-//     const getCustomers = async () => {
-//       const customerData = await fetchCustomers();
-//       setData(customerData);
-//       setFilteredData(customerData); // Initialize filtered data
-//     };
-//     getCustomers();
-//   }, []);
-
-//   // Filter customers based on search input
-//   useEffect(() => {
-//     const result = data.filter(item => {
-//       return item.cardName.toLowerCase().includes(search.toLowerCase()) ||
-//         item.cardCode.toLowerCase().includes(search.toLowerCase());
-//     });
-//     setFilteredData(result);
-//   }, [search, data]);
-
-//   // Handle opening modal with customer details
-//   const handleViewDetails = (customer) => {
-//     setSelectedCustomer(customer);
-//     setShowModal(true);
-//   };
-
-//   // Table columns definition
-//   const columns = [
-//     { name: '#', selector: (row, index) => index + 1, width: '50px' }, // Auto index
-//     { name: 'Customer Code', selector: row => row.cardCode, sortable: true, width: '250px' },
-//     { name: 'Customer Name', selector: row => row.cardName, sortable: true, width: '250px' },
-//     {
-//       name: 'Actions',
-//       cell: (row) => (
-//         <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(row)}>
-//           View Details
-//         </Button>
-//       ),
-//       ignoreRowClick: true,
-//       allowOverflow: true,
-//       button: true,
-//     }
-//   ];
-
-//   // Custom styles for the DataTable
-//   const customStyles = {
-//     headCells: {
-//       style: {
-//         fontWeight: 'bold',
-//         fontSize: '14px',
-//         backgroundColor: "#F1F5FC",
-//       },
-//     },
-//     cells: {
-//       style: {
-//         color: '#64748b',
-//         fontSize: '14px',
-//       },
-//     },
-//   };
-
-//   // Search component in the table header
-//   const subHeaderComponentMemo = useMemo(() => {
-//     return (
-//       <input
-//         type="text"
-//         className="form-control me-4 mb-4"
-//         placeholder="Search by Customer Code or Name"
-//         value={search}
-//         onChange={(e) => setSearch(e.target.value)}
-//       />
-//     );
-//   }, [search]);
-
-//   return (
-//     <Fragment>
-//       <Row>
-//         <Col lg={12} md={12} sm={12}>
-//           <div className="border-bottom pb-4 mb-4 d-md-flex align-items-center justify-content-between">
-//             <div className="mb-3 mb-md-0">
-//               <h1 className="mb-1 h2 fw-bold">Customers List</h1>
-//             </div>
-//           </div>
-//         </Col>
-//       </Row>
-
-//       <Row>
-//         <Col md={12} xs={12} className="mb-5">
-//           <Card>
-//             <Card.Header>
-//               <h4 className="mb-1">Customers Table</h4>
-//             </Card.Header>
-//             <Card.Body className="px-0">
-//               <DataTable
-//                 customStyles={customStyles}
-//                 columns={columns}
-//                 data={filteredData}
-//                 pagination
-//                 highlightOnHover
-//                 subHeader
-//                 subHeaderComponent={subHeaderComponentMemo}
-//                 paginationRowsPerPageOptions={[3, 5, 10]}
-//               />
-//             </Card.Body>
-//           </Card>
-//         </Col>
-//       </Row>
-
-//       {/* Modal for Customer Details */}
-//       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-//         <Modal.Header closeButton>
-//           <Modal.Title>Customer Details</Modal.Title>
-//         </Modal.Header>
-//         <Modal.Body>
-//           {selectedCustomer ? (
-//             <Fragment>
-//               <Form.Group className="mb-3">
-//                 <Form.Label>Customer Code:</Form.Label>
-//                 <Form.Control type="text" value={selectedCustomer.cardCode} readOnly />
-//               </Form.Group>
-//               <Form.Group className="mb-3">
-//                 <Form.Label>Customer Name:</Form.Label>
-//                 <Form.Control type="text" value={selectedCustomer.cardName} readOnly />
-//               </Form.Group>
-//             </Fragment>
-//           ) : (
-//             <p>No customer details available</p>
-//           )}
-//         </Modal.Body>
-//         <Modal.Footer>
-//           <Button variant="secondary" onClick={() => setShowModal(false)}>Close</Button>
-//         </Modal.Footer>
-//       </Modal>
-//     </Fragment>
-//   );
-// };
-
-// export default ViewCustomers;

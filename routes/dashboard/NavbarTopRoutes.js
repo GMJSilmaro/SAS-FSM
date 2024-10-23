@@ -172,56 +172,56 @@ const NavbarDefault = [
 		],
 		isAuthenticated: true,
 	},
-	// {
-	// 	id: uuid(),
-	// 	menuitem: 'SAP B1 Data',
-	// 	badge: 'NEW',
-	// 	link: '#',
-	// 	children: [
-	// 		{
-	// 			id: uuid(),
-	// 			header: true,
-	// 			header_text: 'View SAB B1 Data'
-	// 		},
-	// 		{
-	// 			id: uuid(),
-	// 			menuitem: 'Customers',
-	// 			link: '#',
-	// 			badge: 'NEW',
-	// 			children: [
-	// 				{
-	// 					id: uuid(),
-	// 					header: true,
-	// 					header_text: 'Customer Menu'
-	// 				},
-	// 				{
-	// 					id: uuid(),
-	// 					menuitem: 'View Customers',
-	// 					link: '/dashboard/scheduling/jobs/past'
-	// 				},
-	// 			]
-	// 		},
-	// 		{
-	// 			id: uuid(),
-	// 			menuitem: 'Locations',
-	// 			link: '#',
-	// 			badge: 'NEW',
-	// 			children: [
-	// 				{
-	// 					id: uuid(),
-	// 					header: true,
-	// 					header_text: 'Locations Menu'
-	// 				},
-	// 				{
-	// 					id: uuid(),
-	// 					menuitem: 'View Locations',
-	// 					link: '/dashboard/scheduling/workers/schedules'
-	// 				},
-	// 			]
-	// 		},
-	// 	],
-	// 	isAuthenticated: true,
-	// },
+	{
+		id: uuid(),
+		menuitem: 'SAP B1 Data',
+		badge: 'NEW',
+		link: '#',
+		children: [
+			{
+				id: uuid(),
+				header: true,
+				header_text: 'SAB B1 Data Menu'
+			},
+			{
+				id: uuid(),
+				menuitem: 'Customers',
+				link: '#',
+				badge: 'NEW',
+				children: [
+					{
+						id: uuid(),
+						header: true,
+						header_text: 'Customer Menu'
+					},
+					{
+						id: uuid(),
+						menuitem: 'View Customers',
+						link: '/dashboard/customers/list'
+					},
+				]
+			},
+			// {
+			// 	id: uuid(),
+			// 	menuitem: 'Locations',
+			// 	link: '#',
+			// 	badge: 'NEW',
+			// 	children: [
+			// 		{
+			// 			id: uuid(),
+			// 			header: true,
+			// 			header_text: 'Locations Menu'
+			// 		},
+			// 		{
+			// 			id: uuid(),
+			// 			menuitem: 'View Locations',
+			// 			link: '/dashboard/scheduling/workers/schedules'
+			// 		},
+			// 	]
+			// },
+		],
+		isAuthenticated: true,
+	},
 	
 	// {
 	// 	id: uuid(),

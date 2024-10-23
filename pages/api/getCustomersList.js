@@ -3,16 +3,12 @@ import { renewSAPSession } from '../../utils/renewSAPSession';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
-  const { cardCode } = req.body;
-
-  if (!cardCode) {
-    return res.status(400).json({ error: 'CardCode is required' });
-  }
+  const { page = 1, limit = 10, search = '' } = req.query;
 
   let b1session = req.cookies.B1SESSION;
   let routeid = req.cookies.ROUTEID;
@@ -45,8 +41,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Ensure the SAP base URL does not include `/b1s/v1/`
-    const url = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners`;
+    const skip = (page - 1) * limit;
+    const url = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners?$skip=${skip}&$top=${limit}&$filter=contains(CardName, '${search}')`;
 
     // Fetch the business partners using the session cookies
     const queryResponse = await fetch(url, {
@@ -64,8 +60,23 @@ export default async function handler(req, res) {
 
     const queryData = await queryResponse.json();
 
+    // Get total count
+    const countUrl = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners/$count?$filter=contains(CardName, '${search}')`;
+    const countResponse = await fetch(countUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `B1SESSION=${b1session}; ROUTEID=${routeid}`
+      }
+    });
+
+    const totalCount = await countResponse.json();
+
     // Return the API response
-    res.status(200).json(queryData.value);
+    res.status(200).json({
+      customers: queryData.value,
+      totalCount: totalCount
+    });
   } catch (error) {
     console.error('Error fetching business partners:', error);
     res.status(500).json({ error: 'Internal Server Error' });
