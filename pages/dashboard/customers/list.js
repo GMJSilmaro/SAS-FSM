@@ -1,8 +1,9 @@
 import React, { Fragment, useMemo, useState, useEffect, useCallback } from 'react';
-import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge } from 'react-bootstrap';
+import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
 import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange } from 'react-bootstrap-icons';
+import { GeeksSEO, PageHeading } from 'widgets'
 
 const fetchCustomers = async (page = 1, limit = 10, search = '') => {
   try {
@@ -286,15 +287,21 @@ const ViewCustomers = () => {
 
   return (
     <Fragment>
-      <Row>
-        <Col lg={12} md={12} sm={12}>
-          <div className="border-bottom pb-4 mb-4 d-md-flex align-items-center justify-content-between">
-            <div className="mb-3 mb-md-0">
-              <h1 className="mb-1 h2 fw-bold">Customers List</h1>
+      <GeeksSEO title="View Customers | SAS - SAP B1 Portal" />
+       <Row>
+          <Col lg={12} md={12} sm={12}>
+            <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
+              <div className="mb-3 mb-md-0">
+                <h1 className="mb-1 h2 fw-bold">View Customers</h1>
+                <Breadcrumb>
+                  <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+                  <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
+                  <Breadcrumb.Item active>Customer List</Breadcrumb.Item>
+                </Breadcrumb>
+              </div>
             </div>
-          </div>
-        </Col>
-      </Row>
+          </Col>
+        </Row>
 
       <Row>
         <Col md={12} xs={12} className="mb-5">

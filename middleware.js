@@ -17,12 +17,14 @@ export async function middleware(request) {
 
     if (timeUntilExpiry <= fiveMinutesInMilliseconds) {
       try {
-        // Call your renewal API with current session info
         const baseUrl = request.nextUrl.origin;
+        console.log('Initiating session renewal');
+
         const response = await fetch(`${baseUrl}/api/renewSAPB1Session`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
           body: JSON.stringify({
             currentSession: b1Session.value,
@@ -30,13 +32,23 @@ export async function middleware(request) {
           })
         });
 
-        if (!response.ok) {
-          throw new Error('Session renewal failed');
+        // Log raw response for debugging
+        console.log('Renewal response status:', response.status);
+        const responseText = await response.text();
+        
+        let renewalData;
+        try {
+          renewalData = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse response:', responseText);
+          throw new Error('Invalid JSON response from renewal endpoint');
         }
 
-        const renewalData = await response.json();
+        if (!renewalData.newB1Session) {
+          throw new Error('Invalid session data received');
+        }
 
-        // Create response with new cookies
+        // Create response and set new cookies
         const nextResponse = NextResponse.next();
 
         nextResponse.cookies.set('B1SESSION', renewalData.newB1Session, {
@@ -74,4 +86,3 @@ export async function middleware(request) {
 export const config = {
   matcher: '/api/:path*',
 };
-
