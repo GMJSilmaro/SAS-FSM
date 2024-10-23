@@ -312,7 +312,6 @@ const WorkersListItems = () => {
                 <div className="text-center">Loading...</div>
               ) : (
                 <DataTable
-                  title="Workers List"
                   columns={columns}
                   data={filteredWorkers}
                   pagination

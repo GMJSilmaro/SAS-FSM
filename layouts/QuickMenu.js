@@ -384,60 +384,64 @@ const QuickMenu = () => {
         </Dropdown>
         {/* User Dropdown */}
         <Dropdown as="li" className="ms-2">
-          <Dropdown.Toggle
-            as="a"
-            bsPrefix=" "
-            className="rounded-circle"
-            id="dropdownUser"
-          >
-            <div className="avatar avatar-md avatar-indicators avatar-online">
-              {userDetails && userDetails.profilePicture ? (
-                <Image
-                  alt="avatar"
-                  src={userDetails.profilePicture}
-                  className="rounded-circle"
-                />
-              ) : (
-                <Image alt="avatar" src="" className="rounded-circle" />
-              )}
-            </div>
-          </Dropdown.Toggle>
-          <Dropdown.Menu
-            className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
-            align="end"
-            aria-labelledby="dropdownUser"
-            show={hasMounted && isDesktop ? true : false}
-          >
-            <Dropdown.Item className="mt-3">
-              <div className="d-flex">
-                {userDetails && (
-                  <div>
-                    <h5 className="mb-1">{userDetails.fullName}</h5>
-                    <p className="mb-0 text-muted">{userDetails.email}</p>
-                  </div>
-                )}
-              </div>
-            </Dropdown.Item>
-            <Dropdown.Divider />
-            <Dropdown.Item
-              eventKey="2"
-              onClick={() => router.push("/dashboard/profile/myprofile")}
-            >
-              <i className="fe fe-user me-2"></i> Profile
-            </Dropdown.Item>
-            <Dropdown.Item
-              eventKey="3"
-              onClick={() => router.push("/dashboard/settings")}
-            >
-              <i className="fe fe-settings me-2"></i> Settings
-            </Dropdown.Item>
-
-            <Dropdown.Divider />
-            <Dropdown.Item className="mb-3" onClick={handleSignOut}>
-              <i className="fe fe-power me-2"></i> Sign Out
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown>
+  <Dropdown.Toggle
+    as="a"
+    bsPrefix=" "
+    className="rounded-circle"
+    id="dropdownUser"
+  >
+    <div className="avatar avatar-md avatar-indicators avatar-online">
+      {userDetails && userDetails.profilePicture ? (
+        <Image
+          alt="avatar"
+          src={userDetails.profilePicture}
+          className="rounded-circle"
+        />
+      ) : (
+        <Image alt="avatar" src="" className="rounded-circle" />
+      )}
+    </div>
+    {userDetails && (
+      <div className="position-absolute start-50 translate-middle-x mt-1">
+        <div className="text-dark small text-nowrap fw-bold mt-1">{userDetails.fullName}</div>
+      </div>
+    )}
+  </Dropdown.Toggle>
+  <Dropdown.Menu
+    className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
+    align="end"
+    aria-labelledby="dropdownUser"
+    show={hasMounted && isDesktop ? true : false}
+  >
+    <Dropdown.Item className="mt-3">
+      <div className="d-flex">
+        {userDetails && (
+          <div>
+            <h5 className="mb-1">{userDetails.fullName}</h5>
+            <p className="mb-0 text-muted">{userDetails.email}</p>
+          </div>
+        )}
+      </div>
+    </Dropdown.Item>
+    <Dropdown.Divider />
+    <Dropdown.Item
+      eventKey="2"
+      onClick={() => router.push("/dashboard/profile/myprofile")}
+    >
+      <i className="fe fe-user me-2"></i> Profile
+    </Dropdown.Item>
+    <Dropdown.Item
+      eventKey="3"
+      onClick={() => router.push("/dashboard/settings")}
+    >
+      <i className="fe fe-settings me-2"></i> Settings
+    </Dropdown.Item>
+    <Dropdown.Divider />
+    <Dropdown.Item className="mb-3" onClick={handleSignOut}>
+      <i className="fe fe-power me-2"></i> Sign Out
+    </Dropdown.Item>
+  </Dropdown.Menu>
+</Dropdown>
       </ListGroup>
     </Fragment>
   );

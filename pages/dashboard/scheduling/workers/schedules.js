@@ -35,6 +35,18 @@ import { extend } from "@syncfusion/ej2-base";
 import { DropDownListComponent } from "@syncfusion/ej2-react-dropdowns";
 import { DateTimePickerComponent } from "@syncfusion/ej2-react-calendars";
 import styles from "./SchedulerStyles.module.css";
+// import widget/custom components
+import { GeeksSEO, GridListViewButton } from 'widgets';
+import {
+  Row,
+  Col,
+  Card,
+  Image,
+  OverlayTrigger,
+  Tooltip,
+  Breadcrumb,
+  ListGroup,
+} from "react-bootstrap";
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -582,7 +594,24 @@ const FieldServiceSchedules = () => {
   }
 
   return (
-    <div className="schedule-control-section">
+    <div>
+ <GeeksSEO title="Worker Schedules | SAS - SAP B1 Portal" />
+
+<Row>
+  <Col lg={12}>
+    <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
+      <div className="mb-3">
+        <h1 className="mb-1 h2 fw-bold">Worker Schedules</h1>
+        <Breadcrumb>
+          <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+          <Breadcrumb.Item href="#">Calendar</Breadcrumb.Item>
+          <Breadcrumb.Item active>View Schedules</Breadcrumb.Item>
+        </Breadcrumb>
+      </div>
+    </div>
+  </Col>
+</Row>
+<div className="schedule-control-section">
       <ToastContainer position="top-right" autoClose={5000} />
       <div className="col-lg-12 control-section">
         <div className="control-wrapper">
@@ -648,6 +677,8 @@ const FieldServiceSchedules = () => {
         </div>
       </div>
     </div>
+    </div>
+  
   );
 };
 

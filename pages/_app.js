@@ -52,9 +52,18 @@ function MyApp({ Component, pageProps }) {
   return (
     <Fragment>
       <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta name="keywords" content={keywords} />
         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+        <style>{`
+          @media (min-width: 1200px) {
+            .container {
+              max-width: 100%;
+              padding-left: 5%;
+              padding-right: 5%;
+            }
+          }
+        `}</style>
       </Head>
       <NextSeo
         title={title}

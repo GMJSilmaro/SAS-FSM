@@ -21,6 +21,15 @@ import styles from "./ViewJobs.module.css";
 import { GeeksSEO } from "widgets";
 import JobStats from "sub-components/dashboard/projects/single/task/JobStats";
 import DOMPurify from "dompurify";
+import { 
+  BsHash, 
+  BsBriefcase, 
+  BsPerson, 
+  BsGeoAlt, 
+  BsClipboardCheck, 
+  BsExclamationTriangle, 
+  BsPeople 
+} from "react-icons/bs";
 
 const ViewJobs = () => {
   const router = useRouter();
@@ -48,7 +57,7 @@ const ViewJobs = () => {
     rows: {
       style: {
         minHeight: "72px",
-        cursor: "pointer", // Add this line
+        cursor: "pointer",
       },
       highlightOnHoverStyle: {
         backgroundColor: "#f1f5fc",
@@ -69,16 +78,6 @@ const ViewJobs = () => {
     }
   };
 
-  // const getStatusBadge = (status) => {
-  //   switch (status) {
-  //     case "Created": return <Badge bg="info">Created</Badge>;
-  //     case "Confirm": return <Badge bg="primary">Confirm</Badge>;
-  //     case "Cancel": return <Badge bg="danger">Cancel</Badge>;
-  //     case "Job Started": return <Badge bg="warning">Job Started</Badge>;
-  //     case "Job Complete": return <Badge bg="success">Job Complete</Badge>;
-  //     default: return status;
-  //   }
-  // };
   const getStatusBadge = (status) => {
     const getStyle = (backgroundColor) => ({
       backgroundColor,
@@ -137,16 +136,13 @@ const ViewJobs = () => {
       confirmButtonText: "View",
       denyButtonText: "Edit",
       cancelButtonText: "Remove",
-      backdrop: true, // Enables backdrop clicking to close the alert
+      backdrop: true,
     }).then(async (result) => {
       if (result.isConfirmed) {
-        // Navigate to the view page
         router.push(`/dashboard/jobs/${row.id}`);
       } else if (result.isDenied) {
-        // Navigate to the edit page
         router.push(`./update-jobs/${row.id}`);
       } else if (result.isDismissed) {
-        // Confirm before deletion
         const deleteResult = await Swal.fire({
           title: "Are you sure?",
           text: "This action cannot be undone.",
@@ -162,7 +158,6 @@ const ViewJobs = () => {
             const jobRef = doc(db, "jobs", row.id);
             await deleteDoc(jobRef);
             Swal.fire("Deleted!", "The job has been removed.", "success");
-            // Update state after deletion
             setJobs(jobs.filter((job) => job.id !== row.id));
             setFilteredJobs(filteredJobs.filter((job) => job.id !== row.id));
           } catch (error) {
@@ -296,75 +291,80 @@ const ViewJobs = () => {
     },
     {
       name: "Job No.",
-      selector: (row) => row.jobNo,
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsHash className="me-2" />
+          {row.jobNo}
+        </div>
+      ),
       sortable: true,
       width: "110px",
     },
     {
       name: "Job Name",
-      cell: (row) => <TooltipCell text={row.jobName} />,
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsBriefcase className="me-2" />
+          <TooltipCell text={row.jobName} />
+        </div>
+      ),
       sortable: true,
       width: "200px",
     },
     {
       name: "Customer Name",
-      cell: (row) => <TooltipCell text={row.customerName} />,
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsPerson className="me-2" />
+          <TooltipCell text={row.customerName} />
+        </div>
+      ),
       sortable: true,
       width: "200px",
     },
     {
       name: "Location Name",
-      cell: (row) => <TooltipCell text={row.locationName} />,
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsGeoAlt className="me-2" />
+          <TooltipCell text={row.locationName} />
+        </div>
+      ),
       sortable: true,
       width: "200px",
     },
     {
-      name: "Job Description",
-      cell: (row) => <HTMLCell html={row.jobDescription} />,
-      sortable: false,
-      width: "150px",
-    },
-    {
       name: "Job Status",
-      cell: (row) => getStatusBadge(row.jobStatus),
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsClipboardCheck className="me-2" />
+          {getStatusBadge(row.jobStatus)}
+        </div>
+      ),
       sortable: false,
       width: "150px",
     },
     {
       name: "Priority",
-      cell: (row) => getPriorityBadge(row.priority),
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsExclamationTriangle className="me-2" />
+          {getPriorityBadge(row.priority)}
+        </div>
+      ),
       sortable: true,
       width: "110px",
     },
     {
-      name: "Assigned Worker",
-      cell: (row) => <AssignedWorkerCell workerFullName={row.workerFullName} />,
+      name: "Assigned",
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsPeople className="me-2" />
+          <AssignedWorkerCell workerFullName={row.workerFullName} />
+        </div>
+      ),
       sortable: true,
       width: "200px",
-    },
-    {
-      name: "Start Date",
-      selector: (row) => formatDate(row.startDate),
-      sortable: true,
-      width: "150px",
-    },
-    {
-      name: "End Date",
-      selector: (row) => formatDate(row.endDate),
-      sortable: true,
-      width: "150px",
-    },
-    {
-      name: "Start Time",
-      cell: (row) => formatTime(row.startTime),
-      sortable: true,
-      width: "140px",
-    },
-    {
-      name: "End Time",
-      cell: (row) => formatTime(row.endTime),
-      sortable: true,
-      width: "120px",
     },
   ];
 
@@ -375,7 +375,7 @@ const ViewJobs = () => {
 
       const jobsData = jobsSnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data(), // Ensure that customerName and locationName are part of job data
+        ...doc.data(),
       }));
 
       const usersData = usersSnapshot.docs.map((doc) => ({
@@ -386,13 +386,11 @@ const ViewJobs = () => {
       const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
 
       const mergedData = sortedJobsData.map((job) => {
-        console.log("Job:", job); // Log the entire job object
+        console.log("Job:", job);
         const workerNames = job.assignedWorkers
           .map((workerObj) => {
-            // console.log("Searching for workerId:", workerObj);
-            const workerId = workerObj.workerId; // Extract the workerId from the object
+            const workerId = workerObj.workerId;
             const worker = usersData.find((user) => user.workerId === workerId);
-            //console.log("Found worker:", worker); // Log the found worker (or undefined)
             return worker
               ? `${worker.fullName}`
               : `Unknown Worker (ID: ${workerId})`;
@@ -423,7 +421,6 @@ const ViewJobs = () => {
     const searchLower = search.toLowerCase().trim();
 
     const result = jobs.filter((job) => {
-      // Function to check if any value in the job object matches the search term
       const isMatch = (value) => {
         if (value == null) return false;
 
@@ -446,7 +443,6 @@ const ViewJobs = () => {
         return false;
       };
 
-      // Check all properties of the job object
       return Object.values(job).some(isMatch);
     });
 
@@ -478,8 +474,8 @@ const ViewJobs = () => {
             <div className="mb-3">
               <h1 className="mb-1 h2 fw-bold">Job Lists</h1>
               <Breadcrumb>
-                <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item href="#">Jobs</Breadcrumb.Item>
+                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+                <Breadcrumb.Item href="/dashboard/jobs/list-job">Jobs</Breadcrumb.Item>
                 <Breadcrumb.Item active>View Jobs</Breadcrumb.Item>
               </Breadcrumb>
             </div>

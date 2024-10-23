@@ -324,7 +324,7 @@ const JobDetails = () => {
       <Fragment>
         <h1 className="mb-1 h2 fw-bold">Job Details</h1>
         <Breadcrumb>
-          <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
+          <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
           <Breadcrumb.Item href="/dashboard/jobs/list-jobs">
             Jobs
           </Breadcrumb.Item>

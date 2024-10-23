@@ -292,7 +292,7 @@ const ViewCustomers = () => {
           <Col lg={12} md={12} sm={12}>
             <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
               <div className="mb-3 mb-md-0">
-                <h1 className="mb-1 h2 fw-bold">View Customers</h1>
+                <h1 className="mb-1 h2 fw-bold">Customers</h1>
                 <Breadcrumb>
                   <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
                   <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
