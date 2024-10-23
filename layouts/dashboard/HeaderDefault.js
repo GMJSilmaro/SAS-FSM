@@ -25,22 +25,7 @@ const HeaderDefault = (props) => {
                             <Menu size="18px" />
                         </Link>
 						<div className="ms-lg-3 d-none d-md-none d-lg-block">
-							{/* <!-- Form --> */}
-							{/* <Form className=" d-flex align-items-center">
-								<InputGroup
-									className="input-group-merge search-bar"
-									bsPrefix="group-of-input"
-								>
-									<InputGroup.Text className="ps-2 pe-1 mx-2 my-1 h-40 position-absolute search-icon border-0">
-										<Search size="12px" className="text-secondary" />
-									</InputGroup.Text>
-									<Form.Control
-										type="search"
-										className="form-control form-control-sm ps-6"
-										placeholder="Search Entire Dashboard"
-									/>
-								</InputGroup>
-							</Form> */}
+							
 						</div>
 					</div>
 

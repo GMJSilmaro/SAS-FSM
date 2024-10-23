@@ -42,16 +42,7 @@ const DashboardIndexTop = (props) => {
 					</Navbar.Brand>
 					{/* search box */}
 					<div className="ms-lg-3 d-none d-md-none d-lg-block">
-						{/* <Form className="d-flex align-items-center">
-							<span className="position-absolute ps-3 search-icon">
-								<i className="fe fe-search"></i>
-							</span>
-							<Form.Control
-								type="search"
-								placeholder="Search Entire Dashboard"
-								className="ps-6"
-							/>
-						</Form> */}
+					
 					</div>
 					{/* Right side quick / shortcut menu  */}
 

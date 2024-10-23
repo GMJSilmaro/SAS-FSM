@@ -342,7 +342,12 @@ const AddNewJobs = () => {
       console.error("Error fetching customers:", error);
       setCustomers([]);
       toast.error(`Error fetching customers: ${error.message}`);
-    } finally {
+      
+      // Add auto-refresh logic here
+      setTimeout(() => {
+        toast.info("Attempting to refresh the page...");
+        window.location.reload();
+      }, 5000); // Wait for 5 seconds before refreshing
     }
   };
 
@@ -474,178 +479,6 @@ const AddNewJobs = () => {
   const handleWorkersChange = (selectedOptions) => {
     setSelectedWorkers(selectedOptions);
   };
-
-  // const handleCustomerChange = async (selectedOption) => {
-  //   setSelectedContact(null);
-  //   setSelectedLocation(null);
-  //   setSelectedCustomer(selectedOption);
-
-  //   const selectedCustomer = customers.find(
-  //     (option) => option.value === selectedOption.value
-  //   );
-
-  //   setFormData({
-  //     ...formData,
-  //     customerName: selectedCustomer ? selectedCustomer.label : "",
-  //   });
-
-  //   // Fetch related data for the selected customer
-  //   try {
-  //     // Fetch contacts for the customer
-  //     const contactsResponse = await fetch("/api/getContacts", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!contactsResponse.ok) {
-  //       throw new Error("Failed to fetch contacts");
-  //     }
-
-  //     const contactsData = await contactsResponse.json();
-  //     const formattedContacts = contactsData.map((item) => ({
-  //       value: item.contactId,
-  //       label: item.contactId,
-  //       ...item,
-  //     }));
-  //     setContacts(formattedContacts);
-
-  //     // Fetch locations for the customer
-  //     const locationsResponse = await fetch("/api/getLocation", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!locationsResponse.ok) {
-  //       throw new Error("Failed to fetch locations");
-  //     }
-
-  //     const locationsData = await locationsResponse.json();
-  //     const formattedLocations = locationsData.map((item) => ({
-  //       value: item.siteId,
-  //       label: item.siteId,
-  //       ...item,
-  //     }));
-  //     setLocations(formattedLocations);
-
-  //     // Fetch equipments for the customer
-  //     const equipmentsResponse = await fetch("/api/getEquipments", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!equipmentsResponse.ok) {
-  //       throw new Error("Failed to fetch equipments");
-  //     }
-
-  //     const equipmentsData = await equipmentsResponse.json();
-  //     const formattedEquipments = equipmentsData.map((item) => ({
-  //       value: item.ItemCode,
-  //       label: item.ItemCode,
-  //       ...item,
-  //     }));
-  //     setEquipments(formattedEquipments);
-
-  //     // Fetch service calls for the customer
-  //     const serviceCallResponse = await fetch("/api/getServiceCall", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!serviceCallResponse.ok) {
-  //       throw new Error("Failed to fetch service calls");
-  //     }
-
-  //     const serviceCallsData = await serviceCallResponse.json();
-  //     const formattedServiceCalls = serviceCallsData.map((item) => ({
-  //       value: item.serviceCallID,
-  //       label: item.serviceCallID + " - " + item.subject,
-  //     }));
-  //     setServiceCalls(formattedServiceCalls);
-
-  //     // Fetch sales orders for the customer
-  //     const salesOrderResponse = await fetch("/api/getSalesOrder", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!salesOrderResponse.ok) {
-  //       throw new Error("Failed to fetch sales orders");
-  //     }
-
-  //     const salesOrdersData = await salesOrderResponse.json();
-  //     const formattedSalesOrders = salesOrdersData.map((item) => ({
-  //       value: item.DocNum,
-  //       label: item.DocNum,
-  //     }));
-  //     setSalesOrders(formattedSalesOrders);
-  //   } catch (error) {
-  //     console.error("Error fetching related data:", error);
-  //     setContacts([]);
-  //     setLocations([]);
-  //     setEquipments([]);
-  //     setServiceCalls([]);
-  //     setSalesOrders([]);
-  //   }
-  // };
-
-  // const handleContactChange = (selectedOption) => {
-  //   setSelectedContact(selectedOption);
-  //   setFormData({
-  //     ...formData,
-  //     firstName: selectedOption.firstName || "",
-  //     middleName: selectedOption.middleName || "",
-  //     lastName: selectedOption.lastName || "",
-  //     phoneNumber: selectedOption.tel1 || "",
-  //     mobilePhone: selectedOption.tel2 || "",
-  //     email: selectedOption.email || "",
-  //   });
-  // };
-
-  // const handleContactChange = (selectedOption) => {
-  //   setSelectedContact(selectedOption);
-
-  //   // Combine firstName, middleName, and lastName into fullName
-  //   const contactFullname = `${selectedOption.firstName || ''} ${selectedOption.middleName || ''} ${selectedOption.lastName || ''}`.trim();
-
-  //   setFormData({
-  //     ...formData,
-  //     contact: {
-  //       contactID: selectedOption.value,
-  //       contactFullname: contactFullname,
-  //       contactPhoneNumber: selectedOption.tel1 || "",
-  //       contactMobilePhone: selectedOption.tel2 || "",
-  //       contactEmail: selectedOption.email || "",
-  //     },
-  //   });
-  // };
-
-  // const handleContactChange = (selectedOption) => {
-  //   setSelectedContact(selectedOption);
-  //   setFormData({
-  //     ...formData,
-  //     firstName: selectedOption.firstName || "",
-  //     middleName: selectedOption.middleName || "",
-  //     lastName: selectedOption.lastName || "",
-  //     phoneNumber: selectedOption.tel1 || "",
-  //     mobilePhone: selectedOption.tel2 || "",
-  //     email: selectedOption.email || "",
-  //   });
-  // };
 
   const handleCustomerChange = async (selectedOption) => {
     setSelectedContact(null);

@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange } from 'react-bootstrap-icons';
 import { GeeksSEO, PageHeading } from 'widgets'
 
-const fetchCustomers = async (page = 1, limit = 10, search = '') => {
+const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0) => {
   try {
     const formattedSearch = search.trim();
     const timestamp = new Date().getTime();
@@ -22,6 +22,11 @@ const fetchCustomers = async (page = 1, limit = 10, search = '') => {
     );
     
     if (!response.ok) {
+      if (retryCount < 2) {  // Allow up to 2 retries
+        console.log(`Retry attempt ${retryCount + 1} for fetching customers`);
+        await new Promise(resolve => setTimeout(resolve, 1000));  // Wait for 1 second before retrying
+        return fetchCustomers(page, limit, search, retryCount + 1);
+      }
       throw new Error(`Failed to fetch customers: ${response.status} ${response.statusText}`);
     }
     
