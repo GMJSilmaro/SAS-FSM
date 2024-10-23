@@ -1,14 +1,25 @@
 import React, { Fragment, useMemo, useState, useEffect, useCallback } from 'react';
-import { Col, Row, Card, Button, Modal, Form } from 'react-bootstrap';
+import { Col, Row, Card, Button } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import PropTypes from 'prop-types';
+import { useRouter } from 'next/router';
 
 const fetchCustomers = async (page = 1, limit = 10, search = '') => {
   try {
     const response = await fetch(`/api/getCustomersList?page=${page}&limit=${limit}&search=${search}`);
     
-    if (!response.ok) throw new Error('Failed to fetch customers');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error:', errorText);
+      throw new Error(`Failed to fetch customers: ${response.status} ${response.statusText}`);
+    }
     
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Unexpected content type:', contentType);
+      throw new Error('Received non-JSON response from server');
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -39,15 +50,21 @@ const ViewCustomers = () => {
   const [totalRows, setTotalRows] = useState(0);
   const [perPage, setPerPage] = useState(10);
   const [search, setSearch] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [error, setError] = useState(null);
+  const router = useRouter();
 
   const fetchData = useCallback(async (page) => {
     setLoading(true);
-    const response = await fetchCustomers(page, perPage, search);
-    setData(response.customers);
-    setTotalRows(response.totalCount);
-    setLoading(false);
+    setError(null);
+    try {
+      const response = await fetchCustomers(page, perPage, search);
+      setData(response.customers);
+      setTotalRows(response.totalCount);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }, [perPage, search]);
 
   useEffect(() => {
@@ -76,37 +93,7 @@ const ViewCustomers = () => {
   }, [search, fetchData]);
 
   const handleViewDetails = (customer) => {
-    setSelectedCustomer(customer);
-    setShowModal(true);
-  };
-
-  const renderBPAddresses = (addresses) => {
-    if (!addresses || addresses.length === 0) {
-      return <p>No addresses available</p>;
-    }
-    return addresses.map((address, index) => (
-      <div key={index}>
-        <p><strong>Address Name:</strong> {address.AddressName}</p>
-        <p><strong>Street:</strong> {address.Street}</p>
-        <p><strong>Zip Code:</strong> {address.ZipCode}</p>
-        <p><strong>Country:</strong> {address.Country}</p>
-        <hr />
-      </div>
-    ));
-  };
-
-  const renderContactEmployees = (contacts) => {
-    if (!contacts || contacts.length === 0) {
-      return <p>No contact employees available</p>;
-    }
-    return contacts.map((contact, index) => (
-      <div key={index}>
-        <p><strong>Name:</strong> {contact.Name}</p>
-        <p><strong>Phone:</strong> {contact.Phone1}</p>
-        <p><strong>Email:</strong> {contact.E_Mail}</p>
-        <hr />
-      </div>
-    ));
+    router.push(`/dashboard/customers/${customer.CardCode}`);
   };
 
   const columns = [
@@ -157,15 +144,6 @@ const ViewCustomers = () => {
     );
   }, [search]);
 
-  const filteredData = data.filter(item =>
-    (item.CardCode && item.CardCode.toLowerCase().includes(search.toLowerCase())) ||
-    (item.CardName && item.CardName.toLowerCase().includes(search.toLowerCase())) ||
-    (item.Phone1 && item.Phone1.toLowerCase().includes(search.toLowerCase())) ||
-    (item.EmailAddress && item.EmailAddress.toLowerCase().includes(search.toLowerCase())) ||
-    (item.Country && item.Country.toLowerCase().includes(search.toLowerCase())) ||
-    (item.Currency && item.Currency.toLowerCase().includes(search.toLowerCase()))
-  );
-
   return (
     <Fragment>
       <Row>
@@ -185,10 +163,11 @@ const ViewCustomers = () => {
               <h4 className="mb-1">Customers Table</h4>
             </Card.Header>
             <Card.Body className="px-0">
+              {error && <div className="alert alert-danger">{error}</div>}
               <DataTable
                 customStyles={customStyles}
                 columns={columns}
-                data={filteredData}
+                data={data}
                 pagination
                 paginationServer
                 paginationTotalRows={totalRows}
@@ -205,57 +184,6 @@ const ViewCustomers = () => {
           </Card>
         </Col>
       </Row>
-
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Customer Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedCustomer ? (
-            <Fragment>
-              <h5>Basic Info</h5>
-              <Form.Group className="mb-3">
-                <Form.Label>Customer Code:</Form.Label>
-                <Form.Control type="text" value={selectedCustomer.CardCode} readOnly />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Customer Name:</Form.Label>
-                <Form.Control type="text" value={selectedCustomer.CardName} readOnly />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Email:</Form.Label>
-                <Form.Control type="text" value={selectedCustomer.EmailAddress} readOnly />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Phone:</Form.Label>
-                <Form.Control type="text" value={selectedCustomer.Phone1} readOnly />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Country:</Form.Label>
-                <Form.Control type="text" value={selectedCustomer.Country} readOnly />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Currency:</Form.Label>
-                <Form.Control type="text" value={selectedCustomer.Currency} readOnly />
-              </Form.Group>
-              
-              <hr />
-              <h5>Addresses</h5>
-              {renderBPAddresses(selectedCustomer.BPAddresses)}
-
-              <hr />
-              <h5>Contact Employees</h5>
-              {renderContactEmployees(selectedCustomer.ContactEmployees)}
-
-            </Fragment>
-          ) : (
-            <p>No customer details available</p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>Close</Button>
-        </Modal.Footer>
-      </Modal>
     </Fragment>
   );
 };
