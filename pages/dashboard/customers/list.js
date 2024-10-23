@@ -1,14 +1,12 @@
 import React, { Fragment, useMemo, useState, useEffect, useCallback } from 'react';
-import { Col, Row, Card, Button } from 'react-bootstrap';
+import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
+import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange } from 'react-bootstrap-icons';
 
 const fetchCustomers = async (page = 1, limit = 10, search = '') => {
   try {
-    // Format the search term - trim whitespace and handle case
     const formattedSearch = search.trim();
-    
-    // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
     const response = await fetch(
       `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=${
@@ -28,7 +26,6 @@ const fetchCustomers = async (page = 1, limit = 10, search = '') => {
     
     const data = await response.json();
     
-    // If searching for a specific customer code and no results, try again with case-insensitive search
     if (formattedSearch.toUpperCase().startsWith('C0') && (!data.customers || data.customers.length === 0)) {
       const retryResponse = await fetch(
         `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=general&_=${timestamp}`,
@@ -84,17 +81,15 @@ const ViewCustomers = () => {
     }
   }, [perPage]);
 
-  // Initial load
   useEffect(() => {
     loadData(1);
   }, [loadData]);
 
-  // Handle search with debounce
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page when searching
+      setCurrentPage(1);
       loadData(1, search);
-    }, 300); // Reduced debounce time for better responsiveness
+    }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [search, loadData]);
@@ -111,7 +106,6 @@ const ViewCustomers = () => {
 
   const handleSearch = (e) => {
     const value = e.target.value;
-    // For CustomerCode, automatically convert to uppercase
     if (value.toUpperCase().startsWith('C0')) {
       setSearch(value.toUpperCase());
     } else {
@@ -125,6 +119,10 @@ const ViewCustomers = () => {
 
   const columns = [
     { 
+      name: '', 
+      width: '10px' 
+    },
+    { 
       name: '#', 
       selector: (row, index) => ((currentPage - 1) * perPage) + index + 1, 
       width: '50px' 
@@ -133,38 +131,140 @@ const ViewCustomers = () => {
       name: 'Customer Code', 
       selector: row => row.CardCode, 
       sortable: true, 
-      width: '150px',
-      cell: row => <div style={{fontWeight: 'bold'}}>{row.CardCode}</div>
+      width: '159px',
+      cell: row => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id={`tooltip-${row.CardCode}`}>Click to view details</Tooltip>}
+        >
+          <div style={{fontWeight: 'bold', cursor: 'pointer'}} onClick={() => handleViewDetails(row)}>
+            {row.CardCode}
+          </div>
+        </OverlayTrigger>
+      )
     },
-    { name: 'Customer Name', selector: row => row.CardName, sortable: true, width: '250px' },
-    { name: 'Phone 1', selector: row => row.Phone1, sortable: true, width: '150px' },
-    { name: 'Email', selector: row => row.EmailAddress, sortable: true, width: '250px' },
-    { name: 'Country', selector: row => row.Country, sortable: true, width: '100px' },
-    { name: 'Currency', selector: row => row.Currency, sortable: true, width: '100px' },
+    { 
+      name: 'Customer Name', 
+      selector: row => row.CardName, 
+      sortable: true, 
+      width: '250px',
+      cell: row => (
+        <div className="d-flex align-items-center">
+         
+          {row.CardName}
+        </div>
+      )
+    },
+    { 
+      name: 'Phone', 
+      selector: row => row.Phone1, 
+      sortable: true, 
+      width: '150px',
+      cell: row => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id={`tooltip-phone-${row.CardCode}`}>Click to call</Tooltip>}
+        >
+          <a href={`tel:${row.Phone1}`} className="text-decoration-none">
+            <TelephoneFill className="me-2" />
+            {row.Phone1}
+          </a>
+        </OverlayTrigger>
+      )
+    },
+    { 
+      name: 'Email', 
+      selector: row => row.EmailAddress, 
+      sortable: true, 
+      width: '250px',
+      cell: row => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id={`tooltip-email-${row.CardCode}`}>Click to send email</Tooltip>}
+        >
+          <a href={`mailto:${row.EmailAddress}`} className="text-decoration-none">
+            <EnvelopeFill className="me-2" />
+            {row.EmailAddress}
+          </a>
+        </OverlayTrigger>
+      )
+    },
+    { 
+      name: 'Country', 
+      selector: row => row.Country, 
+      sortable: true, 
+      width: '120px',
+      cell: row => (
+        <div>
+          <GeoAltFill className="me-2" />
+          {row.Country}
+        </div>
+      )
+    },
+    { 
+      name: 'Currency', 
+      selector: row => row.Currency, 
+      sortable: true, 
+      width: '120px',
+      cell: row => (
+        <Badge bg="info" className="d-flex align-items-center">
+          <CurrencyExchange className="me-1" />
+          {row.Currency}
+        </Badge>
+      )
+    },
     { 
       name: 'Actions',
       cell: (row) => (
         <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(row)}>
-          View Details
+          <Eye className="me-1" /> View
         </Button>
       ),
       ignoreRowClick: true,
-      style: { overflow: 'visible' },
+      allowOverflow: true,
+      button: true,
     },
   ];
 
   const customStyles = {
+    headRow: {
+      style: {
+        backgroundColor: "#F1F5FC",
+        borderTopStyle: 'solid',
+        borderTopWidth: '1px',
+        borderTopColor: '#E0E0E0',
+      },
+    },
     headCells: {
       style: {
         fontWeight: 'bold',
         fontSize: '14px',
-        backgroundColor: "#F1F5FC",
+        color: '#333',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+      },
+    },
+    rows: {
+      style: {
+        fontSize: '14px',
+        color: '#333',
+        backgroundColor: 'white',
+        '&:not(:last-of-type)': {
+          borderBottomStyle: 'solid',
+          borderBottomWidth: '1px',
+          borderBottomColor: '#E0E0E0',
+        },
+      },
+      highlightOnHoverStyle: {
+        backgroundColor: '#F5F5F5',
+        transition: '0.3s',
+        borderBottomColor: '#FFFFFF',
       },
     },
     cells: {
       style: {
-        color: '#64748b',
-        fontSize: '14px',
+        paddingLeft: '16px',
+        paddingRight: '16px',
       },
     },
   };
@@ -213,7 +313,8 @@ const ViewCustomers = () => {
                 paginationTotalRows={totalRows}
                 onChangePage={handlePageChange}
                 onChangeRowsPerPage={handlePerRowsChange}
-                highlightOnHover
+                //highlightOnHover
+                pointerOnHover
                 subHeader
                 subHeaderComponent={subHeaderComponentMemo}
                 progressPending={loading}

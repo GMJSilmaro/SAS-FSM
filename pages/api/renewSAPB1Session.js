@@ -1,40 +1,24 @@
-import https from 'https';
+import { renewSAPSession } from '@/utils/renewSAPSession';
 
 export default async function handler(req, res) {
-  const agent = new https.Agent({
-    rejectUnauthorized: false // Only for development/testing
-  });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
 
   try {
-    console.log('Attempting to renew SAP B1 session');
-    const loginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        CompanyDB: process.env.SAP_B1_COMPANY_DB,
-        UserName: process.env.SAP_B1_USERNAME,
-        Password: process.env.SAP_B1_PASSWORD,
-      }),
-      agent: agent,
-    });
+    const { currentSession, currentRouteId } = req.body;
+    const result = await renewSAPSession(currentSession, currentRouteId);
 
-    if (!loginResponse.ok) {
-      throw new Error(`Failed to renew SAP B1 session: ${await loginResponse.text()}`);
+    if (!result) {
+      throw new Error('Failed to renew session');
     }
 
-    const loginData = await loginResponse.json();
-    const newSessionId = loginData.SessionId;
-    const newExpiryTime = new Date(Date.now() + 30 * 60 * 1000);
-
-    res.setHeader('Set-Cookie', [
-      `B1SESSION=${newSessionId}; HttpOnly; Secure; SameSite=None`,
-      `B1SESSION_EXPIRY=${newExpiryTime.toISOString()}; HttpOnly; Secure; SameSite=None`,
-      `ROUTEID=.node4; Secure; SameSite=None`
-    ]);
-
-    res.status(200).json({ message: 'SAP B1 session renewed successfully' });
+    res.status(200).json(result);
   } catch (error) {
     console.error('Error renewing SAP B1 session:', error);
-    res.status(500).json({ message: 'Failed to renew SAP B1 session', error: error.message });
+    res.status(500).json({ 
+      message: 'Failed to renew SAP B1 session', 
+      error: error.message 
+    });
   }
 }

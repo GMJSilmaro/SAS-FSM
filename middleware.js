@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { renewSAPSession } from './utils/renewSAPSession';
 
 export async function middleware(request) {
   if (request.nextUrl.pathname.startsWith('/api') && !request.nextUrl.pathname.startsWith('/api/login')) {
@@ -18,34 +17,50 @@ export async function middleware(request) {
 
     if (timeUntilExpiry <= fiveMinutesInMilliseconds) {
       try {
-        // Renew the SAP B1 session using fetch
-        const renewalResult = await renewSAPSession(b1Session.value, routeId?.value);
-        
-        if (renewalResult) {
-          const response = NextResponse.next();
-          response.cookies.set('B1SESSION', renewalResult.newB1Session, { 
-            httpOnly: true, 
-            secure: true, 
-            sameSite: 'none' 
-          });
-          response.cookies.set('B1SESSION_EXPIRY', renewalResult.newExpiryTime, { 
-            httpOnly: true, 
-            secure: true, 
-            sameSite: 'none' 
-          });
-          if (renewalResult.newRouteId) {
-            response.cookies.set('ROUTEID', renewalResult.newRouteId, { 
-              httpOnly: true, 
-              secure: true, 
-              sameSite: 'none' 
-            });
-          }
-          return response;
-        } else {
-          // If renewal fails, redirect to sign-in
-          console.error('SAP B1 session renewal failed');
-          return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
+        // Call your renewal API with current session info
+        const baseUrl = request.nextUrl.origin;
+        const response = await fetch(`${baseUrl}/api/renewSAPB1Session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            currentSession: b1Session.value,
+            currentRouteId: routeId?.value
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Session renewal failed');
         }
+
+        const renewalData = await response.json();
+
+        // Create response with new cookies
+        const nextResponse = NextResponse.next();
+
+        nextResponse.cookies.set('B1SESSION', renewalData.newB1Session, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          path: '/'
+        });
+
+        nextResponse.cookies.set('B1SESSION_EXPIRY', renewalData.newExpiryTime, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          path: '/'
+        });
+
+        nextResponse.cookies.set('ROUTEID', renewalData.newRouteId || '.node4', {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          path: '/'
+        });
+
+        return nextResponse;
       } catch (error) {
         console.error('Error during SAP B1 session renewal:', error);
         return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
@@ -59,3 +74,4 @@ export async function middleware(request) {
 export const config = {
   matcher: '/api/:path*',
 };
+
