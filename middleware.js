@@ -1,9 +1,28 @@
 import { NextResponse } from 'next/server';
 
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 export async function middleware(request) {
   // Skip the renewal endpoint itself to prevent loops
   if (request.nextUrl.pathname === '/api/renewSAPB1Session') {
     return NextResponse.next();
+  }
+
+  // Check for inactivity
+  const lastActivity = request.cookies.get('LAST_ACTIVITY');
+  const currentTime = Date.now();
+
+  if (lastActivity) {
+    const inactiveTime = currentTime - parseInt(lastActivity.value);
+    if (inactiveTime > INACTIVITY_TIMEOUT) {
+      // User has been inactive, log them out
+      const response = NextResponse.redirect(new URL('/authentication/sign-in', request.url));
+      response.cookies.delete('B1SESSION');
+      response.cookies.delete('B1SESSION_EXPIRY');
+      response.cookies.delete('ROUTEID');
+      response.cookies.delete('LAST_ACTIVITY');
+      return response;
+    }
   }
 
   // Only check API routes that aren't login or renewal
@@ -17,7 +36,6 @@ export async function middleware(request) {
       return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
     }
 
-    const currentTime = Date.now();
     const expiryTime = new Date(sessionExpiry.value).getTime();
     const timeUntilExpiry = expiryTime - currentTime;
     const fiveMinutesInMilliseconds = 5 * 60 * 1000;
@@ -78,6 +96,14 @@ export async function middleware(request) {
           });
         }
 
+        // Update last activity time
+        nextResponse.cookies.set('LAST_ACTIVITY', currentTime.toString(), {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          path: '/'
+        });
+
         return nextResponse;
       } catch (error) {
         console.error('Error during SAP B1 session renewal:', error);
@@ -86,7 +112,16 @@ export async function middleware(request) {
     }
   }
 
-  return NextResponse.next();
+  // Update last activity time for non-API routes
+  const response = NextResponse.next();
+  response.cookies.set('LAST_ACTIVITY', currentTime.toString(), {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/'
+  });
+
+  return response;
 }
 
 export const config = {

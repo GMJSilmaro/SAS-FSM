@@ -479,6 +479,11 @@ const ViewJobs = () => {
                 <Breadcrumb.Item active>View Jobs</Breadcrumb.Item>
               </Breadcrumb>
             </div>
+            <div>
+              <Button variant="primary" href="/dashboard/jobs/create-jobs">
+                Add New Job
+              </Button>
+            </div>
           </div>
         </Col>
       </Row>

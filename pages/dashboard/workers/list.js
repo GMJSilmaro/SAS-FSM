@@ -1,6 +1,6 @@
 // import node module libraries
 import { Fragment } from 'react';
-import { Col, Row, Card, Tab, Breadcrumb } from 'react-bootstrap';
+import { Col, Row, Card, Tab, Breadcrumb, Button } from 'react-bootstrap';
 
 // import widget/custom components
 import { GeeksSEO, GridListViewButton } from 'widgets';
@@ -21,7 +21,6 @@ const Worker = () => {
 							<div className="mb-3 mb-md-0">
 								<h1 className="mb-1 h2 fw-bold">
 									View Workers
-									
 								</h1>
 								<Breadcrumb>
 									<Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
@@ -29,7 +28,11 @@ const Worker = () => {
 									<Breadcrumb.Item active>List</Breadcrumb.Item>
 								</Breadcrumb>
 							</div>
-						
+							<div>
+								<Button variant="primary" href="/dashboard/workers/create-worker">
+									Add New Worker
+								</Button>
+							</div>
 						</div>
 					</Col>
 				</Row>

@@ -2,7 +2,7 @@ import React, { Fragment, useMemo, useState, useEffect, useCallback } from 'reac
 import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
-import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange } from 'react-bootstrap-icons';
+import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill } from 'react-bootstrap-icons';
 import { GeeksSEO, PageHeading } from 'widgets'
 
 const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0) => {
@@ -162,6 +162,18 @@ const ViewCustomers = () => {
       )
     },
     { 
+      name: 'Main Address', 
+      selector: row => row.MailAddress, 
+      sortable: true, 
+      width: '250px',
+      cell: row => (
+        <div>
+          <HouseFill className="me-2" />
+          {row.MailAddress}
+        </div>
+      )
+    },
+    { 
       name: 'Phone', 
       selector: row => row.Phone1, 
       sortable: true, 
@@ -195,30 +207,19 @@ const ViewCustomers = () => {
         </OverlayTrigger>
       )
     },
-    { 
-      name: 'Country', 
-      selector: row => row.Country, 
-      sortable: true, 
-      width: '120px',
-      cell: row => (
-        <div>
-          <GeoAltFill className="me-2" />
-          {row.Country}
-        </div>
-      )
-    },
-    { 
-      name: 'Currency', 
-      selector: row => row.Currency, 
-      sortable: true, 
-      width: '120px',
-      cell: row => (
-        <Badge bg="info" className="d-flex align-items-center">
-          <CurrencyExchange className="me-1" />
-          {row.Currency}
-        </Badge>
-      )
-    },
+    // { 
+    //   name: 'Country', 
+    //   selector: row => row.Country, 
+    //   sortable: true, 
+    //   width: '120px',
+    //   cell: row => (
+    //     <div>
+    //       <GeoAltFill className="me-2" />
+    //       {row.Country}
+    //     </div>
+    //   )
+    // },
+    
     { 
       name: 'Actions',
       cell: (row) => (

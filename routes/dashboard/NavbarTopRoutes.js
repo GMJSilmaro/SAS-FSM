@@ -26,24 +26,6 @@ const NavbarDefault = [
 				menuitem: 'Customers',
 				link: '/dashboard/customers/list'
 			},
-			// {
-			// 	id: uuid(),
-			// 	menuitem: 'Customers',
-			// 	link: '#',
-			// 	badge: 'NEW',
-			// 	children: [
-			// 		{
-			// 			id: uuid(),
-			// 			header: true,
-			// 			header_text: 'Customer Menu'
-			// 		},
-			// 		{
-			// 			id: uuid(),
-			// 			menuitem: 'View Customers',
-			// 			link: '/dashboard/customers/list'
-			// 		},
-			// 	]
-			// },
 		],
 		isAuthenticated: true,
 	},
@@ -67,15 +49,20 @@ const NavbarDefault = [
 						header: true,
 						header_text: 'Manage Workers'
 					},
-					{
-						id: uuid(),
-						menuitem: 'Add Worker',
-						link: '/dashboard/workers/create-worker'
-					},
+					// {
+					// 	id: uuid(),
+					// 	menuitem: 'Add Worker',
+					// 	link: '/dashboard/workers/create-worker'
+					// },
 					{
 						id: uuid(),
 						menuitem: 'View Worker',
 						link: '/dashboard/workers/list'
+					},
+					{
+						id: uuid(),
+						menuitem: 'View Schedules',
+						link: '/dashboard/scheduling/workers/schedules'
 					},
 				]
 			},
@@ -141,74 +128,61 @@ const NavbarDefault = [
 			},
 			{
 				id: uuid(),
-				menuitem: 'Create Jobs',
-				link: '/dashboard/jobs/create-jobs'
-			},
-			{
-				id: uuid(),
 				menuitem: 'View Jobs',
 				link: '/dashboard/jobs/list-jobs'
-			}
-		],
-		isAuthenticated: true,
-	},
-	{
-		id: uuid(),
-		menuitem: 'Schedules',
-		link: '#',
-		children: [
-			{
-				id: uuid(),
-				header: true,
-				header_text: 'Schedule Menu'
 			},
 			{
 				id: uuid(),
-				menuitem: 'Jobs',
-				link: '#',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Job Calendar'
-					},
-					// {
-					// 	id: uuid(),
-					// 	menuitem: 'View Past Jobs',
-					// 	link: '/dashboard/scheduling/jobs/past'
-					// },
-					{
-						id: uuid(),
-						menuitem: 'Calendar',
-						link: '/dashboard/scheduling/jobs/current'
-					},
-					// {
-					// 	id: uuid(),
-					// 	menuitem: 'View Future Jobs',
-					// 	link: '/dashboard/scheduling/jobs/future'
-					// },
-				]
-			},
-			{
-				id: uuid(),
-				menuitem: 'Workers',
-				link: '#',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Worker Calendar'
-					},
-					{
-						id: uuid(),
-						menuitem: 'Calendar',
-						link: '/dashboard/scheduling/workers/schedules'
-					},
-				]
+				menuitem: 'View Schedules',
+				link: '/dashboard/scheduling/jobs/current'
 			},
 		],
 		isAuthenticated: true,
 	},
+	// {
+	// 	id: uuid(),
+	// 	menuitem: 'Schedules',
+	// 	link: '#',
+	// 	children: [
+	// 		{
+	// 			id: uuid(),
+	// 			header: true,
+	// 			header_text: 'Schedule Menu'
+	// 		},
+	// 		{
+	// 			id: uuid(),
+	// 			menuitem: 'Jobs',
+	// 			link: '#',
+	// 			children: [
+	// 				{
+	// 					id: uuid(),
+	// 					header: true,
+	// 					header_text: 'Job Calendar'
+	// 				},
+	// 				
+	// 				// {
+	// 				// 	id: uuid(),
+	// 				// 	menuitem: 'View Future Jobs',
+	// 				// 	link: '/dashboard/scheduling/jobs/future'
+	// 				// },
+	// 			]
+	// 		},
+	// 		{
+	// 			id: uuid(),
+	// 			menuitem: 'Workers',
+	// 			link: '#',
+	// 			children: [
+	// 				{
+	// 					id: uuid(),
+	// 					header: true,
+	// 					header_text: 'Worker Calendar'
+	// 				},
+	// 				
+	// 			]
+	// 		},
+	// 	],
+	// 	isAuthenticated: true,
+	// },
 
 	
 	// {
