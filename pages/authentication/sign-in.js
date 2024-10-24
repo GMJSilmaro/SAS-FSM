@@ -49,18 +49,18 @@ const SignIn = () => {
       const data = await response.json();
       console.log('Backend login response:', data);
   
-      // Step 3: Validate isAdmin field before proceeding
+
       if (!data.isAdmin) {
         throw new Error('Access denied. You must be an admin to log in.');
       }
   
-      // Step 4: Set other cookies using js-cookie (optional)
+
       Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
       Cookies.set('email', email, { secure: true, sameSite: 'None' });
       Cookies.set('workerId', data.workerId, { secure: true, sameSite: 'None' });
       Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
 
-      // Step 5: Show SweetAlert2 for the welcome message
+
       Swal.fire({
         title: 'Welcome!',
         text: `Welcome back, ${data.fullName}!`,
@@ -71,7 +71,7 @@ const SignIn = () => {
         router.push('/dashboard/overview');
       });
 
-      // Step 6: Optionally show a passive success toast for a different operation
+
       toast.success('You have successfully logged in.');
 
     } catch (error) {

@@ -100,6 +100,6 @@ const NavbarDefault = [
 	},
 ];
 
-console.log('NavbarDefault:', JSON.stringify(NavbarDefault, null, 2));
+//console.log('NavbarDefault:', JSON.stringify(NavbarDefault, null, 2));
 
 export default NavbarDefault;
