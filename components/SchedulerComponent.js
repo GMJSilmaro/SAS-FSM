@@ -1,55 +1,60 @@
-import React, { useEffect, useState } from 'react';
-import { ScheduleComponent, Day, Week, Month, Agenda, Inject } from '@syncfusion/ej2-react-schedule';
-import { collection, getDocs } from 'firebase/firestore'; // Firebase Firestore functions
-import { db } from '../firebase'; 
-
+import React, { useEffect, useState } from "react";
+import {
+  ScheduleComponent,
+  Day,
+  Week,
+  Month,
+  Agenda,
+  Inject,
+} from "@syncfusion/ej2-react-schedule";
+import { collection, getDocs } from "firebase/firestore"; // Firebase Firestore functions
+import { db } from "../firebase";
 
 const SchedulerComponent = () => {
-    const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState([]);
 
-    // Fetch job data from Firebase (jobs collection)
-    useEffect(() => {
-        const fetchJobs = async () => {
-            try {
-                const jobsSnapshot = await getDocs(collection(db, 'jobs'));
-                const jobsData = jobsSnapshot.docs.map(doc => {
-                    const job = doc.data();
-                    return {
-                        Id: doc.id,  
-                        Subject: job.jobName,  
-                        StartTime: new Date(job.start),  
-                        EndTime: new Date(`${job.endDate}T${job.endTime}`),  
-                        Description: job.description  
-                    };
-                });
-                setEvents(jobsData);  
-            } catch (error) {
-                console.error("Error fetching jobs from Firebase:", error);
-            }
-        };
-
-        fetchJobs();
-    }, []);
-
-    const eventSettings = {
-        dataSource: events,  // Use the fetched events data from Firebase
+  // Fetch job data from Firebase (jobs collection)
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const jobsSnapshot = await getDocs(collection(db, "jobs"));
+        const jobsData = jobsSnapshot.docs.map((doc) => {
+          const job = doc.data();
+          return {
+            Id: doc.id,
+            Subject: job.jobName,
+            StartTime: new Date(job.start),
+            EndTime: new Date(`${job.endDate}T${job.endTime}`),
+            Description: job.description,
+          };
+        });
+        setEvents(jobsData);
+      } catch (error) {
+        console.error("Error fetching jobs from Firebase:", error);
+      }
     };
 
-    return (
-        <ScheduleComponent 
-          height="650px" 
-          eventSettings={eventSettings}
-          selectedDate={new Date()}  // Default to the current date
-          currentView="Month"  // Default view set to Month
-          views={['Day', 'Week', 'Month', 'Agenda']}  // Calendar views
-        >
-          <Inject services={[Day, Week, Month, Agenda]} />
-        </ScheduleComponent>
-    );
+    fetchJobs();
+  }, []);
+
+  const eventSettings = {
+    dataSource: events, // Use the fetched events data from Firebase
+  };
+
+  return (
+    <ScheduleComponent
+      height="650px"
+      eventSettings={eventSettings}
+      selectedDate={new Date()} // Default to the current date
+      currentView="Month" // Default view set to Month
+      views={["Day", "Week", "Month", "Agenda"]} // Calendar views
+    >
+      <Inject services={[Day, Week, Month, Agenda]} />
+    </ScheduleComponent>
+  );
 };
 
 export default SchedulerComponent;
-
 
 // import * as React from 'react';
 // import { useEffect, useRef, useState } from 'react';
@@ -96,7 +101,7 @@ export default SchedulerComponent;
 //             <div className='col-lg-12 control-section'>
 //                 <div className='control-wrapper drag-sample-wrapper'>
 //                     <div className="schedule-container">
-//                         <ScheduleComponent 
+//                         <ScheduleComponent
 //                             ref={scheduleObj}
 //                             cssClass='schedule-drag-drop'
 //                             width='100%'
@@ -106,23 +111,23 @@ export default SchedulerComponent;
 //                             showQuickInfo={false}
 //                             eventSettings={{
 //                                 dataSource: jobData,  // Use the jobData state for events
-//                                 fields: { 
-//                                     subject: { title: 'Job Name', name: 'Subject' }, 
-//                                     startTime: { title: "Start Time", name: "StartTime" }, 
-//                                     endTime: { title: "End Time", name: "EndTime" }, 
-//                                     description: { title: 'Job Description', name: 'Description' } 
+//                                 fields: {
+//                                     subject: { title: 'Job Name', name: 'Subject' },
+//                                     startTime: { title: "Start Time", name: "StartTime" },
+//                                     endTime: { title: "End Time", name: "EndTime" },
+//                                     description: { title: 'Job Description', name: 'Description' }
 //                                 }
 //                             }}
 //                             group={{ enableCompactView: false, resources: ['Jobs'] }}>
-                            
+
 //                             <ResourcesDirective>
-//                                 <ResourceDirective 
-//                                     field='JobId' 
-//                                     title='Job' 
-//                                     name='Jobs' 
-//                                     allowMultiple={false} 
-//                                     dataSource={jobData} 
-//                                     textField='Subject' 
+//                                 <ResourceDirective
+//                                     field='JobId'
+//                                     title='Job'
+//                                     name='Jobs'
+//                                     allowMultiple={false}
+//                                     dataSource={jobData}
+//                                     textField='Subject'
 //                                     idField='Id'
 //                                     colorField='Color' />
 //                             </ResourcesDirective>
@@ -132,7 +137,7 @@ export default SchedulerComponent;
 //                                 <ViewDirective option='Week'/>
 //                                 <ViewDirective option='Month'/>
 //                             </ViewsDirective>
-                            
+
 //                             <Inject services={[Day, Week, Month, Resize, DragAndDrop]}/>
 //                         </ScheduleComponent>
 //                     </div>
@@ -143,8 +148,6 @@ export default SchedulerComponent;
 // };
 
 // export default SchedulerComponent;
-
-
 
 // 'use client'
 
@@ -176,8 +179,8 @@ export default SchedulerComponent;
 //     };
 
 //   return (
-//     <ScheduleComponent 
-//       height="650px" 
+//     <ScheduleComponent
+//       height="650px"
 //       eventSettings={eventSettings}
 //       selectedDate={new Date(2024, 9, 6)}
 //       currentView="Month"  // Default view set to Month

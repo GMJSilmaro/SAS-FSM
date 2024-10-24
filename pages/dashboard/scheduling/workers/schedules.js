@@ -9,8 +9,8 @@ import {
   ResourcesDirective,
   ResourceDirective,
   Inject,
-  Resize,
-  DragAndDrop,
+  //Resize,
+  // DragAndDrop,
 } from "@syncfusion/ej2-react-schedule";
 import { db, auth } from "../../../../firebase";
 import {
@@ -36,7 +36,7 @@ import { DropDownListComponent } from "@syncfusion/ej2-react-dropdowns";
 import { DateTimePickerComponent } from "@syncfusion/ej2-react-calendars";
 import styles from "./SchedulerStyles.module.css";
 // import widget/custom components
-import { GeeksSEO, GridListViewButton } from 'widgets';
+import { GeeksSEO, GridListViewButton } from "widgets";
 import {
   Row,
   Col,
@@ -47,6 +47,7 @@ import {
   Breadcrumb,
   ListGroup,
 } from "react-bootstrap";
+import { faLessThanEqual } from "@fortawesome/free-solid-svg-icons";
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -179,7 +180,7 @@ const FieldServiceSchedules = () => {
         setFieldWorkers(workers);
 
         // Set up listeners for each worker's schedules
-        workers.forEach(setupWorkerSchedulesListener);
+        workers.forEach(setupWorkerJobsListener);
       },
       (error) => {
         console.error("Error fetching workers:", error);
@@ -188,50 +189,51 @@ const FieldServiceSchedules = () => {
     );
   };
 
-  const setupWorkerSchedulesListener = (worker) => {
-    const scheduleQuery = query(
-      collection(db, "users", worker.id, "workerSchedules")
+  const setupWorkerJobsListener = (worker) => {
+    const jobsQuery = query(
+      collection(db, "jobs"),
+      where("assignedWorkers", "array-contains", { workerId: worker.id })
     );
 
     return onSnapshot(
-      scheduleQuery,
+      jobsQuery,
       (snapshot) => {
-        const workerSchedules = [];
-        snapshot.forEach((scheduleDoc) => {
-          const data = scheduleDoc.data();
-          if (data.schedules && Array.isArray(data.schedules)) {
-            data.schedules.forEach((schedule) => {
-              workerSchedules.push({
-                Id: schedule.id,
-                Subject: schedule.status,
-                StartTime: new Date(schedule.startTime),
-                EndTime: new Date(schedule.endTime),
-                IsAllDay: schedule.isAllDay,
-                WorkerId: worker.id,
-                Status: schedule.status,
-                Day: data.day,
-                DayId: data.dayId,
-              });
-            });
-          }
+        const workerJobs = [];
+        snapshot.forEach((jobDoc) => {
+          const jobData = jobDoc.data();
+
+          const startDate =
+            jobData.startDate instanceof Timestamp
+              ? jobData.startDate.toDate()
+              : new Date(jobData.startDate);
+
+          const endDate =
+            jobData.endDate instanceof Timestamp
+              ? jobData.endDate.toDate()
+              : new Date(jobData.endDate);
+
+          workerJobs.push({
+            WorkerId: worker.id, // Include worker id if needed for filtering
+            Subject: jobData.jobName, // Matches the 'subject' field in ScheduleComponent
+            StartTime: startDate, // Matches the 'startTime' field in ScheduleComponent
+            EndTime: endDate, // Matches the 'endTime' field in ScheduleComponent
+            // Optionally, add other fields if you have a description or other data
+          });
         });
 
-        console.log(`Updated schedules for ${worker.text}:`, workerSchedules);
+        console.log(`Updated jobs for ${worker.text}:`, workerJobs);
 
         setScheduleData((prevData) => {
-          // Remove existing schedules for this worker
+          // Remove existing jobs for this worker
           const filteredData = prevData.filter(
-            (schedule) => schedule.WorkerId !== worker.id
+            (job) => job.WorkerId !== worker.id // Adjusted to match the field name
           );
-          // Add the new schedules
-          return [...filteredData, ...workerSchedules];
+          // Add the new jobs
+          return [...filteredData, ...workerJobs];
         });
       },
       (error) => {
-        console.error(
-          `Error fetching schedules for worker ${worker.text}:`,
-          error
-        );
+        console.error(`Error fetching jobs for worker ${worker.text}:`, error);
       }
     );
   };
@@ -270,312 +272,247 @@ const FieldServiceSchedules = () => {
     [currentUser]
   );
 
-  const onActionComplete = useCallback(
-    async (args) => {
-      if (!currentUser) {
-        console.error("No authenticated user found");
-        toast.error("Error updating schedule: No authenticated user");
-        return;
-      }
+  // const onActionComplete = useCallback(
+  //   async (args) => {
+  //     if (!currentUser) {
+  //       console.error("No authenticated user found");
+  //       toast.error("Error updating schedule: No authenticated user");
+  //       return;
+  //     }
 
-      console.log("onActionComplete triggered", args);
+  //     console.log("onActionComplete triggered", args);
 
-      if (args.data && args.requestType === "eventRemoved") {
-        // Handle event removal
-        const eventData = Array.isArray(args.data) ? args.data[0] : args.data;
-        if (!eventData) {
-          console.error("Event data is missing.");
-          return;
-        }
-
-        // Log the eventData and its Id
-        console.log("Event data for removal:", eventData);
-        console.log("Event ID for removal:", eventData.Id);
-
-        const workerId = eventData.WorkerId;
-        if (!workerId) {
-          console.error("Worker ID is missing. Cannot delete schedule.");
-          toast.error("Failed to delete schedule. Worker ID is missing.");
-          return;
-        }
-
-        const dayId = formatDate(eventData.StartTime);
-        console.log(
-          `Attempting to delete schedule for worker ${workerId} on ${dayId}:`,
-          eventData
-        );
-
-        try {
-          const workerScheduleRef = doc(
-            db,
-            "users",
-            workerId,
-            "workerSchedules",
-            dayId
-          );
-          const docSnap = await getDoc(workerScheduleRef);
-
-          if (docSnap.exists()) {
-            const existingSchedules = docSnap.data().schedules || [];
-            const updatedSchedules = existingSchedules.filter(
-              (schedule) => schedule.id !== eventData.Id
-            );
-
-            // Update the worker's schedule by removing the deleted event
-            await setDoc(
-              workerScheduleRef,
-              { schedules: updatedSchedules },
-              { merge: true }
-            );
-
-            console.log(
-              `Successfully deleted schedule for worker ${workerId} on ${dayId}`
-            );
-            toast.success("Schedule deleted successfully!");
-          } else {
-            console.warn(
-              `No schedule found for worker ${workerId} on ${dayId}`
-            );
-          }
-        } catch (error) {
-          console.error(
-            `Error deleting schedule for worker ${workerId} on ${dayId}:`,
-            error
-          );
-          toast.error("Failed to delete schedule. Please try again.");
-        }
-      } else if (
-        args.data &&
-        (args.requestType === "eventCreated" ||
-          args.requestType === "eventChanged")
-      ) {
-        // Handle event creation or change
-        const eventData = Array.isArray(args.data) ? args.data[0] : args.data;
-        if (!eventData) {
-          console.error("Event data is missing.");
-          return;
-        }
-
-        // Log the eventData and its Id for creation/change
-        console.log("Event data for creation/change:", eventData);
-        console.log("Event ID for creation/change:", eventData.Id);
-
-        const dayId = formatDate(eventData.StartTime);
-
-        // Get the old worker ID from event data, ensure it's set correctly
-        console.log("Old worker ID from state:", oldWorkerId);
-        const newWorkerId = eventData.NewWorkerId || eventData.WorkerId; // Use the new worker ID if it exists
-        const newScheduleEntry = {
-          id: eventData.Id || Date.now().toString(),
-          status: eventData.Subject || statusOptions[0],
-          startTime: eventData.StartTime.toISOString(),
-          endTime: eventData.EndTime.toISOString(),
-          isAllDay: eventData.IsAllDay,
-        };
-
-        console.log(
-          `Attempting to save schedule for worker ${newWorkerId} on ${dayId}:`,
-          newScheduleEntry
-        );
-
-        try {
-          const newWorkerScheduleRef = doc(
-            db,
-            "users",
-            newWorkerId,
-            "workerSchedules",
-            dayId
-          );
-          const newDocSnap = await getDoc(newWorkerScheduleRef);
-
-          let existingSchedules = [];
-          if (newDocSnap.exists()) {
-            existingSchedules = newDocSnap.data().schedules || [];
-          }
-
-          const updatedSchedulesForNewWorker = existingSchedules.filter(
-            (schedule) => schedule.id !== newScheduleEntry.id
-          );
-          updatedSchedulesForNewWorker.push(newScheduleEntry);
-
-          await setDoc(
-            newWorkerScheduleRef,
-            {
-              day: eventData.StartTime.toLocaleDateString("en-US", {
-                weekday: "long",
-              }),
-              dayId: dayId,
-              timestamp: new Date().toISOString(),
-              workerId: newWorkerId,
-              schedules: updatedSchedulesForNewWorker,
-            },
-            { merge: true }
-          );
-
-          console.log(
-            `Successfully saved schedule for worker ${newWorkerId} on ${dayId}`
-          );
-          toast.success("Schedule updated successfully!");
-
-          // Check if the worker has changed
-          console.log(
-            `Old worker ID: ${oldWorkerId}, New worker ID: ${newWorkerId}`
-          );
-          if (oldWorkerId && oldWorkerId !== newWorkerId) {
-            console.log(
-              "Worker has changed. Removing old entry from:",
-              oldWorkerId
-            );
-            await handleOldEntryRemoval(oldWorkerId, eventData.Id, dayId);
-          } else {
-            console.log(
-              "Old and new worker IDs are the same; not removing any old entry."
-            );
-          }
-        } catch (error) {
-          console.error(
-            `Error saving schedule for worker ${newWorkerId} on ${dayId}:`,
-            error
-          );
-          toast.error("Failed to update schedule. Please try again.");
-        }
-      } else {
-        console.log(
-          "Event not created, changed, or removed:",
-          args.requestType
-        );
-      }
-    },
-    [currentUser, createNotification, statusOptions, oldWorkerId]
-  );
-
-  const handleOldEntryRemoval = async (oldWorkerId, eventId, dayId) => {
-    console.log(
-      `Attempting to remove old entry for worker ${oldWorkerId} with event ID ${eventId} on ${dayId}`
-    );
-    try {
-      const oldWorkerScheduleRef = doc(
-        db,
-        "users",
-        oldWorkerId,
-        "workerSchedules",
-        dayId
-      );
-      const oldDocSnap = await getDoc(oldWorkerScheduleRef);
-
-      if (oldDocSnap.exists()) {
-        const existingSchedules = oldDocSnap.data().schedules || [];
-        const updatedSchedules = existingSchedules.filter(
-          (schedule) => schedule.id !== eventId
-        );
-
-        // Update the old worker's schedule by removing the moved event
-        await setDoc(
-          oldWorkerScheduleRef,
-          { schedules: updatedSchedules },
-          { merge: true }
-        );
-
-        console.log(
-          `Successfully removed schedule for worker ${oldWorkerId} on ${dayId}`
-        );
-        toast.success("Old schedule entry removed successfully!");
-      } else {
-        console.warn(`No schedule found for worker ${oldWorkerId} on ${dayId}`);
-      }
-    } catch (error) {
-      console.error(
-        `Error removing old schedule for worker ${oldWorkerId} on ${dayId}:`,
-        error
-      );
-      toast.error("Failed to remove old schedule entry. Please try again.");
-    }
-  };
-
-  // const onActionComplete = useCallback(async (args) => {
-  //   if (!currentUser) {
-  //     console.error("No authenticated user found");
-  //     toast.error("Error updating schedule: No authenticated user");
-  //     return;
-  //   }
-
-  //   console.log("onActionComplete triggered", args);
-  //   if (args.requestType === 'eventCreated' || args.requestType === 'eventChanged') {
-  //     const eventData = args.data[0];
-  //     const workerId = eventData.WorkerId;
-  //     const dayId = formatDate(eventData.StartTime);
-
-  //     const newScheduleEntry = {
-  //       id: Date.now().toString(),
-  //       status: eventData.Subject || statusOptions[0],
-  //       startTime: eventData.StartTime.toISOString(),
-  //       endTime: eventData.EndTime.toISOString(),
-  //       isAllDay: eventData.IsAllDay,
-  //     };
-
-  //     console.log(`Attempting to save schedule for worker ${workerId} on ${dayId}:`, newScheduleEntry);
-
-  //     try {
-  //       const workerScheduleRef = doc(db, "users", workerId, "workerSchedules", dayId);
-
-  //       const docSnap = await getDoc(workerScheduleRef);
-  //       let existingSchedules = [];
-  //       if (docSnap.exists()) {
-  //         existingSchedules = docSnap.data().schedules || [];
+  //     if (args.data && args.requestType === "eventRemoved") {
+  //       // Handle event removal
+  //       const eventData = Array.isArray(args.data) ? args.data[0] : args.data;
+  //       if (!eventData) {
+  //         console.error("Event data is missing.");
+  //         return;
   //       }
 
-  //       const scheduleExists = existingSchedules.some(schedule =>
-  //         schedule.startTime === newScheduleEntry.startTime &&
-  //         schedule.endTime === newScheduleEntry.endTime &&
-  //         schedule.status === newScheduleEntry.status
+  //       // Log the eventData and its Id
+  //       console.log("Event data for removal:", eventData);
+  //       console.log("Event ID for removal:", eventData.Id);
+
+  //       const workerId = eventData.WorkerId;
+  //       if (!workerId) {
+  //         console.error("Worker ID is missing. Cannot delete schedule.");
+  //         toast.error("Failed to delete schedule. Worker ID is missing.");
+  //         return;
+  //       }
+
+  //       const dayId = formatDate(eventData.StartTime);
+  //       console.log(
+  //         `Attempting to delete schedule for worker ${workerId} on ${dayId}:`,
+  //         eventData
   //       );
 
-  //       if (!scheduleExists) {
-  //         const updatedSchedules = [...existingSchedules, newScheduleEntry];
-  //         await setDoc(workerScheduleRef, {
-  //           day: eventData.StartTime.toLocaleDateString('en-US', { weekday: 'long' }),
-  //           dayId: dayId,
-  //           timestamp: new Date().toISOString(),
-  //           workerId: workerId,
-  //           schedules: updatedSchedules
-  //         }, { merge: true });
+  //       try {
+  //         const workerScheduleRef = doc(
+  //           db,
+  //           "users",
+  //           workerId,
+  //           "workerSchedules",
+  //           dayId
+  //         );
+  //         const docSnap = await getDoc(workerScheduleRef);
 
-  //         console.log(`Successfully saved schedule for worker ${workerId} on ${dayId}`);
-  //         toast.success('Schedule updated successfully!');
+  //         if (docSnap.exists()) {
+  //           const existingSchedules = docSnap.data().schedules || [];
+  //           const updatedSchedules = existingSchedules.filter(
+  //             (schedule) => schedule.id !== eventData.Id
+  //           );
 
-  //         await createNotification(workerId, newScheduleEntry.status, newScheduleEntry.startTime);
-  //       } else {
-  //         console.log("Schedule already exists, skipping save");
-  //         toast.info('This schedule already exists.');
+  //           // Update the worker's schedule by removing the deleted event
+  //           await setDoc(
+  //             workerScheduleRef,
+  //             { schedules: updatedSchedules },
+  //             { merge: true }
+  //           );
+
+  //           console.log(
+  //             `Successfully deleted schedule for worker ${workerId} on ${dayId}`
+  //           );
+  //           toast.success("Schedule deleted successfully!");
+  //         } else {
+  //           console.warn(
+  //             `No schedule found for worker ${workerId} on ${dayId}`
+  //           );
+  //         }
+  //       } catch (error) {
+  //         console.error(
+  //           `Error deleting schedule for worker ${workerId} on ${dayId}:`,
+  //           error
+  //         );
+  //         toast.error("Failed to delete schedule. Please try again.");
   //       }
-  //     } catch (error) {
-  //       console.error(`Error saving schedule for worker ${workerId} on ${dayId}:`, error);
-  //       toast.error('Failed to update schedule. Please try again.');
+  //     } else if (
+  //       args.data &&
+  //       (args.requestType === "eventCreated" ||
+  //         args.requestType === "eventChanged")
+  //     ) {
+  //       // Handle event creation or change
+  //       const eventData = Array.isArray(args.data) ? args.data[0] : args.data;
+  //       if (!eventData) {
+  //         console.error("Event data is missing.");
+  //         return;
+  //       }
+
+  //       // Log the eventData and its Id for creation/change
+  //       console.log("Event data for creation/change:", eventData);
+  //       console.log("Event ID for creation/change:", eventData.Id);
+
+  //       const dayId = formatDate(eventData.StartTime);
+
+  //       // Get the old worker ID from event data, ensure it's set correctly
+  //       console.log("Old worker ID from state:", oldWorkerId);
+  //       const newWorkerId = eventData.NewWorkerId || eventData.WorkerId; // Use the new worker ID if it exists
+  //       const newScheduleEntry = {
+  //         id: eventData.Id || Date.now().toString(),
+  //         status: eventData.Subject || statusOptions[0],
+  //         startTime: eventData.StartTime.toISOString(),
+  //         endTime: eventData.EndTime.toISOString(),
+  //         isAllDay: eventData.IsAllDay,
+  //       };
+
+  //       console.log(
+  //         `Attempting to save schedule for worker ${newWorkerId} on ${dayId}:`,
+  //         newScheduleEntry
+  //       );
+
+  //       try {
+  //         const newWorkerScheduleRef = doc(
+  //           db,
+  //           "users",
+  //           newWorkerId,
+  //           "workerSchedules",
+  //           dayId
+  //         );
+  //         const newDocSnap = await getDoc(newWorkerScheduleRef);
+
+  //         let existingSchedules = [];
+  //         if (newDocSnap.exists()) {
+  //           existingSchedules = newDocSnap.data().schedules || [];
+  //         }
+
+  //         const updatedSchedulesForNewWorker = existingSchedules.filter(
+  //           (schedule) => schedule.id !== newScheduleEntry.id
+  //         );
+  //         updatedSchedulesForNewWorker.push(newScheduleEntry);
+
+  //         await setDoc(
+  //           newWorkerScheduleRef,
+  //           {
+  //             day: eventData.StartTime.toLocaleDateString("en-US", {
+  //               weekday: "long",
+  //             }),
+  //             dayId: dayId,
+  //             timestamp: new Date().toISOString(),
+  //             workerId: newWorkerId,
+  //             schedules: updatedSchedulesForNewWorker,
+  //           },
+  //           { merge: true }
+  //         );
+
+  //         console.log(
+  //           `Successfully saved schedule for worker ${newWorkerId} on ${dayId}`
+  //         );
+  //         toast.success("Schedule updated successfully!");
+
+  //         // Check if the worker has changed
+  //         console.log(
+  //           `Old worker ID: ${oldWorkerId}, New worker ID: ${newWorkerId}`
+  //         );
+  //         if (oldWorkerId && oldWorkerId !== newWorkerId) {
+  //           console.log(
+  //             "Worker has changed. Removing old entry from:",
+  //             oldWorkerId
+  //           );
+  //           await handleOldEntryRemoval(oldWorkerId, eventData.Id, dayId);
+  //         } else {
+  //           console.log(
+  //             "Old and new worker IDs are the same; not removing any old entry."
+  //           );
+  //         }
+  //       } catch (error) {
+  //         console.error(
+  //           `Error saving schedule for worker ${newWorkerId} on ${dayId}:`,
+  //           error
+  //         );
+  //         toast.error("Failed to update schedule. Please try again.");
+  //       }
+  //     } else {
+  //       console.log(
+  //         "Event not created, changed, or removed:",
+  //         args.requestType
+  //       );
   //     }
-  //   } else {
-  //     console.log("Event not created or changed:", args.requestType);
+  //   },
+  //   [currentUser, createNotification, statusOptions, oldWorkerId]
+  // );
+
+  // const handleOldEntryRemoval = async (oldWorkerId, eventId, dayId) => {
+  //   console.log(
+  //     `Attempting to remove old entry for worker ${oldWorkerId} with event ID ${eventId} on ${dayId}`
+  //   );
+  //   try {
+  //     const oldWorkerScheduleRef = doc(
+  //       db,
+  //       "users",
+  //       oldWorkerId,
+  //       "workerSchedules",
+  //       dayId
+  //     );
+  //     const oldDocSnap = await getDoc(oldWorkerScheduleRef);
+
+  //     if (oldDocSnap.exists()) {
+  //       const existingSchedules = oldDocSnap.data().schedules || [];
+  //       const updatedSchedules = existingSchedules.filter(
+  //         (schedule) => schedule.id !== eventId
+  //       );
+
+  //       // Update the old worker's schedule by removing the moved event
+  //       await setDoc(
+  //         oldWorkerScheduleRef,
+  //         { schedules: updatedSchedules },
+  //         { merge: true }
+  //       );
+
+  //       console.log(
+  //         `Successfully removed schedule for worker ${oldWorkerId} on ${dayId}`
+  //       );
+  //       toast.success("Old schedule entry removed successfully!");
+  //     } else {
+  //       console.warn(`No schedule found for worker ${oldWorkerId} on ${dayId}`);
+  //     }
+  //   } catch (error) {
+  //     console.error(
+  //       `Error removing old schedule for worker ${oldWorkerId} on ${dayId}:`,
+  //       error
+  //     );
+  //     toast.error("Failed to remove old schedule entry. Please try again.");
   //   }
-  // }, [currentUser, createNotification, statusOptions]);
+  // };
 
-  const onActionBegin = (args) => {
-    console.log("Action has started:", args);
+  // const onActionBegin = (args) => {
+  //   console.log("Action has started:", args);
 
-    if (
-      args.requestType === "eventCreate" ||
-      args.requestType === "eventChange"
-    ) {
-      const eventData = Array.isArray(args.data) ? args.data[0] : args.data;
+  //   if (
+  //     args.requestType === "eventCreate" ||
+  //     args.requestType === "eventChange"
+  //   ) {
+  //     const eventData = Array.isArray(args.data) ? args.data[0] : args.data;
 
-      if (eventData) {
-        const retrievedOldWorkerId =
-          eventData.OldWorkerId || eventData.WorkerId;
-        console.log("Old worker ID retrieved:", retrievedOldWorkerId);
-        setOldWorkerId(retrievedOldWorkerId); // Store in state
-      } else {
-        console.warn("Event data is missing.");
-      }
-    }
-  };
+  //     if (eventData) {
+  //       const retrievedOldWorkerId =
+  //         eventData.OldWorkerId || eventData.WorkerId;
+  //       console.log("Old worker ID retrieved:", retrievedOldWorkerId);
+  //       setOldWorkerId(retrievedOldWorkerId); // Store in state
+  //     } else {
+  //       console.warn("Event data is missing.");
+  //     }
+  //   }
+  // };
 
   if (isLoading) {
     return <LoadingOverlay />;
@@ -595,90 +532,91 @@ const FieldServiceSchedules = () => {
 
   return (
     <div>
- <GeeksSEO title="Worker Schedules | SAS - SAP B1 Portal" />
+      <GeeksSEO title="Worker Schedules | SAS - SAP B1 Portal" />
 
-<Row>
-  <Col lg={12}>
-    <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-      <div className="mb-3">
-        <h1 className="mb-1 h2 fw-bold">Worker Schedules</h1>
-        <Breadcrumb>
-          <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-          <Breadcrumb.Item href="#">Calendar</Breadcrumb.Item>
-          <Breadcrumb.Item active>View Schedules</Breadcrumb.Item>
-        </Breadcrumb>
-      </div>
-    </div>
-  </Col>
-</Row>
-<div className="schedule-control-section">
-      <ToastContainer position="top-right" autoClose={5000} />
-      <div className="col-lg-12 control-section">
-        <div className="control-wrapper">
-          <ScheduleComponent
-            // ref={scheduleRef}
-            cssClass="timeline-resource-grouping"
-            width="100%"
-            height="650px"
-            currentView="TimelineDay"
-            selectedDate={new Date()}
-            startHour="06:00"
-            endHour="21:00"
-            workDays={workDays}
-            // quickInfoTemplates={{
-            //   content: quickInfoTemplatesContent,
-            //   footer: quickInfoTemplatesFooter,
-            // }}
-            // popupOpen={onPopupOpen}
-            eventSettings={{
-              dataSource: scheduleData,
-              fields: {
-                subject: { name: "Subject", title: "Status" },
-                startTime: { name: "StartTime" },
-                endTime: { name: "EndTime" },
-                description: { name: "Description" },
-              },
-            }}
-            group={{ resources: ["Workers"] }}
-            eventRendered={(args) => {
-              args.element.style.backgroundColor = getEventColor(args.data);
-            }}
-            actionComplete={onActionComplete} // Action complete callback
-            actionBegin={onActionBegin} // Action begin callback
-          >
-            <ResourcesDirective>
-              <ResourceDirective
-                field="WorkerId"
-                title="Field Workers"
-                name="Workers"
-                allowMultiple={false}
-                dataSource={fieldWorkers}
-                textField="text"
-                idField="id"
+      <Row>
+        <Col lg={12}>
+          <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
+            <div className="mb-3">
+              <h1 className="mb-1 h2 fw-bold">Worker Schedules</h1>
+              <Breadcrumb>
+                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+                <Breadcrumb.Item href="#">Calendar</Breadcrumb.Item>
+                <Breadcrumb.Item active>View Schedules</Breadcrumb.Item>
+              </Breadcrumb>
+            </div>
+          </div>
+        </Col>
+      </Row>
+      <div className="schedule-control-section">
+        <ToastContainer position="top-right" autoClose={5000} />
+        <div className="col-lg-12 control-section">
+          <div className="control-wrapper">
+            <ScheduleComponent
+              // ref={scheduleRef}
+              cssClass="timeline-resource-grouping"
+              width="100%"
+              height="650px"
+              currentView="TimelineDay"
+              selectedDate={new Date()}
+              startHour="06:00"
+              endHour="21:00"
+              workDays={workDays}
+              // quickInfoTemplates={{
+              //   content: quickInfoTemplatesContent,
+              //   footer: quickInfoTemplatesFooter,
+              // }}
+              // popupOpen={onPopupOpen}
+              eventSettings={{
+                dataSource: scheduleData,
+                fields: {
+                  subject: { name: "Subject", title: "Status" },
+                  startTime: { name: "StartTime" },
+                  endTime: { name: "EndTime" },
+                },
+                allowEditing: false,
+                allowAdding: false,
+                allowDeleting: false,
+              }}
+              group={{ resources: ["Workers"] }}
+              eventRendered={(args) => {
+                args.element.style.backgroundColor = getEventColor(args.data);
+              }}
+              // actionComplete={onActionComplete} // Action complete callback
+              // actionBegin={onActionBegin} // Action begin callback
+            >
+              <ResourcesDirective>
+                <ResourceDirective
+                  field="WorkerId"
+                  title="Field Workers"
+                  name="Workers"
+                  allowMultiple={false}
+                  dataSource={fieldWorkers}
+                  textField="text"
+                  idField="id"
+                />
+              </ResourcesDirective>
+              <ViewsDirective>
+                <ViewDirective option="TimelineDay" />
+                <ViewDirective option="TimelineWeek" />
+                <ViewDirective option="TimelineWorkWeek" />
+                <ViewDirective option="TimelineMonth" />
+                <ViewDirective option="Agenda" />
+              </ViewsDirective>
+              <Inject
+                services={[
+                  TimelineViews,
+                  TimelineMonth,
+                  Agenda,
+                  //Resize,
+                  // DragAndDrop,
+                ]}
               />
-            </ResourcesDirective>
-            <ViewsDirective>
-              <ViewDirective option="TimelineDay" />
-              <ViewDirective option="TimelineWeek" />
-              <ViewDirective option="TimelineWorkWeek" />
-              <ViewDirective option="TimelineMonth" />
-              <ViewDirective option="Agenda" />
-            </ViewsDirective>
-            <Inject
-              services={[
-                TimelineViews,
-                TimelineMonth,
-                Agenda,
-                Resize,
-                DragAndDrop,
-              ]}
-            />
-          </ScheduleComponent>
+            </ScheduleComponent>
+          </div>
         </div>
       </div>
     </div>
-    </div>
-  
   );
 };
 
