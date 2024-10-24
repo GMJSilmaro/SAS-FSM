@@ -112,16 +112,8 @@ export async function middleware(request) {
     }
   }
 
-  // Update last activity time for non-API routes
-  const response = NextResponse.next();
-  response.cookies.set('LAST_ACTIVITY', currentTime.toString(), {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    path: '/'
-  });
-
-  return response;
+  // Don't update LAST_ACTIVITY cookie here
+  return NextResponse.next();
 }
 
 export const config = {

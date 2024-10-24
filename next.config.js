@@ -2,8 +2,19 @@
 const path = require("path");
 
 const nextConfig = {
-  reactStrictMode: false,
-  swcMinify: true,
+  reactStrictMode: true,
+  // Disable source maps in development to speed up compilation
+  productionBrowserSourceMaps: false,
+  // Experimental features to potentially improve performance
+
+  // Webpack configuration for performance optimization
+  webpack: (config, { dev, isServer }) => {
+    // Optimize in production builds
+    if (!dev) {
+      config.optimization.minimize = true;
+    }
+    return config;
+  },
   env: {
     SAP_SERVICE_LAYER_BASE_URL: process.env.SAP_SERVICE_LAYER_BASE_URL,
     SAP_B1_COMPANY_DB: process.env.SAP_B1_COMPANY_DB,

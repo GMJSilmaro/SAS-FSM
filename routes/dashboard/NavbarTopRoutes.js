@@ -1,10 +1,12 @@
 import { v4 as uuid } from 'uuid';
+import { HouseDoorFill, PeopleFill, BriefcaseFill, CalendarWeekFill, PersonFill, PersonBadgeFill, PersonLinesFill, ListTask } from 'react-bootstrap-icons';
 
 const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Dashboard',
 		link: '#',
+		icon: 'HouseDoorFill',
 		children: [
 			{ id: uuid(), menuitem: 'Overview', link: '/dashboard/overview'},
 		],
@@ -15,6 +17,7 @@ const NavbarDefault = [
 		menuitem: 'SAP B1 Data',
 		badge: 'NEW',
 		link: '#',
+		icon: 'PeopleFill',
 		children: [
 			{
 				id: uuid(),
@@ -24,7 +27,8 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				menuitem: 'Customers',
-				link: '/dashboard/customers/list'
+				link: '/dashboard/customers/list',
+				icon: 'PersonFill'
 			},
 		],
 		isAuthenticated: true,
@@ -33,6 +37,7 @@ const NavbarDefault = [
 		id: uuid(),
 		menuitem: 'Manage Users',
 		link: '#',
+		icon: 'PeopleFill',
 		children: [
 			{
 				id: uuid(),
@@ -43,76 +48,27 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Worker',
 				link: '#',
+				icon: 'PersonBadgeFill',
 				children: [
 					{
 						id: uuid(),
 						header: true,
 						header_text: 'Manage Workers'
 					},
-					// {
-					// 	id: uuid(),
-					// 	menuitem: 'Add Worker',
-					// 	link: '/dashboard/workers/create-worker'
-					// },
 					{
 						id: uuid(),
 						menuitem: 'View Worker',
-						link: '/dashboard/workers/list'
+						link: '/dashboard/workers/list',
+						icon: 'PersonLinesFill'
 					},
 					{
 						id: uuid(),
 						menuitem: 'View Schedules',
-						link: '/dashboard/scheduling/workers/schedules'
+						link: '/dashboard/scheduling/workers/schedules',
+						icon: 'CalendarWeekFill'
 					},
 				]
 			},
-			// {
-			// 	id: uuid(),
-			// 	badge: 'NEW',
-			// 	menuitem: 'Supervisor',
-			// 	link: '#',
-			// 	children: [
-			// 		{
-			// 			id: uuid(),
-			// 			header: true,
-			// 			header_text: 'Manage Supervisor'
-			// 		},
-			// 		{
-			// 			id: uuid(),
-			// 			menuitem: 'Add Supervisor',
-			// 			link: '/dashboard/workers/create-worker'
-			// 		},
-			// 		{
-			// 			id: uuid(),
-			// 			menuitem: 'View Supervisor',
-			// 			link: '/dashboard/workers/list'
-			// 		},
-			// 	]
-			// },
-			// {
-			// 	id: uuid(),
-			// 	menuitem: 'Chief Service Officer',
-			// 	link: '#',
-			// 	badge: 'NEW',
-			// 	children: [
-			// 		{
-			// 			id: uuid(),
-			// 			header: true,
-			// 			header_text: 'Manage CSO'
-			// 		},
-			// 		{
-			// 			id: uuid(),
-			// 			menuitem: 'Add CSO',
-			// 			link: '/dashboard/workers/create-worker'
-			// 		},
-			// 		{
-			// 			id: uuid(),
-			// 			menuitem: 'View CSO',
-			// 			link: '/dashboard/workers/list'
-			// 		},
-			// 	]
-			// },
-			
 		],
 		isAuthenticated: true,
 	},
@@ -120,6 +76,7 @@ const NavbarDefault = [
 		id: uuid(),
 		menuitem: 'Manage Jobs',
 		link: '#',
+		icon: 'BriefcaseFill',
 		children: [
 			{
 				id: uuid(),
@@ -129,99 +86,20 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				menuitem: 'View Jobs',
-				link: '/dashboard/jobs/list-jobs'
+				link: '/dashboard/jobs/list-jobs',
+				icon: 'ListTask'
 			},
 			{
 				id: uuid(),
 				menuitem: 'View Schedules',
-				link: '/dashboard/scheduling/jobs/current'
+				link: '/dashboard/scheduling/jobs/current',
+				icon: 'CalendarWeekFill'
 			},
 		],
 		isAuthenticated: true,
 	},
-	// {
-	// 	id: uuid(),
-	// 	menuitem: 'Schedules',
-	// 	link: '#',
-	// 	children: [
-	// 		{
-	// 			id: uuid(),
-	// 			header: true,
-	// 			header_text: 'Schedule Menu'
-	// 		},
-	// 		{
-	// 			id: uuid(),
-	// 			menuitem: 'Jobs',
-	// 			link: '#',
-	// 			children: [
-	// 				{
-	// 					id: uuid(),
-	// 					header: true,
-	// 					header_text: 'Job Calendar'
-	// 				},
-	// 				
-	// 				// {
-	// 				// 	id: uuid(),
-	// 				// 	menuitem: 'View Future Jobs',
-	// 				// 	link: '/dashboard/scheduling/jobs/future'
-	// 				// },
-	// 			]
-	// 		},
-	// 		{
-	// 			id: uuid(),
-	// 			menuitem: 'Workers',
-	// 			link: '#',
-	// 			children: [
-	// 				{
-	// 					id: uuid(),
-	// 					header: true,
-	// 					header_text: 'Worker Calendar'
-	// 				},
-	// 				
-	// 			]
-	// 		},
-	// 	],
-	// 	isAuthenticated: true,
-	// },
-
-	
-	// {
-	// 	id: uuid(),
-	// 	menuitem: 'SAP B1 Data',
-	// 	icon: <PersonFill />, // icon for Customers
-	// 	link: '#',
-	// 	children: [
-	// 		{
-	// 			id: uuid(),
-	// 			header: true,
-	// 			header_text: 'View SAP B1 Data'
-	// 		},
-	// 		{
-	// 			id: uuid(),
-	// 			menuitem: 'View Customers',
-	// 			link: '/dashboard/customers/list'
-	// 		}
-	// 	],
-	// },
-	// {
-	// 	id: uuid(),
-	// 	menuitem: 'Maps',
-	// 	icon: <Map />, // icon for Maps
-	// 	link: '#',
-	// 	badge: 'NEW',
-	// 	children: [
-	// 		{
-	// 			id: uuid(),
-	// 			header: true,
-	// 			header_text: 'Maps'
-	// 		},
-	// 		{
-	// 			id: uuid(),
-	// 			menuitem: 'View Map',
-	// 			link: '/dashboard/map'
-	// 		},
-	// 	],
-	// },
 ];
+
+console.log('NavbarDefault:', JSON.stringify(NavbarDefault, null, 2));
 
 export default NavbarDefault;

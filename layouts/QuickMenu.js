@@ -383,12 +383,17 @@ const QuickMenu = () => {
           </Dropdown.Menu>
         </Dropdown>
         {/* User Dropdown */}
-        <Dropdown as="li" className="ms-2">
+<Dropdown as="li" className="ms-2 pe-4">
   <Dropdown.Toggle
     as="a"
     bsPrefix=" "
     className="rounded-circle"
     id="dropdownUser"
+    style={{ 
+      position: 'relative', 
+      display: 'inline-block',
+      paddingRight: '20px'  // Add padding to the right
+    }}
   >
     <div className="avatar avatar-md avatar-indicators avatar-online">
       {userDetails && userDetails.profilePicture ? (
@@ -402,8 +407,19 @@ const QuickMenu = () => {
       )}
     </div>
     {userDetails && (
-      <div className="position-absolute start-50 translate-middle-x mt-1">
-        <div className="text-dark small text-nowrap fw-bold mt-1">{userDetails.fullName}</div>
+      <div 
+        style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '100%',
+          marginTop: '4px',
+          whiteSpace: 'nowrap',
+          textAlign: 'center',
+          marginRight: '20px'  // Add margin to the right of the text
+        }}
+      >
+        <span className="text-dark small fw-bold">{userDetails.fullName}</span>
       </div>
     )}
   </Dropdown.Toggle>

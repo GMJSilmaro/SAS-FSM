@@ -20,6 +20,7 @@ import { Fragment } from "react";
 import { ToastContainer } from "react-toastify";
 
 import { registerLicense } from "@syncfusion/ej2-base";
+import ActivityTracker from '../components/ActivityTracker';
 
 registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
 
@@ -52,16 +53,39 @@ function MyApp({ Component, pageProps }) {
   return (
     <Fragment>
       <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="keywords" content={keywords} />
         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
         <style>{`
+          .container {
+            width: 100%;
+            padding-right: 15px;
+            padding-left: 15px;
+            margin-right: auto;
+            margin-left: auto;
+          }
+          @media (min-width: 576px) {
+            .container {
+              max-width: 540px;
+            }
+          }
+          @media (min-width: 768px) {
+            .container {
+              max-width: 720px;
+            }
+          }
+          @media (min-width: 992px) {
+            .container {
+              max-width: 960px;
+            }
+          }
           @media (min-width: 1200px) {
             .container {
               max-width: 100%;
-              padding-left: 5%;
-              padding-right: 5%;
             }
+          }
+          body {
+            overflow-x: hidden;
           }
         `}</style>
       </Head>
@@ -79,6 +103,7 @@ function MyApp({ Component, pageProps }) {
       <Provider store={store}>
         <Layout>
           <ToastContainer />
+          <ActivityTracker />
           <Component {...pageProps} />
         </Layout>
       </Provider>
