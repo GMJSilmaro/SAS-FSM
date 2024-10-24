@@ -22,6 +22,8 @@ import {
   doc,
   writeBatch,
   deleteDoc,
+  limit,
+  orderBy,
 } from "firebase/firestore";
 import DotBadge from "components/bootstrap/DotBadge";
 import { format } from "date-fns";
@@ -102,7 +104,9 @@ const QuickMenu = () => {
       const notificationsRef = collection(db, "notifications");
       const q = query(
         notificationsRef,
-        where("workerId", "in", [workerID, "all"])
+        where("workerId", "in", [workerID, "all"]),
+        orderBy("timestamp", "desc"),
+        limit(20) // Limit to 20 most recent notifications
       );
 
       const unsubscribe = onSnapshot(
@@ -112,13 +116,9 @@ const QuickMenu = () => {
             id: doc.id,
             ...doc.data(),
           }));
-          // Sort notifications by timestamp in descending order (latest first)
-          const sortedNotifications = notificationData.sort((a, b) => 
-            b.timestamp.toDate() - a.timestamp.toDate()
-          );
-          setNotifications(sortedNotifications);
+          setNotifications(notificationData);
 
-          const unreadNotifications = sortedNotifications.filter(
+          const unreadNotifications = notificationData.filter(
             (item) => !item.read
           ).length;
           setUnreadCount(unreadNotifications);
