@@ -9,17 +9,20 @@ const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0)
   try {
     const formattedSearch = search.trim();
     const timestamp = new Date().getTime();
-    const response = await fetch(
-      `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=${
-        formattedSearch.toUpperCase().startsWith('C0') ? 'code' : 'general'
-      }&_=${timestamp}`,
-      {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+    const url = `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=${
+      formattedSearch.toUpperCase().startsWith('C0') ? 'code' : 'general'
+    }&_=${timestamp}`;
+    
+    console.log(`Fetching customers: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       }
-    );
+    });
+    
+    console.log(`Fetch response status: ${response.status}`);
     
     if (!response.ok) {
       if (retryCount < 2) {  // Allow up to 2 retries
@@ -31,19 +34,24 @@ const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0)
     }
     
     const data = await response.json();
+    console.log(`Fetched data:`, data);
     
     if (formattedSearch.toUpperCase().startsWith('C0') && (!data.customers || data.customers.length === 0)) {
-      const retryResponse = await fetch(
-        `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=general&_=${timestamp}`,
-        {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
+      const retryUrl = `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=general&_=${timestamp}`;
+      console.log(`Retrying fetch with general search: ${retryUrl}`);
+      
+      const retryResponse = await fetch(retryUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
-      );
+      });
+      
+      console.log(`Retry response status: ${retryResponse.status}`);
+      
       if (retryResponse.ok) {
         const retryData = await retryResponse.json();
+        console.log(`Retry fetched data:`, retryData);
         return {
           customers: retryData.customers || [],
           totalCount: retryData.totalCount || 0
@@ -126,7 +134,7 @@ const ViewCustomers = () => {
   const columns = [
     { 
       name: '', 
-      width: '10px' 
+      width: '5px' 
     },
     { 
       name: '#', 
@@ -134,10 +142,10 @@ const ViewCustomers = () => {
       width: '50px' 
     },
     { 
-      name: 'Customer Code', 
+      name: 'Code', 
       selector: row => row.CardCode, 
       sortable: true, 
-      width: '159px',
+      width: '150px',
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -153,7 +161,7 @@ const ViewCustomers = () => {
       name: 'Customer Name', 
       selector: row => row.CardName, 
       sortable: true, 
-      width: '250px',
+      width: '230px',
       cell: row => (
         <div className="d-flex align-items-center">
          
@@ -194,7 +202,7 @@ const ViewCustomers = () => {
       name: 'Email', 
       selector: row => row.EmailAddress, 
       sortable: true, 
-      width: '250px',
+      width: '200px',
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -207,18 +215,36 @@ const ViewCustomers = () => {
         </OverlayTrigger>
       )
     },
-    // { 
-    //   name: 'Country', 
-    //   selector: row => row.Country, 
-    //   sortable: true, 
-    //   width: '120px',
-    //   cell: row => (
-    //     <div>
-    //       <GeoAltFill className="me-2" />
-    //       {row.Country}
-    //     </div>
-    //   )
-    // },
+    { 
+      name: (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id="tooltip-contract-column">
+            Indicates whether this customer has a contract with us
+          </Tooltip>}
+        >
+          <span>Contract Customer</span>
+        </OverlayTrigger>
+      ),
+      selector: row => row.U_Contract, 
+      sortable: true, 
+      width: '100px',
+      cell: row => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id={`tooltip-contract-${row.CardCode}`}>
+            {row.U_Contract === 'Y' ? 'This customer has a contract with us' : 'This customer does not have a contract with us'}
+          </Tooltip>}
+        >
+          <div>
+            <CurrencyExchange className="me-2" />
+            <Badge bg={row.U_Contract === 'Y' ? 'success' : 'secondary'}>
+              {row.U_Contract === 'Y' ? 'Yes' : 'No'}
+            </Badge>
+          </div>
+        </OverlayTrigger>
+      )
+    },
     
     { 
       name: 'Actions',
