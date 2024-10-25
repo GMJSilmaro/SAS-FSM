@@ -1,3 +1,4 @@
+// pages/api/getServiceCall.js
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { renewSAPSession } from '../../utils/renewSAPSession';
 
@@ -9,8 +10,12 @@ export default async function handler(req, res) {
   const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
   const { cardCode } = req.body;
 
-  if (!cardCode) {
-    return res.status(400).json({ error: 'CardCode is required' });
+  // Improved input validation
+  if (!cardCode || typeof cardCode !== 'string' || cardCode.trim().length === 0) {
+    return res.status(400).json({ 
+      error: 'Invalid input',
+      message: 'CardCode is required and must be a non-empty string' 
+    });
   }
 
   let b1session = req.cookies.B1SESSION;
@@ -18,7 +23,10 @@ export default async function handler(req, res) {
   let sessionExpiry = req.cookies.B1SESSION_EXPIRY;
 
   if (!b1session || !routeid || !sessionExpiry) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Session information is missing'
+    });
   }
 
   // Check if session needs renewal
@@ -27,24 +35,44 @@ export default async function handler(req, res) {
   const fiveMinutesInMilliseconds = 5 * 60 * 1000;
 
   if (expiryTime - currentTime <= fiveMinutesInMilliseconds) {
-    const renewalResult = await renewSAPSession(b1session, routeid);
-    if (renewalResult) {
-      b1session = renewalResult.newB1Session;
-      routeid = renewalResult.newRouteId;
-      sessionExpiry = renewalResult.newExpiryTime;
-      
-      res.setHeader('Set-Cookie', [
-        `B1SESSION=${b1session}; HttpOnly; Secure; SameSite=None`,
-        `ROUTEID=${routeid}; Secure; SameSite=None`,
-        `B1SESSION_EXPIRY=${sessionExpiry}; HttpOnly; Secure; SameSite=None`
-      ]);
-    } else {
-      return res.status(401).json({ error: 'Failed to renew session' });
+    try {
+      const renewalResult = await renewSAPSession(b1session, routeid);
+      if (renewalResult) {
+        b1session = renewalResult.newB1Session;
+        routeid = renewalResult.newRouteId;
+        sessionExpiry = renewalResult.newExpiryTime;
+        
+        res.setHeader('Set-Cookie', [
+          `B1SESSION=${b1session}; HttpOnly; Secure; SameSite=None`,
+          `ROUTEID=${routeid}; Secure; SameSite=None`,
+          `B1SESSION_EXPIRY=${sessionExpiry}; HttpOnly; Secure; SameSite=None`
+        ]);
+      } else {
+        return res.status(401).json({ 
+          error: 'Session renewal failed',
+          message: 'Failed to renew session. Please log in again.'
+        });
+      }
+    } catch (error) {
+      console.error('Session renewal error:', error);
+      return res.status(401).json({ 
+        error: 'Session renewal failed',
+        message: error.message || 'Failed to renew session'
+      });
     }
   }
+
   try {
+    // Clean the cardCode input
+    const cleanCardCode = cardCode.trim().replace(/'/g, "''");
+    
     const requestBody = JSON.stringify({
-      ParamList: `CardCode='${cardCode}'`
+      ParamList: `CardCode='${cleanCardCode}'`
+    });
+
+    console.log('Making request to SAP:', {
+      url: `${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql10')/List`,
+      body: requestBody
     });
 
     const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql10')/List`, {
@@ -58,31 +86,140 @@ export default async function handler(req, res) {
 
     console.log('Query response status:', queryResponse.status);
 
-    // Log the full response body for debugging
     const responseText = await queryResponse.text();
     console.log('Response text:', responseText);
 
     if (!queryResponse.ok) {
-      return res.status(queryResponse.status).json({ error: responseText });
+      return res.status(queryResponse.status).json({ 
+        error: 'SAP Query Failed',
+        details: responseText
+      });
     }
 
-    const queryData = JSON.parse(responseText);
-    console.log('Query response data:', queryData);
+    let queryData;
+    try {
+      queryData = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Failed to parse SAP response:', error);
+      return res.status(500).json({ 
+        error: 'Invalid response',
+        message: 'Failed to parse SAP response'
+      });
+    }
 
+    if (!queryData.value || !Array.isArray(queryData.value)) {
+      return res.status(500).json({ 
+        error: 'Invalid response format',
+        message: 'Unexpected response structure from SAP'
+      });
+    }
 
     const serviceCalls = queryData.value.map(item => ({
-      serviceCallID: item["'ServiceCallID'"],
-      subject: item["'Subject'"], 
-      customerName: item["'CustomerName'"],
-      createDate: item["'CreateDate'"],
-      createTime: item["'CreateTime'"],
-      description: item["'Description'"]
+      serviceCallID: parseInt(item["'ServiceCallID'"], 10), // Convert to number
+      subject: item["'Subject'"] || '',
+      customerName: item["'CustomerName'"] || '',
+      createDate: item["'CreateDate'"] || '',
+      createTime: item["'CreateTime'"] || '',
+      description: item["'Description'"] || ''
     }));
-    
 
+    console.log(`Successfully processed ${serviceCalls.length} service calls`);
     res.status(200).json(serviceCalls);
+
   } catch (error) {
     console.error('Error fetching service calls:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error.message || 'An unexpected error occurred'
+    });
   }
 }
+
+// process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// import { renewSAPSession } from '../../utils/renewSAPSession';
+
+// export default async function handler(req, res) {
+//   if (req.method !== 'POST') {
+//     return res.status(405).json({ error: 'Method not allowed' });
+//   }
+
+//   const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
+//   const { cardCode } = req.body;
+
+//   if (!cardCode) {
+//     return res.status(400).json({ error: 'CardCode is required' });
+//   }
+
+//   let b1session = req.cookies.B1SESSION;
+//   let routeid = req.cookies.ROUTEID;
+//   let sessionExpiry = req.cookies.B1SESSION_EXPIRY;
+
+//   if (!b1session || !routeid || !sessionExpiry) {
+//     return res.status(401).json({ error: 'Unauthorized' });
+//   }
+
+//   // Check if session needs renewal
+//   const currentTime = Date.now();
+//   const expiryTime = new Date(sessionExpiry).getTime();
+//   const fiveMinutesInMilliseconds = 5 * 60 * 1000;
+
+//   if (expiryTime - currentTime <= fiveMinutesInMilliseconds) {
+//     const renewalResult = await renewSAPSession(b1session, routeid);
+//     if (renewalResult) {
+//       b1session = renewalResult.newB1Session;
+//       routeid = renewalResult.newRouteId;
+//       sessionExpiry = renewalResult.newExpiryTime;
+      
+//       res.setHeader('Set-Cookie', [
+//         `B1SESSION=${b1session}; HttpOnly; Secure; SameSite=None`,
+//         `ROUTEID=${routeid}; Secure; SameSite=None`,
+//         `B1SESSION_EXPIRY=${sessionExpiry}; HttpOnly; Secure; SameSite=None`
+//       ]);
+//     } else {
+//       return res.status(401).json({ error: 'Failed to renew session' });
+//     }
+//   }
+//   try {
+//     const requestBody = JSON.stringify({
+//       ParamList: `CardCode='${cardCode}'`
+//     });
+
+//     const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql10')/List`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'Cookie': `B1SESSION=${b1session}; ROUTEID=${routeid}`
+//       },
+//       body: requestBody
+//     });
+
+//     console.log('Query response status:', queryResponse.status);
+
+//     // Log the full response body for debugging
+//     const responseText = await queryResponse.text();
+//     console.log('Response text:', responseText);
+
+//     if (!queryResponse.ok) {
+//       return res.status(queryResponse.status).json({ error: responseText });
+//     }
+
+//     const queryData = JSON.parse(responseText);
+//     console.log('Query response data:', queryData);
+
+
+//     const serviceCalls = queryData.value.map(item => ({
+//       serviceCallID: item["'ServiceCallID'"],
+//       subject: item["'Subject'"], 
+//       customerName: item["'CustomerName'"],
+//       createDate: item["'CreateDate'"],
+//       createTime: item["'CreateTime'"],
+//       description: item["'Description'"]
+//     }));
+    
+
+//     res.status(200).json(serviceCalls);
+//   } catch (error) {
+//     console.error('Error fetching service calls:', error);
+//     res.status(500).json({ error: 'Internal Server Error' });
+//   }
+// }

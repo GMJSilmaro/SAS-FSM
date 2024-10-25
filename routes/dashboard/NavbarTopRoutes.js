@@ -14,7 +14,7 @@ const NavbarDefault = [
 	},
 	{
 		id: uuid(),
-		menuitem: 'SAP B1 Data',
+		menuitem: 'Manage Customer',
 		badge: 'NEW',
 		link: '#',
 		icon: 'PeopleFill',
@@ -22,7 +22,7 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				header: true,
-				header_text: 'SAB B1 Data Menu'
+				header_text: 'Customer Menu'
 			},
 			{
 				id: uuid(),
@@ -35,40 +35,28 @@ const NavbarDefault = [
 	},
 	{
 		id: uuid(),
-		menuitem: 'Manage Users',
+		menuitem: 'Manage Workers',
 		link: '#',
 		icon: 'PeopleFill',
 		children: [
 			{
 				id: uuid(),
 				header: true,
-				header_text: 'Users Menu'
+				header_text: 'Workers Menu'
 			},
 			{
 				id: uuid(),
-				menuitem: 'Worker',
-				link: '#',
-				icon: 'PersonBadgeFill',
-				children: [
-					{
-						id: uuid(),
-						header: true,
-						header_text: 'Manage Workers'
-					},
-					{
-						id: uuid(),
-						menuitem: 'View Worker',
-						link: '/dashboard/workers/list',
-						icon: 'PersonLinesFill'
-					},
-					{
-						id: uuid(),
-						menuitem: 'View Schedules',
-						link: '/dashboard/scheduling/workers/schedules',
-						icon: 'CalendarWeekFill'
-					},
-				]
+				menuitem: 'Workers',
+				link: '/dashboard/workers/list',
+				icon: 'PersonLinesFill'
 			},
+			{
+				id: uuid(),
+				menuitem: 'Workers Dispatch',
+				link: '/dashboard/scheduling/workers/schedules',
+				icon: 'CalendarWeekFill'
+			},
+
 		],
 		isAuthenticated: true,
 	},
@@ -85,13 +73,13 @@ const NavbarDefault = [
 			},
 			{
 				id: uuid(),
-				menuitem: 'View Jobs',
+				menuitem: 'Jobs',
 				link: '/dashboard/jobs/list-jobs',
 				icon: 'ListTask'
 			},
 			{
 				id: uuid(),
-				menuitem: 'View Schedules',
+				menuitem: 'Job Schedules',
 				link: '/dashboard/scheduling/jobs/current',
 				icon: 'CalendarWeekFill'
 			},

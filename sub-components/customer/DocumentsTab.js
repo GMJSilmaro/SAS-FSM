@@ -5,6 +5,7 @@ import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore'
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from 'firebase/storage';
 import { toast } from 'react-toastify';
 import { db } from '../../firebase';
+import * as XLSX from 'xlsx';
 
 export const DocumentsTab = ({ customerData }) => {
   const [documents, setDocuments] = useState([]);
@@ -12,6 +13,8 @@ export const DocumentsTab = ({ customerData }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
+  const [viewDocumentHtml, setViewDocumentHtml] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const storage = getStorage();
 
@@ -40,8 +43,6 @@ export const DocumentsTab = ({ customerData }) => {
 
     try {
       const storageRef = ref(storage, `customers/${customerData.CardCode}/documents/${file.name}`);
-      
-      // Use uploadBytesResumable to track upload progress
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       uploadTask.on('state_changed', 
@@ -78,6 +79,32 @@ export const DocumentsTab = ({ customerData }) => {
     }
   };
 
+  const handleView = async (document) => {
+    setLoading(true);
+    
+    try {
+      if (['XLSX', 'XLS'].includes(document.type)) {
+        // For Excel files, open in a new tab
+        window.open(document.url, '_blank');
+      } else if (['PDF'].includes(document.type)) {
+        // For PDFs, open in a new tab
+        window.open(document.url, '_blank');
+      } else {
+        // For other file types, show download prompt
+        handleDownload(document.url);
+      }
+    } catch (error) {
+      console.error('Error viewing document:', error);
+      toast.error('Failed to view document. Try downloading instead.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseViewModal = () => {
+    setViewDocumentHtml(null);
+  };
+
   const handleDownload = (documentUrl) => {
     window.open(documentUrl, '_blank');
   };
@@ -99,6 +126,7 @@ export const DocumentsTab = ({ customerData }) => {
     const colors = {
       'PDF': 'danger',
       'XLSX': 'success',
+      'XLS': 'success',
       'DOC': 'primary',
       'DOCX': 'primary',
       'JPG': 'info',
@@ -159,6 +187,15 @@ export const DocumentsTab = ({ customerData }) => {
                   <Button 
                     variant="outline-primary" 
                     size="sm" 
+                    onClick={() => handleView(doc)}
+                    className="me-2"
+                    disabled={loading}
+                  >
+                    View
+                  </Button>
+                  <Button 
+                    variant="outline-primary" 
+                    size="sm" 
                     onClick={() => handleDownload(doc.url)}
                     className="me-2"
                   >
@@ -186,6 +223,16 @@ export const DocumentsTab = ({ customerData }) => {
           <Spinner animation="border" role="status" className="my-3" />
           <p>Please wait while your document is being uploaded...</p>
           <ProgressBar now={uploadProgress} label={`${Math.round(uploadProgress)}%`} className="mt-3" />
+        </Modal.Body>
+      </Modal>
+
+      {/* View Document Modal */}
+      <Modal show={!!viewDocumentHtml} onHide={handleCloseViewModal} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>View Document</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div dangerouslySetInnerHTML={{ __html: viewDocumentHtml }} />
         </Modal.Body>
       </Modal>
     </Row>

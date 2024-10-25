@@ -1,5 +1,7 @@
+'use client'
+
 import React, { Fragment, useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb } from 'react-bootstrap';
+import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb, Placeholder, Spinner } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
 import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill, CalendarRange } from 'react-bootstrap-icons';
@@ -8,14 +10,12 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
 import moment from 'moment'; // Make sure to install and import moment.js for date calculations
+import { Search, X } from 'react-feather'; // Add X icon import
 
-const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0) => {
+const fetchCustomers = async (page = 1, limit = 10, search = '', initialLoad = 'true') => {
   try {
-    const formattedSearch = search.trim();
     const timestamp = new Date().getTime();
-    const url = `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=${
-      formattedSearch.toUpperCase().startsWith('C0') ? 'code' : 'general'
-    }&_=${timestamp}`;
+    let url = `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&_=${timestamp}&initialLoad=${initialLoad}`;
     
     console.log(`Fetching customers: ${url}`);
     
@@ -29,39 +29,13 @@ const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0)
     console.log(`Fetch response status: ${response.status}`);
     
     if (!response.ok) {
-      if (retryCount < 2) {  // Allow up to 2 retries
-        console.log(`Retry attempt ${retryCount + 1} for fetching customers`);
-        await new Promise(resolve => setTimeout(resolve, 1000));  // Wait for 1 second before retrying
-        return fetchCustomers(page, limit, search, retryCount + 1);
-      }
-      throw new Error(`Failed to fetch customers: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Error response content: ${errorText}`);
+      throw new Error(`Failed to fetch customers: ${response.status} ${response.statusText}\nError details: ${errorText}`);
     }
     
     const data = await response.json();
     console.log(`Fetched data:`, data);
-    
-    if (formattedSearch.toUpperCase().startsWith('C0') && (!data.customers || data.customers.length === 0)) {
-      const retryUrl = `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(formattedSearch)}&searchType=general&_=${timestamp}`;
-      console.log(`Retrying fetch with general search: ${retryUrl}`);
-      
-      const retryResponse = await fetch(retryUrl, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      console.log(`Retry response status: ${retryResponse.status}`);
-      
-      if (retryResponse.ok) {
-        const retryData = await retryResponse.json();
-        console.log(`Retry fetched data:`, retryData);
-        return {
-          customers: retryData.customers || [],
-          totalCount: retryData.totalCount || 0
-        };
-      }
-    }
     
     return {
       customers: data.customers || [],
@@ -73,29 +47,37 @@ const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0)
   }
 };
 
+// Add this debounce function at the top of the file
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
 const ViewCustomers = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalRows, setTotalRows] = useState(0);
-  const [perPage, setPerPage] = useState(10);
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const router = useRouter();
-  const initialLoadDone = useRef(false);
+  const [perPage, setPerPage] = useState(10);
+  const [initialLoad, setInitialLoad] = useState(true);
 
-  const loadData = useCallback(async (page, searchTerm = '') => {
+  const loadData = useCallback(async (page, search = '') => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      const { customers, totalCount } = await fetchCustomers(page, perPage, searchTerm);
+      const { customers, totalCount } = await fetchCustomers(page, perPage, search, initialLoad);
       setData(customers);
       setTotalRows(totalCount);
-      if (customers.length > 0 && !initialLoadDone.current) {
-        toast.success(`Successfully loaded ${customers.length} customers`);
-        initialLoadDone.current = true;
-      } else if (customers.length === 0) {
-        toast.info('No customers found');
+      if (customers.length === 0 && search) {
+        toast.info('No customers found for the given search criteria');
       }
     } catch (err) {
       setError(err.message);
@@ -104,42 +86,48 @@ const ViewCustomers = () => {
       toast.error(`Error loading customers: ${err.message}`);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
-  }, [perPage]);
+  }, [perPage, initialLoad]);
 
   useEffect(() => {
-    loadData(1);
-  }, [loadData]);
+    // Load initial data (first 25 records) when component mounts
+    if (initialLoad) {
+      loadData(1, '');
+    }
+  }, [loadData, initialLoad]);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
+    // Only load data if there's a search term
+    if (debouncedSearchTerm) {
       setCurrentPage(1);
-      loadData(1, search);
-      if (search) {
-        toast.info(`Searching for "${search}"...`);
-      }
-    }, 300);
+      loadData(1, debouncedSearchTerm);
+    }
+  }, [debouncedSearchTerm, loadData]);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [search, loadData]);
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      // Remove the length check to allow searching with any number of characters
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timerId);
+  }, [searchTerm]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    loadData(page, search);
-  };
-
-  const handlePerRowsChange = async (newPerPage, page) => {
-    setPerPage(newPerPage);
-    loadData(page, search);
+    loadData(page, debouncedSearchTerm);
   };
 
   const handleSearch = (e) => {
     const value = e.target.value;
-    if (value.toUpperCase().startsWith('C0')) {
-      setSearch(value.toUpperCase());
-    } else {
-      setSearch(value);
-    }
+    setSearchTerm(value);
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    loadData(1, '');
   };
 
   const handleViewDetails = (customer) => {
@@ -149,11 +137,13 @@ const ViewCustomers = () => {
     router.push(`/dashboard/customers/${customer.CardCode}`);
   };
 
+  const handlePerRowsChange = async (newPerPage, page) => {
+    setPerPage(newPerPage);
+    await loadData(page, debouncedSearchTerm);
+  };
+
   const columns = [
-    { 
-      name: '', 
-      width: '5px' 
-    },
+  
     { 
       name: '#', 
       selector: (row, index) => ((currentPage - 1) * perPage) + index + 1, 
@@ -236,7 +226,7 @@ const ViewCustomers = () => {
 
     {
       name: 'Contract Duration',
-      selector: row => row.U_ContractStartDate && row.U_ContractEndDate ? 
+      selector: row => row.U_ContractEndDate ? 
         moment(row.U_ContractEndDate).diff(moment(row.U_ContractStartDate), 'months') : null,
       sortable: true,
       width: '180px',
@@ -313,97 +303,115 @@ const ViewCustomers = () => {
         </Button>
       ),
       ignoreRowClick: true,
-      allowOverflow: true,
-      button: true,
     },
   ];
 
   const customStyles = {
+    table: {
+      style: {
+        backgroundColor: '#ffffff',
+        borderRadius: '8px',
+      }
+    },
     headRow: {
       style: {
-        backgroundColor: "#F1F5FC",
-        borderTopStyle: 'solid',
-        borderTopWidth: '1px',
-        borderTopColor: '#E0E0E0',
-      },
+        backgroundColor: '#f8fafc',
+        borderTopLeftRadius: '8px',
+        borderTopRightRadius: '8px',
+        borderBottom: '1px solid #e2e8f0',
+      }
     },
     headCells: {
       style: {
-        fontWeight: 'bold',
-        fontSize: '14px',
-        color: '#333',
-        paddingLeft: '16px',
-        paddingRight: '16px',
-      },
-    },
-    rows: {
-      style: {
-        fontSize: '14px',
-        color: '#333',
-        backgroundColor: 'white',
-        '&:not(:last-of-type)': {
-          borderBottomStyle: 'solid',
-          borderBottomWidth: '1px',
-          borderBottomColor: '#E0E0E0',
-        },
-      },
-      highlightOnHoverStyle: {
-        backgroundColor: '#F5F5F5',
-        transition: '0.3s',
-        borderBottomColor: '#FFFFFF',
-      },
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#475569',
+        paddingTop: '16px',
+        paddingBottom: '16px',
+      }
     },
     cells: {
       style: {
-        paddingLeft: '16px',
-        paddingRight: '16px',
-      },
+        fontSize: '14px',
+        color: '#64748b',
+        paddingTop: '12px',
+        paddingBottom: '12px',
+      }
     },
+    rows: {
+      style: {
+        '&:hover': {
+          backgroundColor: '#f1f5f9',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        },
+      }
+    },
+    pagination: {
+      style: {
+        borderTop: '1px solid #e2e8f0',
+      }
+    }
   };
 
   const subHeaderComponentMemo = useMemo(() => {
     return (
-      <div className="w-100 me-4 mb-4">
+      <div className="w-100 mb-4 position-relative">
+        <Search 
+          size={18} 
+          className="position-absolute text-muted" 
+          style={{ top: '12px', left: '12px' }} 
+        />
         <input
           type="text"
-          className="form-control"
-          placeholder="Search by Customer Code (C0xxxxx) or other details..."
-          value={search}
+          className="form-control ps-5 pe-5"
+          placeholder="Search customers... (e.g. C012345, Customer Name Only!)"
+          value={searchTerm}
           onChange={handleSearch}
+          style={{
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            padding: '0.75rem 1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
         />
-        {loading && <small className="text-muted">Searching...</small>}
+        {searchTerm && (
+          <button
+            className="btn btn-link position-absolute"
+            style={{ top: '6px', right: '6px' }}
+            onClick={handleClearSearch}
+          >
+            <X size={18} />
+          </button>
+        )}
+        {loading && <small className="text-muted position-absolute" style={{ top: '12px', right: '40px' }}>Searching...</small>}
       </div>
     );
-  }, [search, loading]);
+  }, [searchTerm, loading]);
 
   return (
     <Fragment>
       <GeeksSEO title="View Customers | SAS - SAP B1 Portal" />
-       <Row>
-          <Col lg={12} md={12} sm={12}>
-            <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-              <div className="mb-3 mb-md-0">
-                <h1 className="mb-1 h2 fw-bold">Customers</h1>
-                <Breadcrumb>
-                  <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                  <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
-                  <Breadcrumb.Item active>Customer List</Breadcrumb.Item>
-                </Breadcrumb>
-              </div>
+      <Row>
+        <Col lg={12}>
+          <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
+            <div className="mb-3">
+              <h1 className="mb-1 h2 fw-bold">Customers</h1>
+              <Breadcrumb>
+                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+                <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
+                <Breadcrumb.Item active>Customer List</Breadcrumb.Item>
+              </Breadcrumb>
             </div>
-          </Col>
-        </Row>
-
+          </div>
+        </Col>
+      </Row>
       <Row>
         <Col md={12} xs={12} className="mb-5">
-          <Card>
-            <Card.Header>
-              <h4 className="mb-1">Customers Table</h4>
-            </Card.Header>
-            <Card.Body className="px-0">
-              {error && <div className="alert alert-danger mx-3">{error}</div>}
+          <Card className="border-0 shadow-sm">
+            <Card.Body className="p-4">
+              {error && <div className="alert alert-danger mb-4">{error}</div>}
               <DataTable
-                customStyles={customStyles}
                 columns={columns}
                 data={data}
                 pagination
@@ -411,13 +419,27 @@ const ViewCustomers = () => {
                 paginationTotalRows={totalRows}
                 onChangePage={handlePageChange}
                 onChangeRowsPerPage={handlePerRowsChange}
-                //highlightOnHover
+                paginationPerPage={perPage}
+                paginationRowsPerPageOptions={[10, 25, 50, 100]}
+                highlightOnHover
                 pointerOnHover
+                progressPending={loading}
+                progressComponent={
+                  <div className="text-center py-5">
+                    <Spinner animation="border" variant="primary" className="me-2" />
+                    <span className="text-muted">Loading customers...</span>
+                  </div>
+                }
+                customStyles={customStyles}
                 subHeader
                 subHeaderComponent={subHeaderComponentMemo}
-                progressPending={loading}
-                progressComponent={<div className="p-4">Loading customers...</div>}
-                noDataComponent={<div className="p-4">No matching records found</div>}
+                persistTableHead
+                noDataComponent={
+                  <div className="text-center py-5">
+                    <div className="text-muted mb-2">No customers found</div>
+                    <small>Try adjusting your search terms</small>
+                  </div>
+                }
               />
             </Card.Body>
           </Card>

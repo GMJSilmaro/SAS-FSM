@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
-  const { cardCode } = req.body;
+  const { cardCode, serviceCallID } = req.body;
 
   if (!cardCode) {
     return res.status(400).json({ error: 'CardCode is required' });
@@ -22,32 +22,16 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Check if session needs renewal
-  const currentTime = Date.now();
-  const expiryTime = new Date(sessionExpiry).getTime();
-  const fiveMinutesInMilliseconds = 5 * 60 * 1000;
-
-  if (expiryTime - currentTime <= fiveMinutesInMilliseconds) {
-    const renewalResult = await renewSAPSession(b1session, routeid);
-    if (renewalResult) {
-      b1session = renewalResult.newB1Session;
-      routeid = renewalResult.newRouteId;
-      sessionExpiry = renewalResult.newExpiryTime;
-      
-      res.setHeader('Set-Cookie', [
-        `B1SESSION=${b1session}; HttpOnly; Secure; SameSite=None`,
-        `ROUTEID=${routeid}; Secure; SameSite=None`,
-        `B1SESSION_EXPIRY=${sessionExpiry}; HttpOnly; Secure; SameSite=None`
-      ]);
-    } else {
-      return res.status(401).json({ error: 'Failed to renew session' });
-    }
-  }
-
   try {
+    // Format ParamList exactly as shown in Postman
+    const paramList = `CardCode='${cardCode}'&ServiceCallID='${serviceCallID}'`;
+
     const requestBody = JSON.stringify({
-      ParamList: `CardCode='${cardCode}'`
+      ParamList: paramList
     });
+    
+    console.log('Sending request to:', `${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql05')/List`);
+    console.log('With body:', requestBody);
 
     const queryResponse = await fetch(`${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql05')/List`, {
       method: 'POST',
@@ -58,27 +42,38 @@ export default async function handler(req, res) {
       body: requestBody
     });
 
-    const responseText = await queryResponse.text();
-    console.log('Query response status:', queryResponse.status);
-    console.log('Response text:', responseText);
-
     if (!queryResponse.ok) {
-      return res.status(queryResponse.status).json({ error: responseText });
+      const errorText = await queryResponse.text();
+      console.error('SAP API error:', errorText);
+      return res.status(queryResponse.status).json({ 
+        error: 'Failed to fetch from SAP',
+        details: errorText
+      });
     }
 
-    const queryData = JSON.parse(responseText);
+    const responseText = await queryResponse.text();
+    console.log('Raw response:', responseText);
 
-    // Extract DocNum, DocStatus, and DocTotal from the queryData
-    const salesOrder = queryData.value.map(item => ({
-      DocNum: item.DocNum,
-      DocStatus: item.DocStatus,
-      DocTotal: item.DocTotal
-    }));
+    try {
+      const queryData = JSON.parse(responseText);
+      // Return the exact structure as seen in Postman
+      return res.status(200).json({
+        value: queryData.value.map(item => ({
+          DocNum: item.DocNum,
+          DocStatus: item.DocStatus,
+          DocTotal: item.DocTotal
+        }))
+      });
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError);
+      return res.status(500).json({ error: 'Error parsing SAP response' });
+    }
 
-    // Return the sales order list
-    res.status(200).json(salesOrder);
   } catch (error) {
     console.error('Error fetching sales orders:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error.message
+    });
   }
-};
+}

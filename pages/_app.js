@@ -1,8 +1,9 @@
 // import node module libraries
 import Head from "next/head";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { NextSeo } from "next-seo";
+import { QueryClient, QueryClientProvider } from 'react-query'
 
 import Cookies from "js-cookie";
 
@@ -21,8 +22,12 @@ import { ToastContainer } from "react-toastify";
 
 import { registerLicense } from "@syncfusion/ej2-base";
 import ActivityTracker from '../components/ActivityTracker';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
+
+// Create a client
+const queryClient = new QueryClient()
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -50,6 +55,8 @@ function MyApp({ Component, pageProps }) {
     }
   }, [router.pathname]); // Trigger on path change
 
+  const [isLoading, setIsLoading] = useState(false);
+
   return (
     <Fragment>
       <Head>
@@ -69,11 +76,14 @@ function MyApp({ Component, pageProps }) {
         }}
       />
       <Provider store={store}>
-        <Layout>
-          <ToastContainer />
-          <ActivityTracker />
-          <Component {...pageProps} />
-        </Layout>
+        <QueryClientProvider client={queryClient}>
+          <Layout>
+            <ToastContainer />
+            <ActivityTracker />
+            <LoadingOverlay isLoading={isLoading} />
+            <Component {...pageProps} setIsLoading={setIsLoading} />
+          </Layout>
+        </QueryClientProvider>
       </Provider>
     </Fragment>
   );

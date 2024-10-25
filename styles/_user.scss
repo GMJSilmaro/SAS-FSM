@@ -321,7 +321,129 @@
   .disabled-item:hover {
     background-color: #e9ecef; /* Ensure hover doesn't change the background */
   }
+
+
+  // CUSTOM FOR JOB LIST PAGE
+
+  .job-details-modal {
+    text-align: left;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
   
+  .job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .job-number {
+    margin: 0;
+    color: #3498db;
+    font-size: 1.5em;
+  }
+  
+  .job-priority {
+    font-size: 1.2em;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 20px;
+  }
+  
+  .job-priority.high { background-color: #e74c3c; color: white; }
+  .job-priority.mid { background-color: #f39c12; color: white; }
+  .job-priority.low { background-color: #2ecc71; color: white; }
+  
+  .job-name {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #34495e;
+    font-size: 1.3em;
+  }
+  
+  .job-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .info-item {
+    display: flex;
+    align-items: center;
+  }
+  
+  .info-item i {
+    margin-right: 10px;
+    font-size: 1.2em;
+  }
+  
+  .status-badge {
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.9em;
+  }
+  
+  .job-timeline {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+  }
+  
+  .timeline-item {
+    display: flex;
+    align-items: center;
+  }
+  
+  .timeline-item i {
+    font-size: 1.5em;
+    margin-right: 10px;
+  }
+  
+  .timeline-item p {
+    margin: 0;
+  }
+  
+  .skeleton-loader {
+    animation: pulse 1.5s infinite;
+  }
+  
+  .skeleton-row {
+    display: flex;
+    margin-bottom: 10px;
+  }
+  
+  .skeleton-cell {
+    height: 20px;
+    background-color: #f0f0f0;
+    margin-right: 10px;
+    border-radius: 4px;
+  }
+  
+  @keyframes pulse {
+    0% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.6;
+    }
+  }
+  
+  .worker-action-modal {
+    .swal2-html-container {
+      margin: 0;
+      padding: 1rem;
+    }
+  }
   
 
 // /// COLOR!
@@ -354,3 +476,4 @@
 // .e-schedule .e-appointment {
 //   border: none !important;
 // }
+

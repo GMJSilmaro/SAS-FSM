@@ -84,13 +84,31 @@ const ViewCustomer = () => {
 
   if (loading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+      <Container className="mt-5">
+           <Row>
+          <Col lg={12}>
+            <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
+              <div className="mb-3">
+                <h1 className="mb-1 h2 fw-bold">Customers</h1>
+                <Breadcrumb>
+                  <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+                  <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
+                  <Breadcrumb.Item active>Customer List</Breadcrumb.Item>
+                </Breadcrumb>
+              </div>
+            </div>
+          </Col>
+        </Row>
         <Row>
-          <Col className="text-center">
-            <Spinner animation="border" role="status" variant="primary" style={{ width: '3rem', height: '3rem' }}>
-              <span className="visually-hidden">Loading...</span>
-            </Spinner>
-            <p className="mt-3">Loading customer data...</p>
+          <Col>
+            <Card className="text-center shadow-sm">
+              <Card.Body>
+                <Spinner animation="border" role="status" variant="primary" style={{ width: '3rem', height: '3rem' }}>
+                  <span className="visually-hidden">Loading...</span>
+                </Spinner>
+                <p className="mt-3">Loading customer data...</p>
+              </Card.Body>
+            </Card>
           </Col>
         </Row>
       </Container>

@@ -4,34 +4,27 @@ import {
   Col,
   Card,
   Badge,
-  Dropdown,
   Button,
   Breadcrumb,
   OverlayTrigger,
   Tooltip,
+  Spinner,
 } from "react-bootstrap";
-import { MoreVertical, Trash, Edit } from "react-feather";
 import { FaUser } from "react-icons/fa";
 import { useRouter } from "next/router";
 import { db } from "../../../firebase";
 import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import DataTable from "react-data-table-component";
 import Swal from "sweetalert2";
-import styles from "./ViewJobs.module.css";
 import { GeeksSEO } from "widgets";
 import JobStats from "sub-components/dashboard/projects/single/task/JobStats";
-import DOMPurify from "dompurify";
+import { Search } from "react-feather";
 import { 
-  BsHash, 
   BsBriefcase, 
-  BsPerson, 
-  BsGeoAlt, 
-  BsClipboardCheck, 
-  BsExclamationTriangle, 
-  BsPeople, 
   BsCalendar, 
   BsClock 
 } from "react-icons/bs";
+import Link from 'next/link';
 
 const ViewJobs = () => {
   const router = useRouter();
@@ -39,40 +32,9 @@ const ViewJobs = () => {
   const [search, setSearch] = useState("");
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-
-   // Add new state for pagination
-   const [currentPage, setCurrentPage] = useState(1);
-   const [jobsPerPage] = useState(10);
-   const [usersData, setUsersData] = useState([]);
-   const [lastFetchTime, setLastFetchTime] = useState(null);
-   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-  // Custom Styles for DataTable
-  const customStyles = {
-    headCells: {
-      style: {
-        fontWeight: "bold",
-        fontSize: "14px",
-        backgroundColor: "#F1F5FC",
-      },
-    },
-    cells: {
-      style: {
-        color: "#64748b",
-        fontSize: "14px",
-        textAlign: "left",
-      },
-    },
-    rows: {
-      style: {
-        minHeight: "72px",
-        cursor: "pointer",
-      },
-      highlightOnHoverStyle: {
-        backgroundColor: "#f1f5fc",
-      },
-    },
-  };
+  const [usersData, setUsersData] = useState([]);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -88,31 +50,37 @@ const ViewJobs = () => {
   };
 
   const getStatusBadge = (status) => {
-    const getStyle = (backgroundColor) => ({
+    const getStyle = (backgroundColor, textColor = "#fff") => ({
       backgroundColor,
-      color: "#fff",
+      color: textColor,
       padding: "0.5em 0.75em",
       borderRadius: "0.25rem",
       fontWeight: "normal",
+      display: "inline-block",
+      fontSize: "0.875em",
+      lineHeight: "1",
+      textAlign: "center",
+      whiteSpace: "nowrap",
+      verticalAlign: "baseline",
     });
 
     switch (status) {
       case "Created":
-        return <Badge style={getStyle("#9e9e9e")}>Created</Badge>;
+        return <span style={getStyle("#D3D3D3", "#000")}>Created</span>; // Light Gray
       case "Confirmed":
-        return <Badge style={getStyle("#2196f3")}>Confirmed</Badge>;
+        return <span style={getStyle("#4169E1")}>Confirmed</span>; // Royal Blue
       case "Cancelled":
-        return <Badge style={getStyle("#f44336")}>Cancelled</Badge>;
+        return <span style={getStyle("#FF0000")}>Cancelled</span>; // Red
       case "Job Started":
-        return <Badge style={getStyle("#FFA500")}>Job Started</Badge>;
+        return <span style={getStyle("#FFA500")}>Job Started</span>; // Orange
       case "Job Complete":
-        return <Badge style={getStyle("#32CD32")}>Job Complete</Badge>;
+        return <span style={getStyle("#008000")}>Job Complete</span>; // Green
       case "Validate":
-        return <Badge style={getStyle("#00bcd4")}>Validate</Badge>;
+        return <span style={getStyle("#00FFFF", "#000")}>Validate</span>; // Cyan
       case "Scheduled":
-        return <Badge style={getStyle("#607d8b")}>Scheduled</Badge>;
+        return <span style={getStyle("#808080")}>Scheduled</span>; // Gray
       default:
-        return <Badge style={getStyle("#9e9e9e")}>{status}</Badge>;
+        return <span style={getStyle("#D3D3D3", "#000")}>{status}</span>; // Default to light gray
     }
   };
 
@@ -135,100 +103,65 @@ const ViewJobs = () => {
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
-  const ActionMenu = ({ jobId }) => {
-    const handleEditClick = () => router.push(`./update-jobs/${jobId}`);
-    const handleRemove = async (jobId) => {
-      const result = await Swal.fire({
-        title: "Are you sure?",
-        text: "This action cannot be undone.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: "Yes, remove it!",
-      });
-
-      if (result.isConfirmed) {
-        try {
-          const jobRef = doc(db, "jobs", jobId);
-          await deleteDoc(jobRef);
-          Swal.fire("Deleted!", "The job has been removed.", "success");
-          setJobs(jobs.filter((job) => job.id !== jobId));
-          setFilteredJobs(filteredJobs.filter((job) => job.id !== jobId));
-        } catch (error) {
-          Swal.fire("Error!", "There was a problem removing the job.", "error");
-        }
+  const customStyles = {
+    table: {
+      style: {
+        backgroundColor: '#ffffff',
+        borderRadius: '8px',
       }
-    };
-
-    return (
-      <Dropdown>
-        <Dropdown.Toggle as={CustomToggle}>
-          <MoreVertical size="15px" className="text-secondary" />
-        </Dropdown.Toggle>
-        <Dropdown.Menu align="end">
-          <Dropdown.Header>SETTINGS</Dropdown.Header>
-          <Dropdown.Item onClick={handleEditClick}>
-            <Edit size="15px" className="dropdown-item-icon" /> Edit
-          </Dropdown.Item>
-          <Dropdown.Item onClick={() => handleRemove(jobId)}>
-            <Trash size="15px" className="dropdown-item-icon" /> Remove
-          </Dropdown.Item>
-        </Dropdown.Menu>
-      </Dropdown>
-    );
+    },
+    headRow: {
+      style: {
+        backgroundColor: '#f8fafc',
+        borderTopLeftRadius: '8px',
+        borderTopRightRadius: '8px',
+        borderBottom: '1px solid #e2e8f0',
+      }
+    },
+    headCells: {
+      style: {
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#475569',
+        paddingTop: '16px',
+        paddingBottom: '16px',
+      }
+    },
+    cells: {
+      style: {
+        fontSize: '14px',
+        color: '#64748b',
+        paddingTop: '12px',
+        paddingBottom: '12px',
+      }
+    },
+    rows: {
+      style: {
+        '&:hover': {
+          backgroundColor: '#f1f5f9',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        },
+      }
+    },
+    pagination: {
+      style: {
+        borderTop: '1px solid #e2e8f0',
+      }
+    }
   };
 
-  const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
-    <Button
-      ref={ref}
-      onClick={(e) => {
-        e.preventDefault();
-        onClick(e);
-      }}
-      className="btn-icon btn btn-ghost btn-sm rounded-circle"
-    >
-      {children}
-    </Button>
-  ));
-  CustomToggle.displayName = "CustomToggle";
-
-  const HTMLCell = ({ html, maxLength = 100 }) => {
-    const sanitizedHTML = DOMPurify.sanitize(html);
-    const textContent = sanitizedHTML.replace(/<[^>]+>/g, "");
-    const truncatedText =
-      textContent.length > maxLength
-        ? `${textContent.substring(0, maxLength)}...`
-        : textContent;
-
-    return (
-      <div title={textContent} style={{ cursor: "pointer" }}>
-        <div dangerouslySetInnerHTML={{ __html: truncatedText }} />
-      </div>
-    );
-  };
-
-  const TooltipCell = ({ text, maxLength = 50 }) => {
-    const truncatedText =
-      text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
-
-    return (
-      <div title={text} style={{ cursor: "pointer" }}>
-        {truncatedText}
-      </div>
-    );
-  };
-
-  const AssignedWorkerCell = ({ workerFullName }) => {
-    const workers = workerFullName.split(", ");
-    const displayName = workers[0];
+  const AssignedWorkerCell = ({ workers }) => {
+    const displayName = workers[0]?.workerId || "Unassigned";
     const remainingCount = workers.length - 1;
 
     return (
       <OverlayTrigger
         placement="top"
         overlay={
-          <Tooltip id={`tooltip-${displayName}`}>{workerFullName}</Tooltip>
+          <Tooltip id={`tooltip-${displayName}`}>
+            {workers.map(w => w.workerId).join(", ")}
+          </Tooltip>
         }
       >
         <div className="d-flex align-items-center">
@@ -246,317 +179,410 @@ const ViewJobs = () => {
     );
   };
 
-   // Add memoized users data
-   const memoizedUsersData = useMemo(() => {
-    return usersData;
-  }, [usersData]);
-
-  const handleRowClick = (row) => {
-    Swal.fire({
-      title: '<strong>Job Details</strong>',
-      html: `
-        <div style="text-align: left; padding: 20px; background-color: #f8f9fa; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <h3 style="margin: 0; color: #3498db;">#${row.jobNo}</h3>
-            <span style="font-size: 1.2em; font-weight: bold; color: ${row.priority === 'High' ? '#e74c3c' : row.priority === 'Mid' ? '#f39c12' : '#2ecc71'};">${row.priority} Priority</span>
-          </div>
-          <h4 style="margin-top: 0; margin-bottom: 15px; color: #34495e;">${row.jobName}</h4>
-          <p style="margin-bottom: 10px;"><strong>Customer:</strong> ${row.customerName}</p>
-          <p style="margin-bottom: 10px;"><strong>Location:</strong> ${row.locationName}</p>
-          <p style="margin-bottom: 10px;"><strong>Status:</strong> <span style="padding: 3px 8px; border-radius: 12px; background-color: ${getStatusColor(row.jobStatus)}; color: white;">${row.jobStatus}</span></p>
-          <p style="margin-bottom: 10px;"><strong>Assigned Workers:</strong> ${row.workerFullName}</p>
-          <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-            <div>
-              <p style="margin-bottom: 5px;"><strong>Start:</strong></p>
-              <p style="margin: 0;">${formatDate(row.startDate)}</p>
-              <p style="margin: 0;">${formatTime(row.startTime)}</p>
-            </div>
-            <div>
-              <p style="margin-bottom: 5px;"><strong>End:</strong></p>
-              <p style="margin: 0;">${formatDate(row.endDate)}</p>
-              <p style="margin: 0;">${formatTime(row.endTime)}</p>
-            </div>
-          </div>
-        </div>
-      `,
-      showCloseButton: true,
-      showCancelButton: true,
-      showDenyButton: true,
-      focusConfirm: false,
-      confirmButtonText: '<i class="fa fa-eye"></i> View',
-      confirmButtonAriaLabel: 'View',
-      confirmButtonColor: '#3085d6',
-      denyButtonText: '<i class="fa fa-edit"></i> Edit',
-      denyButtonAriaLabel: 'Edit',
-      denyButtonColor: '#ffc107',
-      cancelButtonText: '<i class="fa fa-trash"></i> Remove',
-      cancelButtonAriaLabel: 'Remove',
-      cancelButtonColor: '#d33'
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        router.push(`/dashboard/jobs/${row.id}`);
-      } else if (result.isDenied) {
-        router.push(`./update-jobs/${row.id}`);
-      } else if (result.dismiss === Swal.DismissReason.cancel) {
-        const deleteResult = await Swal.fire({
-          title: "Are you sure?",
-          text: "This action cannot be undone.",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonColor: "#d33",
-          cancelButtonColor: "#3085d6",
-          confirmButtonText: "Yes, remove it!",
-        });
-
-        if (deleteResult.isConfirmed) {
-          try {
-            const jobRef = doc(db, "jobs", row.id);
-            await deleteDoc(jobRef);
-            Swal.fire("Deleted!", "The job has been removed.", "success");
-            const updatedJobs = jobs.filter((job) => job.id !== row.id);
-            setJobs(updatedJobs);
-            setFilteredJobs(prevFiltered => 
-              prevFiltered.filter((job) => job.id !== row.id)
-            );
-          } catch (error) {
-            console.error("Delete error:", error);
-            Swal.fire(
-              "Error!",
-              "There was a problem removing the job.",
-              "error"
-            );
-          }
-        }
-      }
-    });
-  };
-
-  // Helper function to get status color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Created": return "#9e9e9e";
-      case "Confirmed": return "#2196f3";
-      case "Cancelled": return "#f44336";
-      case "Job Started": return "#FFA500";
-      case "Job Complete": return "#32CD32";
-      case "Validate": return "#00bcd4";
-      case "Scheduled": return "#607d8b";
-      default: return "#9e9e9e";
-    }
-  };
-
   const columns = [
     {
-      name: "",
-      cell: (row) => "",
-      width: "40px", // Keep this minimal width for the empty column
+      name: "#",
+      selector: (row, index) => index + 1,
+      sortable: false,
+      width: "60px",
+      cell: (row, index) => <span className="text-muted">{index + 1}</span>
     },
     {
       name: "Job No.",
-      cell: (row) => (
-        <OverlayTrigger
-          overlay={<Tooltip id={`tooltip-${row.id}`}>View Details</Tooltip>}
-        >
-          <div className="d-flex align-items-center" onClick={() => handleRowClick(row)}>
-            <BsHash className="me-2" />
-            {row.jobNo}
-          </div>
-        </OverlayTrigger>
-      ),
+      selector: (row) => row.jobNo,
       sortable: true,
+      width: "100px",
+      cell: row => <span className="badge bg-light text-dark">{row.jobNo}</span>
     },
     {
       name: "Job Name",
-      cell: (row) => (
-        <div className="d-flex align-items-center">
-          <BsBriefcase className="me-2" />
-          <TooltipCell text={row.jobName} />
-        </div>
-      ),
+      selector: (row) => row.jobName,
       sortable: true,
+      width: "150px",
+      cell: (row) => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip>{row.jobName}</Tooltip>}
+        >
+          <div className="fw-semibold text-dark text-truncate" style={{ maxWidth: "130px" }}>{row.jobName}</div>
+        </OverlayTrigger>
+      ),
     },
     {
-      name: "Customer Name",
-      cell: (row) => (
-        <div className="d-flex align-items-center">
-          <BsPerson className="me-2" />
-          <TooltipCell text={row.customerName} />
-        </div>
-      ),
+      name: "Customer",
+      selector: (row) => row.customerName,
       sortable: true,
+      width: "200px",
+      cell: (row) => {
+        const customerName = row.customerName.replace(/^C\d+ - /, '');
+        const cardCodeMatch = row.customerName.match(/^C(\d+)/);
+        const cardCode = cardCodeMatch ? `C${cardCodeMatch[1].padStart(6, '0')}` : null;
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>View Customer Details</Tooltip>}
+          >
+            {cardCode ? (
+              <Link href={`/dashboard/customers/${cardCode}`} passHref>
+                <span className="text-primary cursor-pointer">
+                  {customerName}
+                </span>
+              </Link>
+            ) : (
+              <span>{customerName}</span>
+            )}
+          </OverlayTrigger>
+        );
+      },
     },
     {
-      name: "Location Name",
-      cell: (row) => (
-        <div className="d-flex align-items-center">
-          <BsGeoAlt className="me-2" />
-          <TooltipCell text={row.locationName} />
-        </div>
-      ),
+      name: "Address",
+      selector: (row) => row.location?.locationName,
       sortable: true,
+      width: "200px",
+      cell: (row) => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip>{row.location?.address?.streetAddress || 'No address available'}</Tooltip>}
+        >
+          <div className="text-truncate" style={{ maxWidth: "180px" }}>
+            {row.location?.locationName || 'No location'}
+          </div>
+        </OverlayTrigger>
+      ),
     },
     {
-      name: "Job Status",
-      cell: (row) => (
-        <div className="d-flex align-items-center">
-          <BsClipboardCheck className="me-2" />
-          {getStatusBadge(row.jobStatus)}
-        </div>
-      ),
-      sortable: false,
+      name: "Status",
+      selector: (row) => row.jobStatus,
+      sortable: true,
+      width: "120px",
+      cell: (row) => getStatusBadge(row.jobStatus),
     },
     {
       name: "Priority",
-      cell: (row) => (
-        <div className="d-flex align-items-center">
-          {getPriorityBadge(row.priority)}
-        </div>
-      ),
-      width: "105px",
+      selector: (row) => row.priority,
       sortable: true,
+      width: "100px",
+      cell: (row) => getPriorityBadge(row.priority),
     },
     {
-      name: "Assigned",
-      cell: (row) => (
-        <div className="d-flex align-items-center">
-          <AssignedWorkerCell workerFullName={row.workerFullName} />
-        </div>
-      ),
+      name: "Assigned Workers",
+      selector: (row) => row.assignedWorkers,
       sortable: true,
+      width: "180px",
+      cell: (row) => (
+        <AssignedWorkerCell workers={row.assignedWorkers} />
+      ),
     },
     {
-      name: "Start Date",
+      name: "Date & Time",
+      selector: (row) => row.startDate,
+      sortable: true,
+      width: "180px",
       cell: (row) => (
-        <div className="d-flex align-items-center">
-          <BsCalendar className="me-2" />
-          {formatDate(row.startDate)}
+        <div className="d-flex flex-column">
+          <span>{formatDate(row.startDate)}</span>
+          <small className="text-muted">{formatTime(row.startTime)} - {formatTime(row.endTime)}</small>
         </div>
       ),
-      sortable: true,
     },
     {
-      name: "Time",
+      name: "Est. Duration",
+      selector: (row) => row.estimatedDurationHours,
+      sortable: true,
+      width: "120px",
+      cell: (row) => (
+        <span>{`${row.estimatedDurationHours}h ${row.estimatedDurationMinutes}m`}</span>
+      ),
+    },
+    {
+      name: "Equipment",
+      selector: (row) => row.equipments,
+      sortable: true,
+      width: "200px",
       cell: (row) => (
         <OverlayTrigger
           placement="top"
           overlay={
-            <Tooltip id={`tooltip-time-${row.id}`}>
-              Start: {formatDate(row.startDate)} {formatTime(row.startTime)}
-              <br />
-              End: {formatDate(row.endDate)} {formatTime(row.endTime)}
+            <Tooltip>
+              {row.equipments.map(eq => `${eq.equipmentType} - ${eq.modelSeries}`).join(', ')}
             </Tooltip>
           }
         >
-          <div className="d-flex align-items-center">
-            <BsClock className="me-2" />
-            {formatTime(row.startTime)} - {formatTime(row.endTime)}
+          <div className="text-truncate" style={{ maxWidth: "180px" }}>
+            {row.equipments.length > 0 ? `${row.equipments.length} item(s)` : "No equipment"}
           </div>
         </OverlayTrigger>
       ),
-      sortable: true,
     },
   ];
 
-// Optimized fetch function with caching
-const fetchData = async () => {
-  try {
-    setLoading(true);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
 
-    // Check if we have recent users data
-    const shouldFetchUsers = !lastFetchTime || (Date.now() - lastFetchTime) > CACHE_DURATION;
+      // Check if we have recent users data
+      const shouldFetchUsers = !lastFetchTime || (Date.now() - lastFetchTime) > CACHE_DURATION;
 
-    let users = usersData;
-    if (shouldFetchUsers) {
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      users = usersSnapshot.docs.map((doc) => ({
+      let users = usersData;
+      if (shouldFetchUsers) {
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        users = usersSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setUsersData(users);
+        setLastFetchTime(Date.now());
+      }
+
+      // Always fetch jobs as they might change more frequently
+      const jobsSnapshot = await getDocs(collection(db, "jobs"));
+      const jobsData = jobsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setUsersData(users);
-      setLastFetchTime(Date.now());
-    }
 
-    // Always fetch jobs as they might change more frequently
-    const jobsSnapshot = await getDocs(collection(db, "jobs"));
-    const jobsData = jobsSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
 
-    const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
+      const mergedData = sortedJobsData.map((job) => {
+        const workerNames = job.assignedWorkers
+          .map((workerObj) => {
+            const workerId = workerObj.workerId;
+            const worker = users.find((user) => user.workerId === workerId);
+            return worker
+              ? `${worker.fullName}`
+              : `Unknown Worker (ID: ${workerId})`;
+          })
+          .join(", ");
 
-    const mergedData = sortedJobsData.map((job) => {
-      const workerNames = job.assignedWorkers
-        .map((workerObj) => {
-          const workerId = workerObj.workerId;
-          const worker = users.find((user) => user.workerId === workerId);
-          return worker
-            ? `${worker.fullName}`
-            : `Unknown Worker (ID: ${workerId})`;
-        })
-        .join(", ");
-
-      return {
-        ...job,
-        workerFullName: workerNames || "No workers assigned",
-        locationName: job.location?.locationName || "No location name",
-      };
-    });
-
-    setJobs(mergedData);
-    setFilteredJobs(mergedData);
-  } catch (error) {
-    console.error("Error fetching data:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-
-// Optimized search with debouncing
-useEffect(() => {
-  const debounceTimeout = setTimeout(() => {
-    if (!search.trim()) {
-      setFilteredJobs(jobs);
-      return;
-    }
-
-    const searchLower = search.toLowerCase().trim();
-    const searchableFields = ['jobNo', 'jobName', 'customerName', 'locationName', 
-                            'jobStatus', 'priority', 'workerFullName'];
-
-    const result = jobs.filter((job) => {
-      return searchableFields.some(field => {
-        const value = job[field];
-        if (!value) return false;
-        return value.toString().toLowerCase().includes(searchLower);
+        return {
+          ...job,
+          workerFullName: workerNames || "No workers assigned",
+          locationName: job.location?.locationName || "No location name",
+        };
       });
+
+      setJobs(mergedData);
+      setFilteredJobs(mergedData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const debounceTimeout = setTimeout(() => {
+      if (!search.trim()) {
+        setFilteredJobs(jobs);
+        return;
+      }
+
+      const searchLower = search.toLowerCase().trim();
+      const searchableFields = ['jobNo', 'jobName', 'customerName', 'locationName', 
+                              'jobStatus', 'priority', 'workerFullName'];
+
+      const result = jobs.filter((job) => {
+        return searchableFields.some(field => {
+          const value = job[field];
+          if (!value) return false;
+          return value.toString().toLowerCase().includes(searchLower);
+        });
+      });
+
+      setFilteredJobs(result);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(debounceTimeout);
+  }, [search, jobs]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleRowClick = (row) => {
+    Swal.fire({
+      title: `<strong class="text-primary">Job Summary</strong>`,
+      html: `
+        <div>
+          <div class="text-center mb-4">
+            <h5 class="mb-1">#${row.jobNo}</h5>
+            <p class="text-muted">${row.jobName}</p>
+          </div>
+          
+          <div class="row g-3 mb-4">
+            <!-- Left Column -->
+            <div class="col-6 text-start">
+              <div class="mb-3">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="fas fa-user text-primary me-2"></i>
+                  <strong>Customer:</strong>
+                </div>
+                <div class="ms-4">
+                  ${row.customerName}
+                </div>
+              </div>
+  
+              <div class="mb-3">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="fas fa-map-marker-alt text-danger me-2"></i>
+                  <strong>Location:</strong>
+                </div>
+                <div class="ms-4">
+                  ${row.location?.locationName || 'No location'}
+                </div>
+              </div>
+  
+              <div class="mb-3">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="fas fa-users text-info me-2"></i>
+                  <strong>Assigned Workers:</strong>
+                </div>
+                <div class="ms-4">
+                  ${row.assignedWorkers?.map(w => w.workerId).join(', ') || 'None'}
+                </div>
+              </div>
+            </div>
+  
+            <!-- Right Column -->
+            <div class="col-6 text-start">
+              <div class="mb-3">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="fas fa-tasks text-success me-2"></i>
+                  <strong>Status:</strong>
+                </div>
+                <div class="ms-4">
+                  <span class="badge bg-secondary">${row.jobStatus}</span>
+                </div>
+              </div>
+  
+              <div class="mb-3">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="far fa-calendar text-warning me-2"></i>
+                  <strong>Date & Time:</strong>
+                </div>
+                <div class="ms-4">
+                  <div class="d-flex justify-content-between">
+                    <div>
+                      <strong>Start:</strong><br>
+                      ${formatDate(row.startDate)}<br>
+                      ${formatTime(row.startTime)}
+                    </div>
+                    <div>
+                      <strong>End:</strong><br>
+                      ${formatDate(row.endDate)}<br>
+                      ${formatTime(row.endTime)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+  
+          <div class="d-grid gap-2">
+            <button class="btn btn-primary" id="viewBtn">
+              <i class="fas fa-eye me-2"></i>View Job
+            </button>
+            <button class="btn btn-warning" id="editBtn">
+              <i class="fas fa-edit me-2"></i>Edit Job
+            </button>
+            <button class="btn btn-outline-danger" id="removeBtn">
+              <i class="fas fa-trash-alt me-2"></i>Remove Job
+            </button>
+          </div>
+        </div>
+      `,
+      showConfirmButton: false,
+      showCloseButton: true,
+      width: '600px', // Made wider to accommodate two columns
+      customClass: {
+        container: 'job-action-modal',
+        closeButton: 'position-absolute top-0 end-0 mt-2 me-2',
+      },
+      didOpen: () => {
+        document.getElementById('viewBtn').addEventListener('click', () => {
+          Swal.close();
+          router.push(`/dashboard/jobs/${row.id}`);
+        });
+  
+        document.getElementById('editBtn').addEventListener('click', () => {
+          Swal.close();
+          router.push(`./update-jobs/${row.id}`);
+        });
+  
+        document.getElementById('removeBtn').addEventListener('click', async () => {
+          Swal.close();
+          const deleteResult = await Swal.fire({
+            title: "Are you sure?",
+            text: "This action cannot be undone.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes, remove it!"
+          });
+  
+          if (deleteResult.isConfirmed) {
+            try {
+              const jobRef = doc(db, "jobs", row.id);
+              await deleteDoc(jobRef);
+              Swal.fire("Deleted!", "The job has been removed.", "success");
+              const updatedJobs = jobs.filter((job) => job.id !== row.id);
+              setJobs(updatedJobs);
+              setFilteredJobs(prevFiltered => 
+                prevFiltered.filter((job) => job.id !== row.id)
+              );
+            } catch (error) {
+              console.error("Delete error:", error);
+              Swal.fire(
+                "Error!",
+                "There was a problem removing the job.",
+                "error"
+              );
+            }
+          }
+        });
+      }
     });
+  };
 
-    setFilteredJobs(result);
-  }, 300); // 300ms debounce delay
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Created": return "#D3D3D3";  // Light Gray
+      case "Confirmed": return "#4169E1"; // Royal Blue
+      case "Cancelled": return "#FF0000"; // Red
+      case "Job Started": return "#FFA500"; // Orange
+      case "Job Complete": return "#008000"; // Green
+      case "Validate": return "#00FFFF"; // Cyan
+      case "Scheduled": return "#808080"; // Gray
+      default: return "#D3D3D3"; // Default to light gray
+    }
+  };
 
-  return () => clearTimeout(debounceTimeout);
-}, [search, jobs]);
-
-// Initial data fetch
-useEffect(() => {
-  fetchData();
-}, []);
-
-  const subHeaderComponentMemo = useMemo(
-    () => (
-      <Fragment>
+  const subHeaderComponentMemo = useMemo(() => {
+    return (
+      <div className="w-100 mb-4 position-relative">
+        <Search 
+          size={18} 
+          className="position-absolute text-muted" 
+          style={{ top: '12px', left: '12px' }} 
+        />
         <input
           type="text"
-          className="form-control me-4 mb-4"
-          placeholder="Search Jobs..."
+          className="form-control ps-5"
+          placeholder="Search jobs by number, name, customer, status..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          style={{
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            padding: '0.75rem 1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
         />
-      </Fragment>
-    ),
-    [search]
-  );
+      </div>
+    );
+  }, [search]);
 
   return (
     <Fragment>
@@ -583,21 +609,39 @@ useEffect(() => {
       </Row>
       <JobStats />
       <Row>
-        <Col md={12}>
-          <Card>
-            <Card.Body className="px-0">
-            <DataTable
-        customStyles={customStyles}
-        columns={columns}
-        data={filteredJobs}
-        pagination
-        highlightOnHover
-        subHeader
-        subHeaderComponent={subHeaderComponentMemo}
-        paginationRowsPerPageOptions={[5, 10, 15, 20, 25, 50]}
-        onRowClicked={handleRowClick}
-        progressPending={loading}
-      />
+        <Col md={12} xs={12} className="mb-5">
+          <Card className="border-0 shadow-sm">
+            <Card.Body className="p-4">
+              {loading ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" variant="primary" className="me-2" />
+                  <span className="text-muted">Loading jobs...</span>
+                </div>
+              ) : filteredJobs.length > 0 ? (
+                <DataTable
+                  columns={columns}
+                  data={filteredJobs}
+                  pagination
+                  highlightOnHover
+                  pointerOnHover
+                  onRowClicked={(row) => handleRowClick(row)}
+                  customStyles={customStyles}
+                  subHeader
+                  subHeaderComponent={subHeaderComponentMemo}
+                  persistTableHead
+                  noDataComponent={
+                    <div className="text-center py-5">
+                      <div className="text-muted mb-2">No jobs found</div>
+                      <small>Try adjusting your search terms</small>
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="text-center py-5">
+                  <div className="text-muted mb-2">No jobs found</div>
+                  <small>Try adjusting your search terms or add new jobs</small>
+                </div>
+              )}
             </Card.Body>
           </Card>
         </Col>

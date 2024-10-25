@@ -47,6 +47,8 @@ import {
   InputGroup,
 } from "react-bootstrap";
 import { faLessThanEqual } from "@fortawesome/free-solid-svg-icons";
+import { useRouter } from 'next/router';
+import Swal from 'sweetalert2';
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -71,6 +73,8 @@ const FieldServiceSchedules = () => {
   const [oldWorkerId, setOldWorkerId] = useState(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [filteredWorkers, setFilteredWorkers] = useState([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const unsubscribeRef = useRef(null);
 
   const statusColors = {
     Available: "#28a745",
@@ -106,6 +110,43 @@ const FieldServiceSchedules = () => {
     return `${month}-${day}-${year}`;
   };
 
+  const router = useRouter();
+
+  // Add this function to handle cell double click
+  const handleCellDoubleClick = useCallback((args) => {
+    if (args.element.classList.contains('e-work-cells')) {
+      const startTime = args.startTime;
+      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Default to 1 hour duration
+      const workerId = args.groupIndex !== undefined ? filteredWorkers[args.groupIndex].id : null;
+      const workerName = filteredWorkers[args.groupIndex]?.text || 'Unknown Worker';
+
+      Swal.fire({
+        title: 'Create a Job?',
+        text: `Are you sure you want to create a job for ${workerName}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, create job'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push({
+            pathname: '/dashboard/jobs/create-jobs',
+            query: {
+              startDate: startTime.toISOString().split('T')[0],
+              endDate: endTime.toISOString().split('T')[0],
+              startTime: startTime.toTimeString().split(' ')[0],
+              endTime: endTime.toTimeString().split(' ')[0],
+              workerId: workerId,
+              scheduleSession: 'custom'
+            }
+          });
+        }
+      });
+    }
+  }, [filteredWorkers, router]);
+
+  // Authentication effect
   useEffect(() => {
     console.log("Starting authentication process...");
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -127,12 +168,7 @@ const FieldServiceSchedules = () => {
               role: userData.role,
               workerId: userDoc.id,
             });
-            console.log("Current user set:", {
-              uid: user.uid,
-              userId: userData.userId || userDoc.id,
-              role: userData.role,
-              workerId: userDoc.id,
-            });
+            setIsAuthenticated(true);
           } else {
             console.error("No user document found for the authenticated user");
             setError("User data not found. Please contact support.");
@@ -155,16 +191,26 @@ const FieldServiceSchedules = () => {
     };
   }, []);
 
+  // Data loading effect
   useEffect(() => {
-    if (currentUser && !error) {
+    if (isAuthenticated && !error) {
+      console.log("Setting up workers and jobs listeners");
+      setIsLoading(true);
       const unsubscribeWorkers = setupWorkersListener();
+      unsubscribeRef.current = unsubscribeWorkers;
+
       return () => {
-        if (unsubscribeWorkers) unsubscribeWorkers();
+        console.log("Cleaning up workers and jobs listeners");
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+        }
       };
     }
-  }, [currentUser, error]);
+  }, [isAuthenticated, error]);
 
-  const setupWorkersListener = () => {
+  const setupWorkersListener = useCallback(() => {
+    console.log("Setting up workers listener");
     const workersQuery = query(
       collection(db, "users"),
       where("role", "==", "Worker")
@@ -182,16 +228,25 @@ const FieldServiceSchedules = () => {
         setFilteredWorkers(workers);
 
         // Set up listeners for each worker's schedules
-        workers.forEach(setupWorkerJobsListener);
+        const unsubscribeJobs = workers.map(setupWorkerJobsListener);
+
+        setIsLoading(false);
+
+        // Return a function to unsubscribe from all listeners
+        return () => {
+          unsubscribeJobs.forEach((unsubscribe) => unsubscribe());
+        };
       },
       (error) => {
         console.error("Error fetching workers:", error);
         setError("Error loading worker data. Please try again later.");
+        setIsLoading(false);
       }
     );
-  };
+  }, []);
 
-  const setupWorkerJobsListener = (worker) => {
+  const setupWorkerJobsListener = useCallback((worker) => {
+    console.log(`Setting up jobs listener for worker: ${worker.text}`);
     const jobsQuery = query(
       collection(db, "jobs"),
       where("assignedWorkers", "array-contains", { workerId: worker.id })
@@ -236,7 +291,7 @@ const FieldServiceSchedules = () => {
         console.error(`Error fetching jobs for worker ${worker.text}:`, error);
       }
     );
-  };
+  }, []);
 
   const createNotification = useCallback(
     async (workerId, status, startTime) => {
@@ -362,6 +417,7 @@ const FieldServiceSchedules = () => {
               quickInfoTemplates={{
                 footer: () => { return <div></div>; }
               }}
+              cellDoubleClick={handleCellDoubleClick}
             >
               <ResourcesDirective>
                 <ResourceDirective

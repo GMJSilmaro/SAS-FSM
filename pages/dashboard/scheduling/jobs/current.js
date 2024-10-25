@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { getDocs, collection, updateDoc, doc } from "firebase/firestore"; // Firebase Firestore imports
 import { db } from "../../../../firebase"; 
 import { Row, Col, Card, Image, OverlayTrigger, Tooltip, Breadcrumb, ListGroup, Spinner  } from "react-bootstrap";
@@ -22,6 +22,8 @@ import { useRouter } from 'next/router';
 import truncate from 'html-truncate';
 import { ToastContainer, toast } from "react-toastify"; // Import Toastify
 import "react-toastify/dist/ReactToastify.css";
+import Swal from 'sweetalert2';
+import { format } from 'date-fns'; // Make sure to import this at the top of your file
 
 const Calendar = () => {
     const router = useRouter();
@@ -309,6 +311,32 @@ const Calendar = () => {
         { status: "Scheduled", color: getStatusColor("Scheduled").backgroundColor }
       ];
 
+      const handleCellDoubleClick = useCallback((args) => {
+        if (args.element.classList.contains('e-work-cells')) {
+          const startDate = args.startTime;
+          const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+
+          Swal.fire({
+            title: 'Create a Job?',
+            text: `Are you sure you want to create a new job starting on ${format(startDate, 'MMMM d, yyyy')}?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, create job'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              router.push({
+                pathname: '/dashboard/jobs/create-jobs',
+                query: {
+                  startDate: formattedStartDate
+                }
+              });
+            }
+          });
+        }
+      }, [router]);
+
   
     return (
       <>
@@ -345,7 +373,10 @@ const Calendar = () => {
                 style={{ marginTop: '15px' }}
                 width="100%"
                 selectedDate={new Date(2024, 9, 15)}
-                eventSettings={{ dataSource: filteredEvents }}
+                eventSettings={{ 
+                  dataSource: filteredEvents,
+                  allowEditing: false,
+                  allowAdding: false }}
                 eventRendered={(args) => {
                   const colorStyle = getStatusColor(args.data.JobStatus);
                   args.element.style.backgroundColor = colorStyle.backgroundColor;
@@ -357,7 +388,7 @@ const Calendar = () => {
                   footer: footerTemplate,
                 }}
                 popupOpen={onPopupOpen}
-                cellDoubleClick={onCellDoubleClick}
+                cellDoubleClick={handleCellDoubleClick}
                 eventDoubleClick={onEventDoubleClick}
                 currentView="Month"
                 dragStop={onDragStop} // Add drag stop event handler

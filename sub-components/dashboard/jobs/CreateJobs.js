@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect } from "react";
 import {
   Container,
@@ -35,6 +37,44 @@ import { getAuth } from "firebase/auth";
 
 const AddNewJobs = () => {
   const router = useRouter();
+  const { startDate, endDate, startTime, endTime, workerId, scheduleSession } = router.query;
+
+  useEffect(() => {
+    if (router.isReady) {
+      let updatedFormData = { ...formData };
+
+      if (startDate) {
+        updatedFormData.startDate = startDate;
+      }
+
+      if (endDate) {
+        updatedFormData.endDate = endDate;
+      }
+
+      if (startTime) {
+        updatedFormData.startTime = startTime;
+      }
+
+      if (endTime) {
+        updatedFormData.endTime = endTime;
+      }
+
+      if (scheduleSession) {
+        updatedFormData.scheduleSession = scheduleSession;
+      }
+
+      setFormData(updatedFormData);
+
+      // Handle worker selection if workerId is provided
+      if (workerId) {
+        const selectedWorker = workers.find(worker => worker.value === workerId);
+        if (selectedWorker) {
+          setSelectedWorkers([selectedWorker]);
+        }
+      }
+    }
+  }, [router.isReady, startDate, endDate, startTime, endTime, workerId, scheduleSession]);
+
   const timestamp = Timestamp.now();
 
   const [schedulingWindows, setSchedulingWindows] = useState([]); // State for scheduling windows
@@ -342,7 +382,7 @@ const AddNewJobs = () => {
       console.error("Error fetching customers:", error);
       setCustomers([]);
       toast.error(`Error fetching customers: ${error.message}`);
-      
+
       // Add auto-refresh logic here
       setTimeout(() => {
         toast.info("Attempting to refresh the page...");
@@ -485,21 +525,29 @@ const AddNewJobs = () => {
   };
 
   const handleCustomerChange = async (selectedOption) => {
+    console.log("handleCustomerChange called with:", selectedOption);
+
     setSelectedContact(null);
     setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
+    setSelectedServiceCall(null);
+    setSelectedSalesOrder(null);
 
     const selectedCustomer = customers.find(
       (option) => option.value === selectedOption.value
     );
 
-    setFormData({
-      ...formData,
+    console.log("Selected customer:", selectedCustomer);
+
+    setFormData((prevFormData) => ({
+      ...prevFormData,
       customerName: selectedCustomer ? selectedCustomer.label : "",
-    });
+    }));
 
     // Fetch related data for the selected customer
     try {
+      console.log("Fetching related data for customer:", selectedOption.value);
+
       // Fetch contacts for the customer
       const contactsResponse = await fetch("/api/getContacts", {
         method: "POST",
@@ -514,6 +562,8 @@ const AddNewJobs = () => {
       }
 
       const contactsData = await contactsResponse.json();
+      console.log("Fetched contacts:", contactsData);
+
       const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
         label: item.contactId,
@@ -522,10 +572,9 @@ const AddNewJobs = () => {
       setContacts(formattedContacts);
 
       if (formattedContacts.length === 0) {
-        toast.warning("No contacts available for the selected customer.", {
-          position: "top-right",
-          autoClose: 3000,
-        });
+        toast.warning("No contacts found for this customer.");
+      } else {
+        toast.success(`Successfully fetched ${formattedContacts.length} contacts.`);
       }
 
       // Fetch locations for the customer
@@ -542,6 +591,8 @@ const AddNewJobs = () => {
       }
 
       const locationsData = await locationsResponse.json();
+      console.log("Fetched locations:", locationsData);
+
       const formattedLocations = locationsData.map((item) => ({
         value: item.siteId,
         label: item.siteId,
@@ -550,10 +601,9 @@ const AddNewJobs = () => {
       setLocations(formattedLocations);
 
       if (formattedLocations.length === 0) {
-        toast.warning("No locations available for the selected customer.", {
-          position: "top-right",
-          autoClose: 3000,
-        });
+        toast.warning("No locations found for this customer.");
+      } else {
+        toast.success(`Successfully fetched ${formattedLocations.length} locations.`);
       }
 
       // Fetch equipments for the customer
@@ -570,6 +620,8 @@ const AddNewJobs = () => {
       }
 
       const equipmentsData = await equipmentsResponse.json();
+      console.log("Fetched equipments:", equipmentsData);
+
       const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
         label: item.ItemCode,
@@ -578,10 +630,9 @@ const AddNewJobs = () => {
       setEquipments(formattedEquipments);
 
       if (formattedEquipments.length === 0) {
-        toast.warning("No equipment available for the selected customer.", {
-          position: "top-right",
-          autoClose: 3000,
-        });
+        toast.warning("No equipments found for this customer.");
+      } else {
+        toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`);
       }
 
       // Fetch service calls for the customer
@@ -598,33 +649,26 @@ const AddNewJobs = () => {
       }
 
       const serviceCallsData = await serviceCallResponse.json();
+      console.log("Fetched service calls:", serviceCallsData);
+
       const formattedServiceCalls = serviceCallsData.map((item) => ({
         value: item.serviceCallID,
         label: item.serviceCallID + " - " + item.subject,
       }));
       setServiceCalls(formattedServiceCalls);
 
-      // Fetch sales orders for the customer
-      const salesOrderResponse = await fetch("/api/getSalesOrder", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ cardCode: selectedOption.value }),
-      });
-
-      if (!salesOrderResponse.ok) {
-        throw new Error("Failed to fetch sales orders");
+      if (formattedServiceCalls.length === 0) {
+        toast.warning("No service calls found for this customer.");
+      } else {
+        toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`);
       }
 
-      const salesOrdersData = await salesOrderResponse.json();
-      const formattedSalesOrders = salesOrdersData.map((item) => ({
-        value: item.DocNum,
-        label: item.DocNum,
-      }));
-      setSalesOrders(formattedSalesOrders);
+      // Clear sales orders when customer changes
+      setSalesOrders([]);
+
     } catch (error) {
       console.error("Error fetching related data:", error);
+      toast.error(`Error: ${error.message}`);
       setContacts([]);
       setLocations([]);
       setEquipments([]);
@@ -670,7 +714,7 @@ const AddNewJobs = () => {
       ...prevFormData,
       location: {
         ...prevFormData.location, // Spread existing location object
-        locationName: selectedLocation.siteId || "",
+        locationName: selectedLocation.label || "",
         address: {
           ...prevFormData.location.address,
           streetNo: selectedLocation.streetNo || "",
@@ -698,7 +742,13 @@ const AddNewJobs = () => {
         },
       }));
     } catch (error) {
-      console.error("Error fetching coordinates:", error);
+      console.error("Error fetching related data:", error);
+      toast.error(`Error: ${error.message}`);
+      setContacts([]);
+      setLocations([]);
+      setEquipments([]);
+      setServiceCalls([]);
+      setSalesOrders([]);
     }
   };
 
@@ -708,6 +758,80 @@ const AddNewJobs = () => {
   //     equipment: selectedEquipments,
   //   }));
   // };
+  const handleSelectedServiceCallChange = async (selectedServiceCall) => {
+    console.log("handleSelectedServiceCallChange called with:", selectedServiceCall);
+    setSelectedServiceCall(selectedServiceCall);
+    
+    if (selectedCustomer && selectedServiceCall) {
+      try {
+        console.log('Fetching sales orders with:', {
+          cardCode: selectedCustomer.value,
+          serviceCallID: selectedServiceCall.value
+        });
+  
+        const salesOrderResponse = await fetch("/api/getSalesOrder", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            cardCode: selectedCustomer.value,
+            serviceCallID: selectedServiceCall.value 
+          }),
+        });
+  
+        if (!salesOrderResponse.ok) {
+          const errorData = await salesOrderResponse.json();
+          console.error('Sales order fetch error:', errorData);
+          toast.error(`Error fetching sales orders: ${errorData.error || 'Unknown error'}`);
+          setSalesOrders([]);
+          return;
+        }
+  
+        const response = await salesOrderResponse.json();
+        console.log("Fetched sales orders:", response);
+  
+        if (!response.value) {
+          console.error('Unexpected response format:', response);
+          toast.error('Unexpected response format from server');
+          setSalesOrders([]);
+          return;
+        }
+  
+        const formattedSalesOrders = response.value.map((item) => ({
+          value: item.DocNum.toString(),
+          label: `${item.DocNum} - ${getStatusText(item.DocStatus)}`,
+          docTotal: item.DocTotal,
+          docStatus: item.DocStatus
+        }));
+        
+        setSalesOrders(formattedSalesOrders);
+  
+        if (formattedSalesOrders.length === 0) {
+          toast.warning("No sales orders found for this service call.");
+        } else {
+          toast.success(`Successfully fetched ${formattedSalesOrders.length} sales orders.`);
+        }
+
+      } catch (error) {
+        console.error("Error fetching sales orders:", error);
+        toast.error(`Error: ${error.message}`);
+        setSalesOrders([]);
+      }
+    } else {
+      setSalesOrders([]); // Clear sales orders if either customer or service call is not selected
+    }
+  };
+  
+  // Helper function to convert status codes to readable text
+  const getStatusText = (status) => {
+    const statusMap = {
+      'O': 'Open',
+      'C': 'Closed',
+      'P': 'Pending'
+    };
+    return statusMap[status] || status;
+  };
 
   const handleSelectedEquipmentsChange = (selectedEquipments) => {
     const formattedEquipments = selectedEquipments.map((equipment) => ({
@@ -791,6 +915,15 @@ const AddNewJobs = () => {
       ...prevState,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    // If the scheduleSession is changed to 'custom', make sure the time inputs are editable
+    if (name === 'scheduleSession' && value === 'custom') {
+      setFormData(prevState => ({
+        ...prevState,
+        scheduleSession: 'custom',
+        // You might want to reset times here or keep the existing ones
+      }));
+    }
 
     // SENT API THRU SAP
   };
@@ -893,16 +1026,23 @@ const AddNewJobs = () => {
     // Check for overlaps before creating the job
     const overlapErrors = await checkForOverlappingJobs();
     if (overlapErrors.length > 0) {
-      // If there are any overlap errors, display them
+      // If there are any overlap errors, ask for user confirmation
       const errorMessages = overlapErrors
         .map((error) => error.message)
         .join("\n");
-      Swal.fire({
-        title: "Overlap Error!",
-        text: errorMessages,
-        icon: "error",
+
+      const confirmation = await Swal.fire({
+        title: "Overlap Warning!",
+        text: `The following overlaps were found:\n${errorMessages}\nDo you want to proceed anyway?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, proceed",
+        cancelButtonText: "No, cancel",
       });
-      return;
+
+      if (!confirmation.isConfirmed) {
+        return; // Exit if the user chooses to cancel
+      }
     }
 
     try {
@@ -975,7 +1115,6 @@ const AddNewJobs = () => {
             formData.customerSignature.signatureTimestamp || null,
         },
       };
-
       // Save the job document
       const jobRef = doc(db, "jobs", jobNo);
       await setDoc(jobRef, updatedFormData);
@@ -1452,18 +1591,16 @@ const AddNewJobs = () => {
                 <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
               </Form.Select>
             </Form.Group> */}
-            <Form.Group as={Col} md="3" controlId="serviceCall">
-              <Form.Label>Service Call</Form.Label>
-              <Select
-                instanceId="service-call-select"
-                options={serviceCalls}
-                value={selectedServiceCall}
-                onChange={(selectedOption) =>
-                  setSelectedServiceCall(selectedOption)
-                }
-                placeholder="Select Service Call"
-              />
-            </Form.Group>
+           <Form.Group as={Col} md="3" controlId="serviceCall">
+            <Form.Label>Service Call</Form.Label>
+            <Select
+              instanceId="service-call-select"
+              options={serviceCalls}
+              value={selectedServiceCall}
+              onChange={handleSelectedServiceCallChange}
+              placeholder="Select Service Call"
+            />
+          </Form.Group>
 
             <Form.Group as={Col} md="3" controlId="salesOrder">
               <Form.Label>Sales Order</Form.Label>
@@ -1577,7 +1714,7 @@ const AddNewJobs = () => {
                 aria-label="Select schedule session"
               >
                 <option value="">Select a session</option>{" "}
-                <option value="">Custom</option> {/* Placeholder option */}
+                <option value="">Custom</option> 
                 {schedulingWindows.map((window) => (
                   <option key={window.id} value={window.label}>
                     {window.label} ({window.timeStart} to {window.timeEnd})

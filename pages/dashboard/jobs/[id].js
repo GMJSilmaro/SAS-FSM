@@ -43,6 +43,7 @@ import {
 
 // Add this import at the top of your file
 import defaultAvatar from '/public/images/avatar/NoProfile.png'; // Adjust the path as needed
+import Link from 'next/link'; // Add this import
 
 // Helper function to fetch worker details from Firebase
 const fetchWorkerDetails = async (workerIds) => {
@@ -377,23 +378,15 @@ const JobDetails = () => {
     return (
       <LoadScript
         googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-        onLoad={() => setMapLoaded(true)}
-        onError={(error) => setMapError(error)}
+        key={mapKey} // Add this line
       >
-        {mapLoaded ? (
-          <GoogleMap
-            key={mapKey} // Add this line
-            mapContainerStyle={{ width: "100%", height: "350px" }}
-            center={location}
-            zoom={15}
-          >
-            <Marker position={location} />
-          </GoogleMap>
-        ) : mapError ? (
-          <p>Error loading map: {mapError.message}</p>
-        ) : (
-          <p>Loading map...</p>
-        )}
+        <GoogleMap
+          mapContainerStyle={{ width: "100%", height: "350px" }}
+          center={location}
+          zoom={15}
+        >
+          <Marker position={location} />
+        </GoogleMap>
       </LoadScript>
     );
   };
@@ -403,13 +396,21 @@ const JobDetails = () => {
       case "overview":
         return (
           <>
-            <h4 className="mb-2">Job Description</h4>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">Job Description</h4>
+              <Button
+                variant="primary"
+                onClick={() => router.push(`/dashboard/jobs/update-jobs/${id}`)}
+              >
+                Edit Job
+              </Button>
+            </div>
             <div
               dangerouslySetInnerHTML={{
                 __html: job.jobDescription || "No description available",
               }}
             />
-            <h4 className="mb-2">Address</h4>
+            <h4 className="mb-2 mt-4">Address</h4>
             <p>
               {`${job.location?.address?.streetAddress || ""} 
                 ${job.location?.address?.city || ""} 
@@ -503,6 +504,12 @@ const JobDetails = () => {
     }
   };
 
+  const extractCustomerCode = (fullName) => {
+    if (!fullName) return null;
+    const match = fullName.match(/^(C\d+)/);
+    return match ? match[1] : null;
+  };
+
   if (!job) {
     return <div>Loading job details...</div>;
   }
@@ -510,14 +517,19 @@ const JobDetails = () => {
   return (
     <div className={styles.container}>
       <Fragment>
-        <h1 className="mb-1 h2 fw-bold">Job Details</h1>
-        <Breadcrumb>
-          <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-          <Breadcrumb.Item href="/dashboard/jobs/list-jobs">
-            Jobs
-          </Breadcrumb.Item>
-          <Breadcrumb.Item active>{id}</Breadcrumb.Item>
-        </Breadcrumb>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h1 className="mb-1 h2 fw-bold">Job Details</h1>
+            <Breadcrumb>
+              <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+              <Breadcrumb.Item href="/dashboard/jobs/list-jobs">
+                Jobs
+              </Breadcrumb.Item>
+              <Breadcrumb.Item active>{id}</Breadcrumb.Item>
+            </Breadcrumb>
+          </div>
+       
+        </div>
 
         <Row>
           <Col xs={12} className="mb-4">
@@ -585,6 +597,7 @@ const JobDetails = () => {
         <Col xl={6} xs={12} className="mb-4">
           <Card>
             <Card.Body>{renderTabContent()}</Card.Body>
+            
           </Card>
         </Col>
 
@@ -621,7 +634,20 @@ const JobDetails = () => {
               {/* Customer Company Name */}
               <div className="d-flex align-items-center mb-2">
                 <PersonFill size={16} className="text-primary me-2" />
-                <p className="mb-0">{job.customerName || "Unknown Company"}</p>
+                {job.customerName ? (
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={<Tooltip id="customer-tooltip">View Customer Details</Tooltip>}
+                  >
+                    <Link href={`/dashboard/customers/${extractCustomerCode(job.customerName)}`}>
+                      <span className="mb-0 text-primary" style={{ cursor: 'pointer' }}>
+                        {job.customerName || "Unknown Company"}
+                      </span>
+                    </Link>
+                  </OverlayTrigger>
+                ) : (
+                  <p className="mb-0">Unknown Company</p>
+                )}
               </div>
             </Card.Body>
 
@@ -717,20 +743,6 @@ const JobDetails = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Row>
-          <Col xs={12} className="mb-4">
-            <div className="d-flex justify-content-end">
-              {" "}
-              {/* Flexbox container for right alignment */}
-              <button
-                className="btn btn-primary" // Bootstrap button styles
-                onClick={() => router.push(`/dashboard/jobs/update-jobs/${id}`)} // Redirect to edit page
-              >
-                Edit Job
-              </button>
-            </div>
-          </Col>
-        </Row>
       </Row>
     </div>
   );

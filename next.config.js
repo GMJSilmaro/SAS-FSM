@@ -2,24 +2,15 @@
 const path = require("path");
 
 const nextConfig = {
+  // Remove swcMinify as it's enabled by default in Next.js 13+
   reactStrictMode: true,
-  // Disable source maps in development to speed up compilation
-  productionBrowserSourceMaps: false,
-  // Experimental features to potentially improve performance
-
-  // Webpack configuration for performance optimization
-  webpack: (config, { dev, isServer }) => {
-    // Optimize in production builds
-    if (!dev) {
-      config.optimization.minimize = true;
-    }
-    return config;
-  },
+  
   env: {
     SAP_SERVICE_LAYER_BASE_URL: process.env.SAP_SERVICE_LAYER_BASE_URL,
     SAP_B1_COMPANY_DB: process.env.SAP_B1_COMPANY_DB,
     SAP_B1_USERNAME: process.env.SAP_B1_USERNAME,
     SAP_B1_PASSWORD: process.env.SAP_B1_PASSWORD,
+    //REDIS_URL: process.env.REDIS_URL,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     SYNCFUSION_LICENSE_KEY: process.env.SYNCFUSION_LICENSE_KEY,
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -30,12 +21,15 @@ const nextConfig = {
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
   },
+  
   sassOptions: {
     includePaths: [path.join(__dirname, "styles")],
   },
+  
   images: {
     domains: ["firebasestorage.googleapis.com"],
   },
+  
   async headers() {
     return [
       {
@@ -56,6 +50,7 @@ const nextConfig = {
       },
     ];
   },
+  
   async rewrites() {
     return [
       {
@@ -68,6 +63,7 @@ const nextConfig = {
       },
     ];
   },
+  
   async redirects() {
     return [
       {
