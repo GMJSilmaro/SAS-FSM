@@ -15,8 +15,6 @@ const NavDropdownMain = (props) => {
 		query: '(min-width: 1224px)'
 	});
 
-	console.log('NavDropdownMain item:', JSON.stringify(item, null, 2));
-
 	const renderBadge = (badge) => {
 		if (!badge) return null;
 		return (
@@ -27,7 +25,6 @@ const NavDropdownMain = (props) => {
 	};
 
 	const renderIcon = (iconName) => {
-		console.log('Rendering icon:', iconName);
 		if (!iconName) return null;
 		const IconComponent = Icons[iconName];
 		return IconComponent ? <IconComponent size={16} className="me-2" /> : null;

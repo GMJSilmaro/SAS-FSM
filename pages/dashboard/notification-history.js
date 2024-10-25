@@ -1,7 +1,7 @@
 // import node module libraries
 import React, { useState, useEffect } from "react";
 import { Col, Row, Card, ListGroup, Form, InputGroup, Pagination } from "react-bootstrap";
-import { Bell, Briefcase, CheckCircle, ExclamationCircle, Search } from "react-feather";
+import { Bell, Briefcase, CheckCircle, AlertCircle, Search } from "react-feather";
 import { format } from "date-fns";
 import { GKTippy } from "widgets";
 import DotBadge from "components/bootstrap/DotBadge";
@@ -106,7 +106,7 @@ const Notifications = () => {
       case "general": return <Bell className="text-primary" size={20} />;
       case "task": return <Briefcase className="text-warning" size={20} />;
       case "approval": return <CheckCircle className="text-success" size={20} />;
-      case "alert": return <ExclamationCircle className="text-danger" size={20} />;
+      case "alert": return <AlertCircle className="text-danger" size={20} />;
       default: return <Bell className="text-primary" size={20} />;
     }
   };
