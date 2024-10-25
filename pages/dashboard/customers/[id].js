@@ -18,6 +18,7 @@ import EquipmentsTab from 'sub-components/customer/EquipmentsTab';
 import { DocumentsTab } from 'sub-components/customer/DocumentsTab';
 import { HistoryTab } from 'sub-components/customer/HistoryTab';
 import { NotesTab } from 'sub-components/customer/NotesTab';
+import QuotationsTab from 'sub-components/customer/QuotationsTab';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -174,6 +175,9 @@ const ViewCustomer = () => {
                 <Tab eventKey="equipments" title="Equipments">
                     <EquipmentsTab customerData={customerData} equipments={equipments} />
                 </Tab>
+                <Tab eventKey="quotations" title="Quotations">
+                  <QuotationsTab customerId={id} />
+                </Tab>
                 <Tab eventKey="documents" title="Documents">
                   <DocumentsTab customerData={customerData} />
                 </Tab>
@@ -183,6 +187,7 @@ const ViewCustomer = () => {
                 <Tab eventKey="notes" title="Notes">
                   <NotesTab customerId={id} />
                 </Tab>
+               
               </Tabs>
             </Card.Body>
           </Card>

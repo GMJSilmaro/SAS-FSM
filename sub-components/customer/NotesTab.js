@@ -283,20 +283,6 @@ export const NotesTab = ({ customerId }) => {
               Add New Tag
             </Button>
           </Form.Group>
-          <div className="mt-3">
-            <h6>Newly Added Tags:</h6>
-            {selectedTags.filter(tag => !availableTags.includes(tag)).map((tag, index) => (
-              <Button
-                key={index}
-                variant="outline-danger"
-                size="sm"
-                className="me-2 mb-2"
-                onClick={() => handleRemoveNewTag(tag)}
-              >
-                {tag} <X />
-              </Button>
-            ))}
-          </div>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowTagModal(false)}>
@@ -308,14 +294,7 @@ export const NotesTab = ({ customerId }) => {
         </Modal.Footer>
       </Modal>
 
-      <ToastContainer position="top-end" className="p-3" style={{ zIndex: 1 }}>
-        <Toast show={showToast} onClose={() => setShowToast(false)} delay={3000} autohide>
-          <Toast.Header>
-            <strong className="me-auto">Notification</strong>
-          </Toast.Header>
-          <Toast.Body>{toastMessage}</Toast.Body>
-        </Toast>
-      </ToastContainer>
+    
     </>
   );
 };
