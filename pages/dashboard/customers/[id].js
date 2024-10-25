@@ -169,25 +169,25 @@ const ViewCustomer = () => {
                 <Tab eventKey="accountInfo" title="Account Info">
                   <AccountInfoTab customerData={customerData} />
                 </Tab>
-                <Tab eventKey="serviceLocation" title="Service Location">
+                <Tab eventKey="serviceLocation" title="Address">
                   <ServiceLocationTab customerData={customerData} />
-                </Tab>
-                <Tab eventKey="equipments" title="Equipments">
-                    <EquipmentsTab customerData={customerData} equipments={equipments} />
-                </Tab>
-                <Tab eventKey="quotations" title="Quotations">
-                  <QuotationsTab customerId={id} />
-                </Tab>
-                <Tab eventKey="documents" title="Documents">
-                  <DocumentsTab customerData={customerData} />
-                </Tab>
-                <Tab eventKey="history" title="History">
-                  <HistoryTab customerData={customerData} />
                 </Tab>
                 <Tab eventKey="notes" title="Notes">
                   <NotesTab customerId={id} />
                 </Tab>
-               
+                <Tab eventKey="equipments" title="Equipments">
+                    <EquipmentsTab customerData={customerData} equipments={equipments} />
+                </Tab>
+                <Tab eventKey="history" title="Jobs">
+                  <HistoryTab customerData={customerData} />
+                </Tab>
+                <Tab eventKey="quotations" title="Quotations">
+                  <QuotationsTab customerId={id} />
+                </Tab>
+                
+                <Tab eventKey="documents" title="Documents">
+                  <DocumentsTab customerData={customerData} />
+                </Tab>
               </Tabs>
             </Card.Body>
           </Card>

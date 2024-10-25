@@ -201,7 +201,7 @@ const QuotationsTab = ({ customerId }) => {
                   <th>Quotation Number</th>
                   <th>Date</th>
                   <th>Total</th>
-                  <th>Comments</th>
+                  <th>Subjects</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,7 +210,7 @@ const QuotationsTab = ({ customerId }) => {
                     <td>{quote.DocNum}</td>
                     <td>{formatDate(quote.DocDate)}</td>
                     <td>{formatCurrency(quote.DocTotal)}</td>
-                    <td>{quote.Comments || 'No comments'}</td>
+                    <td>{quote.subject || 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>

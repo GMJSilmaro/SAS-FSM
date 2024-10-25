@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Table, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Row, Col, Table, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange } from 'react-bootstrap-icons';
 
 export const AccountInfoTab = ({ customerData }) => {
@@ -14,18 +14,6 @@ export const AccountInfoTab = ({ customerData }) => {
     }
     return 'N/A';
   };
-
-  // Get status based on Valid field
-  const getAccountStatus = () => {
-    if (customerData.Valid === "tYES" && customerData.Frozen === "tNO") {
-      return { text: "Active", variant: "success" };
-    } else if (customerData.Frozen === "tYES") {
-      return { text: "Frozen", variant: "warning" };
-    }
-    return { text: "Inactive", variant: "danger" };
-  };
-
-  const status = getAccountStatus();
 
   return (
     <Row className="p-4">
@@ -44,20 +32,6 @@ export const AccountInfoTab = ({ customerData }) => {
             <tr>
               <td className="fw-bold">Contact Person</td>
               <td>{customerData.ContactPerson || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td className="fw-bold">Email</td>
-              <td>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={<Tooltip id="email-tooltip">Click to send email</Tooltip>}
-                >
-                  <a href={`mailto:${customerData.EmailAddress}`} className="text-decoration-none">
-                    <EnvelopeFill className="me-2" />
-                    {customerData.EmailAddress || 'N/A'}
-                  </a>
-                </OverlayTrigger>
-              </td>
             </tr>
             <tr>
               <td className="fw-bold">Phone</td>
@@ -88,7 +62,21 @@ export const AccountInfoTab = ({ customerData }) => {
               </td>
             </tr>
             <tr>
-              <td className="fw-bold">Mailing Address</td>
+              <td className="fw-bold">Email</td>
+              <td>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip id="email-tooltip">Click to send email</Tooltip>}
+                >
+                  <a href={`mailto:${customerData.EmailAddress}`} className="text-decoration-none">
+                    <EnvelopeFill className="me-2" />
+                    {customerData.EmailAddress || 'N/A'}
+                  </a>
+                </OverlayTrigger>
+              </td>
+            </tr>
+            <tr>
+              <td className="fw-bold">Default Address</td>
               <td>
                 <OverlayTrigger
                   placement="top"
@@ -102,8 +90,8 @@ export const AccountInfoTab = ({ customerData }) => {
               </td>
             </tr>
             <tr>
-              <td className="fw-bold">Account Status</td>
-              <td><Badge bg={status.variant}>{status.text}</Badge></td>
+              <td className="fw-bold">Service Remarks</td>
+              <td>{customerData.ServiceRemarks || 'N/A'}</td>
             </tr>
             <tr>
               <td className="fw-bold">Current Account Balance</td>
@@ -120,24 +108,8 @@ export const AccountInfoTab = ({ customerData }) => {
               </td>
             </tr>
             <tr>
-              <td className="fw-bold">Payment Terms Group</td>
-              <td>{customerData.PayTermsGrpCode !== -1 ? customerData.PayTermsGrpCode : 'N/A'}</td>
-            </tr>
-            <tr>
-              <td className="fw-bold">Group Code</td>
-              <td>{customerData.GroupCode || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td className="fw-bold">VAT Group</td>
-              <td>{customerData.VatGroup || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td className="fw-bold">Created Date</td>
-              <td>{customerData.CreateDate ? new Date(customerData.CreateDate).toLocaleDateString() : 'N/A'}</td>
-            </tr>
-            <tr>
-              <td className="fw-bold">Last Updated</td>
-              <td>{customerData.UpdateDate ? new Date(customerData.UpdateDate).toLocaleDateString() : 'N/A'}</td>
+              <td className="fw-bold">Orders</td>
+              <td>{customerData.Orders || 'N/A'}</td>
             </tr>
           </tbody>
         </Table>

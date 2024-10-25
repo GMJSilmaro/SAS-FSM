@@ -121,6 +121,7 @@ const EquipmentsTab = ({ customerData }) => {
                 <tr>
                   <th>Item Code</th>
                   <th>Item Name</th>
+                  <th>Model Series</th>
                   <th>Serial No</th>
                   <th>Location</th>
                   <th>Actions</th>
@@ -131,6 +132,7 @@ const EquipmentsTab = ({ customerData }) => {
                   <tr key={index}>
                     <td>{item.ItemCode || 'N/A'}</td>
                     <td>{item.ItemName || 'N/A'}</td>
+                    <td>{item.ModelSeries || 'N/A'}</td>
                     <td>{item.SerialNo || 'N/A'}</td>
                     <td>{item.EquipmentLocation || 'N/A'}</td>
                     <td>

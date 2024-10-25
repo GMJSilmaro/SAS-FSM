@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Card, ListGroup, Row, Col, InputGroup, Modal, Toast, ToastContainer } from 'react-bootstrap';
+import { Form, Button, Card, ListGroup, Row, Col, InputGroup, Modal, Toast, ToastContainer, Pagination } from 'react-bootstrap';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Trash, PencilSquare, Plus, Save, X, Tags } from 'react-bootstrap-icons';
+import { Trash, PencilSquare, Plus, Save, X, Tags, Search } from 'react-bootstrap-icons';
 import { formatDistanceToNow } from 'date-fns';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
+import { AllNotesTable } from './AllNotesTable';
 
 export const NotesTab = ({ customerId }) => {
   const [notes, setNotes] = useState([]);
@@ -22,6 +23,12 @@ export const NotesTab = ({ customerId }) => {
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [notesPerPage] = useState(3);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const [showAllNotes, setShowAllNotes] = useState(false);
 
   useEffect(() => {
     // Retrieve email from cookies
@@ -46,6 +53,24 @@ export const NotesTab = ({ customerId }) => {
 
     return () => unsubscribe();
   }, [customerId]);
+
+  // Filter notes based on search term
+  const filteredNotes = notes.filter(note =>
+    note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    note.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Get current notes for pagination
+  const indexOfLastNote = currentPage * notesPerPage;
+  const indexOfFirstNote = indexOfLastNote - notesPerPage;
+  const currentNotes = filteredNotes.slice(indexOfFirstNote, indexOfLastNote);
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // Add this function to calculate total pages
+  const totalPages = Math.ceil(filteredNotes.length / notesPerPage);
 
   const handleAddNote = async (e) => {
     e.preventDefault();
@@ -83,10 +108,21 @@ export const NotesTab = ({ customerId }) => {
     }
   };
 
-  const handleEditNote = (note) => {
-    setEditingNote(note);
-    setNewNote(note.content);
-    setSelectedTags(note.tags || []);
+  const handleEditNote = async (updatedNote) => {
+    if (updatedNote.content.trim() === '') return;
+
+    try {
+      const noteRef = doc(db, `customers/${customerId}/notes`, updatedNote.id);
+      await updateDoc(noteRef, {
+        content: updatedNote.content,
+        updatedAt: serverTimestamp(),
+      });
+      setEditingNote(null);
+      toast.success('Note updated successfully!');
+    } catch (error) {
+      console.error('Error updating note:', error);
+      toast.error('Error updating note. Please try again.');
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -139,117 +175,185 @@ export const NotesTab = ({ customerId }) => {
 
   return (
     <>
-      <Row className="g-4">
-        <Col md={8}>
-          <Card className="shadow-sm">
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">Customer Notes</h5>
-            </Card.Header>
-            <Card.Body>
-              <Form onSubmit={editingNote ? handleSaveEdit : handleAddNote} className="mb-4">
-                <InputGroup>
+      {!showAllNotes ? (
+        <Row className="g-4">
+          <Col md={8}>
+            <Card className="shadow-sm">
+              <Card.Header className="bg-light">
+                <h5 className="mb-0">Customer Notes</h5>
+              </Card.Header>
+              <Card.Body>
+                {/* Add search input */}
+                <InputGroup className="mb-3">
+                  <InputGroup.Text>
+                    <Search />
+                  </InputGroup.Text>
                   <Form.Control
-                    as="textarea"
-                    rows={1}
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    placeholder={editingNote ? "Edit your note here..." : "Enter your note here..."}
+                    type="text"
+                    placeholder="Search notes..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
-                  <Button variant="outline-secondary" onClick={() => setShowTagModal(true)}>
+                </InputGroup>
+
+                <ListGroup variant="flush">
+                  {currentNotes.map((note) => (
+                    <ListGroup.Item 
+                      key={note.id} 
+                      className="border-bottom py-3"
+                    >
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div className="me-3">
+                          <p className="mb-1">{note.content}</p>
+                          <small className="text-muted">
+                            {note.createdAt?.toDate().toLocaleString() || 'Date not available'} 
+                            ({formatDistanceToNow(note.createdAt?.toDate() || new Date(), { addSuffix: true })})
+                          </small>
+                          <div>
+                            <small className="text-muted">By: {note.userEmail}</small>
+                          </div>
+                          <div>
+                            {note.tags && note.tags.map((tag, index) => (
+                              <span key={index} className="badge bg-secondary me-1">{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <Button 
+                            variant="outline-danger" 
+                            size="sm"
+                            onClick={() => handleDeleteNote(note.id)}
+                            className="me-2"
+                          >
+                            <Trash />
+                          </Button>
+                    
+                        </div>
+                      </div>
+                    </ListGroup.Item>
+                  ))}
+                </ListGroup>
+
+                {/* Replace the existing pagination with this new one */}
+                {totalPages > 1 && (
+                  <Row className="mt-3">
+                    <Col>
+                      <Pagination className="justify-content-center">
+                        <Pagination.First 
+                          onClick={() => setCurrentPage(1)} 
+                          disabled={currentPage === 1}
+                        />
+                        <Pagination.Prev 
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                        />
+                        {[...Array(totalPages).keys()].map((number) => (
+                          <Pagination.Item
+                            key={number + 1}
+                            active={number + 1 === currentPage}
+                            onClick={() => setCurrentPage(number + 1)}
+                          >
+                            {number + 1}
+                          </Pagination.Item>
+                        ))}
+                        <Pagination.Next 
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                        />
+                        <Pagination.Last 
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                        />
+                      </Pagination>
+                    </Col>
+                  </Row>
+                )}
+
+                <Button 
+                  variant="primary" 
+                  onClick={() => setShowAllNotes(true)}
+                  className="w-100 mt-3"
+                >
+                  View All Notes
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4}>
+            <Card className="shadow-sm mb-4">
+              <Card.Header className="bg-light">
+                <h5 className="mb-0">Latest Note</h5>
+              </Card.Header>
+              <Card.Body>
+                {latestNote ? (
+                  <>
+                    <Card.Text>{latestNote.content}</Card.Text>
+                    <Card.Subtitle className="text-muted mt-2">
+                      {latestNote.createdAt?.toDate().toLocaleString() || 'Date not available'}
+                      ({formatDistanceToNow(latestNote.createdAt?.toDate() || new Date(), { addSuffix: true })})
+                    </Card.Subtitle>
+                    <div className="mt-2">
+                      <small className="text-muted">By: {latestNote.userEmail}</small>
+                    </div>
+                    <div className="mt-2">
+                      {latestNote.tags && latestNote.tags.map((tag, index) => (
+                        <span key={index} className="badge bg-secondary me-1">{tag}</span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted">No notes available</p>
+                )}
+              </Card.Body>
+            </Card>
+            <Card className="shadow-sm mb-4">
+              <Card.Header className="bg-light">
+                <h5 className="mb-0">Add Note</h5>
+              </Card.Header>
+              <Card.Body>
+                <Form onSubmit={editingNote ? handleSaveEdit : handleAddNote}>
+                  <Form.Group className="mb-3">
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      placeholder={editingNote ? "Edit your note here..." : "Enter your note here..."}
+                    />
+                  </Form.Group>
+                  <Button variant="outline-secondary" onClick={() => setShowTagModal(true)} className="mb-2 w-100">
                     <Tags /> Add Tags
                   </Button>
                   {editingNote ? (
                     <>
-                      <Button variant="success" onClick={handleSaveEdit}>
+                      <Button variant="success" onClick={handleSaveEdit} className="me-2 mb-2">
                         <Save className="me-1" /> Save
                       </Button>
-                      <Button variant="secondary" onClick={handleCancelEdit}>
+                      <Button variant="secondary" onClick={handleCancelEdit} className="mb-2">
                         <X className="me-1" /> Cancel
                       </Button>
                     </>
                   ) : (
-                    <Button variant="primary" type="submit">
+                    <Button variant="primary" type="submit" className="w-100">
                       <Plus className="me-1" /> Add Note
                     </Button>
                   )}
-                </InputGroup>
-              </Form>
+                </Form>
+              </Card.Body>
+            </Card>
 
-              <ListGroup variant="flush">
-                {notes.map((note) => (
-                  <ListGroup.Item 
-                    key={note.id} 
-                    className="border-bottom py-3"
-                  >
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="me-3">
-                        <p className="mb-1">{note.content}</p>
-                        <small className="text-muted">
-                          {note.createdAt?.toDate().toLocaleString() || 'Date not available'} 
-                          ({formatDistanceToNow(note.createdAt?.toDate() || new Date(), { addSuffix: true })})
-                        </small>
-                        <div>
-                          <small className="text-muted">By: {note.userEmail}</small>
-                        </div>
-                        <div>
-                          {note.tags && note.tags.map((tag, index) => (
-                            <span key={index} className="badge bg-secondary me-1">{tag}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <Button 
-                          variant="outline-danger" 
-                          size="sm"
-                          onClick={() => handleDeleteNote(note.id)}
-                          className="me-2"
-                        >
-                          <Trash />
-                        </Button>
-                        <Button 
-                          variant="outline-primary" 
-                          size="sm"
-                          onClick={() => handleEditNote(note)}
-                        >
-                          <PencilSquare />
-                        </Button>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={4}>
-          <Card className="shadow-sm">
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">Latest Note</h5>
-            </Card.Header>
-            <Card.Body>
-              {latestNote ? (
-                <>
-                  <Card.Text>{latestNote.content}</Card.Text>
-                  <Card.Subtitle className="text-muted mt-2">
-                    {latestNote.createdAt?.toDate().toLocaleString() || 'Date not available'}
-                    ({formatDistanceToNow(latestNote.createdAt?.toDate() || new Date(), { addSuffix: true })})
-                  </Card.Subtitle>
-                  <div className="mt-2">
-                    <small className="text-muted">By: {latestNote.userEmail}</small>
-                  </div>
-                  <div className="mt-2">
-                    {latestNote.tags && latestNote.tags.map((tag, index) => (
-                      <span key={index} className="badge bg-secondary me-1">{tag}</span>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-muted">No notes available</p>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+            <Col md={12} className="mt-4">
+             
+            </Col>
+          </Col>
+        </Row>
+      ) : (
+        <AllNotesTable 
+          notes={notes} 
+          onClose={() => setShowAllNotes(false)}
+          customerId={customerId}
+        />
+      )}
 
       <Modal show={showTagModal} onHide={() => setShowTagModal(false)}>
         <Modal.Header closeButton>
