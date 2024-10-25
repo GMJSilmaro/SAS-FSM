@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState, Fragment } from "react";
-import { getDoc, doc, setDoc } from "firebase/firestore";
+import { getDoc, doc, setDoc, collection, getDocs, query, orderBy, onSnapshot, deleteDoc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../firebase";
 import styles from "./ViewJobs.module.css"; // Import your CSS module
 import {
@@ -17,6 +17,9 @@ import {
   Tab,
   Tabs,
   Modal,
+  Pagination,
+  InputGroup,
+  Badge,
 } from "react-bootstrap";
 import {
   Calendar4,
@@ -30,6 +33,11 @@ import {
   ClipboardCheck,
   FileText,
   QuestionCircle,
+  Search,
+  Tags,
+  Plus,
+  X,
+  Whatsapp, // Add this import
 } from "react-bootstrap-icons";
 import { GoogleMap, Marker, useLoadScript } from "@react-google-maps/api"; // Google Map import
 
@@ -44,6 +52,10 @@ import {
 // Add this import at the top of your file
 import defaultAvatar from '/public/images/avatar/NoProfile.png'; // Adjust the path as needed
 import Link from 'next/link'; // Add this import
+import Cookies from 'js-cookie';
+import { toast } from 'react-toastify'; // Make sure to import toast
+import { formatDistanceToNow } from 'date-fns';
+import { AllTechnicianNotesTable } from '../../../components/AllTechnicianNotesTable'; 
 
 // Helper function to fetch worker details from Firebase
 const fetchWorkerDetails = async (workerIds) => {
@@ -109,7 +121,10 @@ const JobDetails = () => {
   const [workers, setWorkers] = useState([]); // To store worker details
   const [location, setLocation] = useState(null); // Store location for Google Map
   const [activeTab, setActiveTab] = useState("overview"); // State for active tab
-  const [technicianNotes, setTechnicianNotes] = useState('');
+  const [technicianNotes, setTechnicianNotes] = useState([]);
+  const [newTechnicianNote, setNewTechnicianNote] = useState('');
+  const [editingNote, setEditingNote] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [workerComments, setWorkerComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [images, setImages] = useState([]);
@@ -123,6 +138,50 @@ const JobDetails = () => {
     // Add this to ensure the Google Maps script is loaded before using it
     libraries: ['places']
   });
+  const [showAllNotes, setShowAllNotes] = useState(false);
+  const [currentNotesPage, setCurrentNotesPage] = useState(1);
+  const [currentCommentsPage, setCurrentCommentsPage] = useState(1);
+  const notesPerPage = 3;
+  const commentsPerPage = 5;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [availableTags, setAvailableTags] = useState(['Important', 'Follow-up', 'Resolved', 'Pending', 'Question']);
+  const [newTag, setNewTag] = useState('');
+
+  useEffect(() => {
+    // Retrieve email from cookies
+    const emailFromCookie = Cookies.get('email');
+    setUserEmail(emailFromCookie || 'Unknown');
+  }, []);
+
+  useEffect(() => {
+    if (id && activeTab === "notes") {  // Only fetch notes when on the notes tab
+      console.log("Fetching notes for job:", id); // Debug log
+      
+      const notesRef = collection(db, "jobs", id, "technicianNotes");
+      const q = query(notesRef, orderBy("createdAt", "desc"));
+  
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedNotes = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const createdAt = data.createdAt?.toDate?.() || new Date();
+          return {
+            id: doc.id,
+            ...data,
+            createdAt
+          };
+        });
+        console.log('Fetched notes:', fetchedNotes); // Debug log
+        setTechnicianNotes(fetchedNotes);
+      }, (error) => {
+        console.error("Error fetching notes:", error);
+        toast.error("Error loading notes. Please try again.");
+      });
+  
+      return () => unsubscribe();
+    }
+  }, [id, activeTab]); // Add activeTab to the dependency array
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -157,7 +216,7 @@ const JobDetails = () => {
               console.error("No valid street address found for the given job");
             }
 
-            setTechnicianNotes(jobData.technicianNotes || '');
+            setTechnicianNotes(jobData.technicianNotes || []);
             setWorkerComments(jobData.workerComments || []);
             setImages(jobData.images || []);
           } else {
@@ -169,6 +228,30 @@ const JobDetails = () => {
       };
 
       fetchJob();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      const notesRef = collection(db, "jobs", id, "technicianNotes");
+      const q = query(notesRef, orderBy("createdAt", "desc"));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedNotes = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date() // Convert to Date object or use current date as fallback
+          };
+        });
+        setTechnicianNotes(fetchedNotes);
+      }, (error) => {
+        console.error("Error fetching notes:", error);
+        toast.error("Error loading notes. Please try again.");
+      });
+
+      return () => unsubscribe();
     }
   }, [id]);
 
@@ -267,41 +350,300 @@ const JobDetails = () => {
     }
   };
 
+  const handleAddTechnicianNote = async (e) => {
+    e.preventDefault();
+    if (newTechnicianNote.trim() === '') {
+      toast.error('Please enter a note before adding.');
+      return;
+    }
+
+    try {
+      const notesRef = collection(db, "jobs", id, "technicianNotes");
+      
+      // Include tags in the new note
+      await addDoc(notesRef, {
+        content: newTechnicianNote,
+        createdAt: serverTimestamp(),
+        userEmail: userEmail,
+        updatedAt: serverTimestamp(),
+        tags: selectedTags // Add this line
+      });
+
+      setNewTechnicianNote('');
+      setSelectedTags([]); // Reset selected tags
+      toast.success('Note added successfully!');
+    } catch (error) {
+      console.error('Error adding note:', error);
+      toast.error('Error adding note. Please try again.');
+    }
+  };
+
+  const handleDeleteTechnicianNote = async (noteId) => {
+    try {
+      // Create a reference to the specific note document
+      const noteRef = doc(db, "jobs", id, "technicianNotes", noteId);
+      
+      // Delete the note
+      await deleteDoc(noteRef);
+      toast.success('Note deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast.error('Error deleting note. Please try again.');
+    }
+  };
+
+  const handleEditTechnicianNote = async (updatedNote) => {
+    if (updatedNote.content.trim() === '') {
+      toast.error('Note content cannot be empty.');
+      return;
+    }
+
+    try {
+      const noteRef = doc(db, "jobs", id, "technicianNotes", updatedNote.id);
+      
+      await updateDoc(noteRef, {
+        content: updatedNote.content,
+        updatedAt: serverTimestamp(),
+        tags: updatedNote.tags // Add this line
+      });
+
+      setEditingNote(null);
+      toast.success('Note updated successfully!');
+    } catch (error) {
+      console.error('Error updating note:', error);
+      toast.error('Error updating note. Please try again.');
+    }
+  };
+
+  const handleTagSelection = (tag) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleAddNewTag = () => {
+    if (newTag.trim() !== '' && !availableTags.includes(newTag.trim())) {
+      const trimmedTag = newTag.trim();
+      setAvailableTags(prev => [...prev, trimmedTag]);
+      setSelectedTags(prev => [...prev, trimmedTag]);
+      setNewTag('');
+      toast.success(`New tag "${trimmedTag}" added successfully!`);
+    }
+  };
+
+  const handleRemoveNewTag = (tagToRemove) => {
+    setSelectedTags(prev => prev.filter(tag => tag !== tagToRemove));
+    setAvailableTags(prev => prev.filter(tag => tag !== tagToRemove));
+    toast.success(`Tag "${tagToRemove}" removed successfully!`);
+  };
+
   const renderNotesAndComments = () => {
+    if (showAllNotes) {
+      return (
+        <AllTechnicianNotesTable 
+          notes={technicianNotes} 
+          onClose={() => setShowAllNotes(false)}
+          jobId={id}
+        />
+      );
+    }
+
+    // Filter notes based on search term
+    const filteredNotes = technicianNotes.filter(note =>
+      note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      note.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Calculate pagination for notes
+    const indexOfLastNote = currentNotesPage * notesPerPage;
+    const indexOfFirstNote = indexOfLastNote - notesPerPage;
+    const currentNotes = filteredNotes.slice(indexOfFirstNote, indexOfLastNote);
+    const totalNotePages = Math.ceil(filteredNotes.length / notesPerPage);
+
+    // Calculate pagination for comments
+    const indexOfLastComment = currentCommentsPage * commentsPerPage;
+    const indexOfFirstComment = indexOfLastComment - commentsPerPage;
+    const currentComments = workerComments.slice(indexOfFirstComment, indexOfLastComment);
+    const totalCommentPages = Math.ceil(workerComments.length / commentsPerPage);
+
     return (
       <>
         <h4 className="mb-3">Technician Notes</h4>
-        <Form.Group className="mb-3">
-          <Form.Control
-            as="textarea"
-            rows={3}
-            value={technicianNotes}
-            onChange={(e) => setTechnicianNotes(e.target.value)}
-            placeholder="Enter technician notes here..."
-          />
-        </Form.Group>
-        <Button variant="primary" className="mb-4">Save Notes</Button>
+        
+        <Card className="shadow-sm mb-4">
+          <Card.Header className="bg-light">
+            <h5 className="mb-0">Add Note</h5>
+          </Card.Header>
+          <Card.Body>
+            <Form onSubmit={handleAddTechnicianNote}>
+              <Form.Group className="mb-3">
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  value={newTechnicianNote}
+                  onChange={(e) => setNewTechnicianNote(e.target.value)}
+                  placeholder="Enter technician notes here..."
+                />
+              </Form.Group>
+              <Button variant="outline-secondary" onClick={() => setShowTagModal(true)} className="mb-2 w-100">
+                <Tags /> Add Tags
+              </Button>
+              {selectedTags.length > 0 && (
+                <div className="mb-2">
+                  {selectedTags.map((tag, index) => (
+                    <Badge key={index} bg="secondary" className="me-1">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <Button variant="primary" type="submit" className="w-100">
+                <Plus className="me-1" /> Add Note
+              </Button>
+            </Form>
+          </Card.Body>
+        </Card>
 
-        <h4 className="mb-3">Worker Comments</h4>
-        {workerComments.map((comment, index) => (
-          <Card key={index} className="mb-2">
-            <Card.Body>
-              <Card.Text>{comment.text}</Card.Text>
-              <Card.Footer className="text-muted">
-                {comment.worker} - {new Date(comment.timestamp).toLocaleString()}
-              </Card.Footer>
-            </Card.Body>
-          </Card>
-        ))}
-        <Form.Group className="mb-3">
+        <ListGroup variant="flush">
+           {/* Add search input */}
+ <InputGroup className="mb-3">
+          <InputGroup.Text>
+            <Search />
+          </InputGroup.Text>
           <Form.Control
             type="text"
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a new comment..."
+            placeholder="Search notes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-        </Form.Group>
-        <Button variant="primary" onClick={handleAddComment}>Add Comment</Button>
+        </InputGroup>
+          {currentNotes.map((note) => (
+            <ListGroup.Item key={note.id} className="border-bottom py-3">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="me-3">
+                  {editingNote && editingNote.id === note.id ? (
+                    <>
+                      <Form.Control
+                        as="textarea"
+                        rows={3}
+                        value={editingNote.content}
+                        onChange={(e) => setEditingNote({...editingNote, content: e.target.value})}
+                      />
+                      <Button variant="outline-secondary" onClick={() => setShowTagModal(true)} className="mt-2">
+                        <Tags /> Edit Tags
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mb-1">{note.content}</p>
+                      {note.tags && note.tags.length > 0 && (
+                        <div className="mb-2">
+                          {note.tags.map((tag, index) => (
+                            <Badge key={index} bg="secondary" className="me-1">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <small className="text-muted">
+                    {note.createdAt.toLocaleString() || 'Date not available'} 
+                    ({formatDistanceToNow(note.createdAt, { addSuffix: true })})
+                  </small>
+                  <div>
+                    <small className="text-muted">By: {note.userEmail}</small>
+                  </div>
+                </div>
+                <div>
+                  {editingNote && editingNote.id === note.id ? (
+                    <>
+                      <Button 
+                        variant="success" 
+                        size="sm"
+                        onClick={() => handleEditTechnicianNote(editingNote)}
+                        className="me-2"
+                      >
+                        Save
+                      </Button>
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={() => setEditingNote(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm"
+                        onClick={() => setEditingNote(note)}
+                        className="me-2"
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm"
+                        onClick={() => handleDeleteTechnicianNote(note.id)}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </ListGroup.Item>
+          ))}
+        </ListGroup>
+
+        {totalNotePages > 1 && (
+          <Row className="mt-3">
+            <Col>
+              <Pagination className="justify-content-center">
+                <Pagination.First 
+                  onClick={() => setCurrentNotesPage(1)} 
+                  disabled={currentNotesPage === 1}
+                />
+                <Pagination.Prev 
+                  onClick={() => setCurrentNotesPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentNotesPage === 1}
+                />
+                {[...Array(totalNotePages).keys()].map((number) => (
+                  <Pagination.Item
+                    key={number + 1}
+                    active={number + 1 === currentNotesPage}
+                    onClick={() => setCurrentNotesPage(number + 1)}
+                  >
+                    {number + 1}
+                  </Pagination.Item>
+                ))}
+                <Pagination.Next 
+                  onClick={() => setCurrentNotesPage(prev => Math.min(prev + 1, totalNotePages))}
+                  disabled={currentNotesPage === totalNotePages}
+                />
+                <Pagination.Last 
+                  onClick={() => setCurrentNotesPage(totalNotePages)}
+                  disabled={currentNotesPage === totalNotePages}
+                />
+              </Pagination>
+            </Col>
+          </Row>
+        )}
+
+        {technicianNotes.length > notesPerPage && (
+          <Button 
+            variant="primary" 
+            onClick={() => setShowAllNotes(true)}
+            className="w-100 mt-3"
+          >
+            View All Technician Notes
+          </Button>
+        )}
+
+      
       </>
     );
   };
@@ -565,6 +907,18 @@ const JobDetails = () => {
     return match ? match[1] : null;
   };
 
+  const formatPhoneForWhatsApp = (phone) => {
+    // Remove all non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    // Add country code if not present (assuming default country code is +60 for Malaysia)
+    if (!cleanPhone.startsWith('60')) {
+      return `60${cleanPhone}`;
+    }
+    
+    return cleanPhone;
+  };
+
   if (!job) {
     return <div>Loading job details...</div>;
   }
@@ -673,21 +1027,51 @@ const JobDetails = () => {
                 </p>
               </div>
 
-              {/* Mobile Phone (Contact) */}
-              <div className="d-flex align-items-center mb-2">
-                <TelephoneFill size={16} className="text-primary me-2" />
-                <p className="mb-0">
-                  {job.contact?.mobilePhone || "Unknown Mobile Phone"}
-                </p>
-              </div>
+             {/* Mobile Phone (Contact) */}
+<div className="d-flex align-items-center mb-2">
+  <TelephoneFill size={16} className="text-primary me-2" />
+  <p className="mb-0 me-2">
+    {job.contact?.mobilePhone || "Unknown Mobile Phone"}
+  </p>
+  {job.contact?.mobilePhone && (
+    <OverlayTrigger
+      placement="top"
+      overlay={<Tooltip id="mobile-whatsapp-tooltip">Open in WhatsApp</Tooltip>}
+    >
+      <a
+        href={`https://wa.me/${formatPhoneForWhatsApp(job.contact.mobilePhone)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-success"
+      >
+        <Whatsapp size={20} />
+      </a>
+    </OverlayTrigger>
+  )}
+</div>
 
-              {/* Phone Number (Contact) */}
-              <div className="d-flex align-items-center mb-2">
-                <TelephoneFill size={16} className="text-primary me-2" />
-                <p className="mb-0">
-                  {job.contact?.phoneNumber || "Unknown Phone Number"}
-                </p>
-              </div>
+{/* Phone Number (Contact) */}
+<div className="d-flex align-items-center mb-2">
+  <TelephoneFill size={16} className="text-primary me-2" />
+  <p className="mb-0 me-2">
+    {job.contact?.phoneNumber || "Unknown Phone Number"}
+  </p>
+  {job.contact?.phoneNumber && (
+    <OverlayTrigger
+      placement="top"
+      overlay={<Tooltip id="phone-whatsapp-tooltip">Open in WhatsApp</Tooltip>}
+    >
+      <a
+        href={`https://wa.me/${formatPhoneForWhatsApp(job.contact.phoneNumber)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-success"
+      >
+        <Whatsapp size={20} />
+      </a>
+    </OverlayTrigger>
+  )}
+</div>
 
               {/* Customer Company Name */}
               <div className="d-flex align-items-center mb-2">
@@ -802,6 +1186,52 @@ const JobDetails = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal show={showTagModal} onHide={() => setShowTagModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Select Tags</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {availableTags.map((tag, index) => (
+            <Button
+              key={index}
+              variant={selectedTags.includes(tag) ? "primary" : "outline-primary"}
+              className="me-2 mb-2"
+              onClick={() => handleTagSelection(tag)}
+            >
+              {tag}
+              {!['Important', 'Follow-up', 'Resolved', 'Pending', 'Question'].includes(tag) && (
+                <X
+                  className="ms-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveNewTag(tag);
+                  }}
+                />
+              )}
+            </Button>
+          ))}
+          <Form.Group className="mt-3">
+            <Form.Control
+              type="text"
+              placeholder="Add new tag"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+            />
+            <Button variant="secondary" className="mt-2" onClick={handleAddNewTag}>
+              Add New Tag
+            </Button>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTagModal(false)}>
+            Close
+          </Button>
+          <Button variant="primary" onClick={() => setShowTagModal(false)}>
+            Apply Tags
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
