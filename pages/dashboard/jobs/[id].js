@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState, Fragment } from "react";
-import { getDoc, doc } from "firebase/firestore";
+import { getDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import styles from "./ViewJobs.module.css"; // Import your CSS module
 import {
@@ -12,6 +12,11 @@ import {
   Tooltip,
   Breadcrumb,
   ListGroup,
+  Form,
+  Button,
+  Tab,
+  Tabs,
+  Modal,
 } from "react-bootstrap";
 import {
   Calendar4,
@@ -36,6 +41,9 @@ import {
   Inject,
 } from "@syncfusion/ej2-react-grids";
 
+// Add this import at the top of your file
+import defaultAvatar from '/public/images/avatar/NoProfile.png'; // Adjust the path as needed
+
 // Helper function to fetch worker details from Firebase
 const fetchWorkerDetails = async (workerIds) => {
   const workersData = [];
@@ -50,13 +58,26 @@ const fetchWorkerDetails = async (workerIds) => {
   return workersData;
 };
 
-// Helper function to geocode address
-const geocodeAddress = async (address) => {
-  const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`);
+// Modified geocodeAddress function
+const geocodeAddress = async (address, jobId) => {
+  // Check if coordinates are already cached in the job document
+  const jobDoc = await getDoc(doc(db, "jobs", jobId));
+  const jobData = jobDoc.data();
+  
+  if (jobData.cachedCoordinates) {
+    return jobData.cachedCoordinates;
+  }
+
+  const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`);
   const data = await response.json();
   if (data.results && data.results.length > 0) {
     const { lat, lng } = data.results[0].geometry.location;
-    return { lat, lng };
+    const coordinates = { lat, lng };
+    
+    // Cache the coordinates in the job document
+    await setDoc(doc(db, "jobs", jobId), { cachedCoordinates: coordinates }, { merge: true });
+    
+    return coordinates;
   }
   return null;
 };
@@ -68,6 +89,14 @@ const JobDetails = () => {
   const [workers, setWorkers] = useState([]); // To store worker details
   const [location, setLocation] = useState(null); // Store location for Google Map
   const [activeTab, setActiveTab] = useState("overview"); // State for active tab
+  const [technicianNotes, setTechnicianNotes] = useState('');
+  const [workerComments, setWorkerComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [images, setImages] = useState([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [mapKey, setMapKey] = useState(0); // Add this line
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -77,39 +106,34 @@ const JobDetails = () => {
           if (jobDoc.exists()) {
             const jobData = jobDoc.data();
             setJob(jobData);
-            console.log("Job Data:", jobData);
-
+            
             // Extract worker IDs from assignedWorkers array
             const assignedWorkers = jobData.assignedWorkers || [];
             if (Array.isArray(assignedWorkers)) {
-              const workerIds = assignedWorkers.map(
-                (worker) => worker.workerId
-              ); // Adjust this based on the structure
-              const workerData = await fetchWorkerDetails(workerIds); // Pass only IDs
+              const workerIds = assignedWorkers.map(worker => worker.workerId);
+              const workerData = await fetchWorkerDetails(workerIds);
               setWorkers(workerData);
             } else {
               console.error("assignedWorkers is not an array");
             }
 
-            // Log the entire location object for debugging
-            console.log("Location Object:", jobData.location);
-
             // Use the street address to get coordinates
             const streetAddress = jobData.location?.address?.streetAddress;
             if (streetAddress) {
-              const coordinates = await geocodeAddress(streetAddress);
+              const coordinates = await geocodeAddress(streetAddress, id);
               if (coordinates) {
-                console.log("Coordinates Found:", coordinates.lat, coordinates.lng);
-                setLocation({ 
-                  lat: coordinates.lat, 
-                  lng: coordinates.lng 
-                });
+                setLocation(coordinates);
+                setMapKey(prevKey => prevKey + 1); // Force map re-render
               } else {
                 console.error("No valid coordinates found for the given address");
               }
             } else {
               console.error("No valid street address found for the given job");
             }
+
+            setTechnicianNotes(jobData.technicianNotes || '');
+            setWorkerComments(jobData.workerComments || []);
+            setImages(jobData.images || []);
           } else {
             console.error("Job not found");
           }
@@ -204,6 +228,176 @@ const JobDetails = () => {
     );
   };
 
+  const handleAddComment = () => {
+    if (newComment.trim()) {
+      const comment = {
+        text: newComment,
+        timestamp: new Date().toISOString(),
+        worker: 'Current Worker Name' // Replace with actual worker name
+      };
+      setWorkerComments([...workerComments, comment]);
+      setNewComment('');
+      // Here you would also update this in your database
+    }
+  };
+
+  const renderNotesAndComments = () => {
+    return (
+      <>
+        <h4 className="mb-3">Technician Notes</h4>
+        <Form.Group className="mb-3">
+          <Form.Control
+            as="textarea"
+            rows={3}
+            value={technicianNotes}
+            onChange={(e) => setTechnicianNotes(e.target.value)}
+            placeholder="Enter technician notes here..."
+          />
+        </Form.Group>
+        <Button variant="primary" className="mb-4">Save Notes</Button>
+
+        <h4 className="mb-3">Worker Comments</h4>
+        {workerComments.map((comment, index) => (
+          <Card key={index} className="mb-2">
+            <Card.Body>
+              <Card.Text>{comment.text}</Card.Text>
+              <Card.Footer className="text-muted">
+                {comment.worker} - {new Date(comment.timestamp).toLocaleString()}
+              </Card.Footer>
+            </Card.Body>
+          </Card>
+        ))}
+        <Form.Group className="mb-3">
+          <Form.Control
+            type="text"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Add a new comment..."
+          />
+        </Form.Group>
+        <Button variant="primary" onClick={handleAddComment}>Add Comment</Button>
+      </>
+    );
+  };
+
+  const renderSignatures = () => {
+    return (
+      <div>
+        <h4>Signatures</h4>
+        <div className="d-flex justify-content-between">
+          <div>
+            <p>Technician Signature: ___________________</p>
+            <p>Timestamp: {job.technicianSignatureTimestamp ? new Date(job.technicianSignatureTimestamp).toLocaleString() : 'Not signed'}</p>
+          </div>
+          <div>
+            <p>Worker Signature: ___________________</p>
+            <p>Timestamp: {job.workerSignatureTimestamp ? new Date(job.workerSignatureTimestamp).toLocaleString() : 'Not signed'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderImages = () => {
+    const noImageAvailable = 'https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg';
+
+    const handleImageClick = (imageUrl) => {
+      setSelectedImage(imageUrl);
+    };
+
+    const handleCloseModal = () => {
+      setSelectedImage(null);
+    };
+
+    return (
+      <div>
+        <h4>Job Images</h4>
+        <div className="d-flex flex-wrap">
+          {images.length > 0 ? (
+            images.map((image, index) => (
+              <div key={index} className="m-2">
+                <img 
+                  src={image.url} 
+                  alt={`Job image ${index + 1}`} 
+                  style={{
+                    width: '200px', 
+                    height: '200px', 
+                    objectFit: 'cover', 
+                    cursor: 'pointer'  // Add pointer cursor
+                  }} 
+                  onClick={() => handleImageClick(image.url)}
+                />
+                <p className="text-center mt-1">
+                  <a 
+                    href="#" 
+                    onClick={(e) => { 
+                      e.preventDefault(); 
+                      handleImageClick(image.url); 
+                    }}
+                    style={{ cursor: 'pointer' }}  // Add pointer cursor to link
+                  >
+                    View
+                  </a>
+                </p>
+              </div>
+            ))
+          ) : (
+            <div className="d-flex flex-column align-items-center m-2">
+              <img 
+                src={noImageAvailable} 
+                alt="No Image Available" 
+                style={{width: '200px', height: '200px', objectFit: 'contain'}} 
+              />
+              <p className="mt-2">No Images Available</p>
+            </div>
+          )}
+        </div>
+
+        <Modal show={selectedImage !== null} onHide={handleCloseModal} size="lg" centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Image View</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <img 
+              src={selectedImage} 
+              alt="Enlarged job image" 
+              style={{width: '100%', height: 'auto'}} 
+            />
+          </Modal.Body>
+        </Modal>
+      </div>
+    );
+  };
+
+  const renderMap = () => {
+    if (!location) {
+      return <p>No location data available for this job.</p>;
+    }
+
+    return (
+      <LoadScript
+        googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        onLoad={() => setMapLoaded(true)}
+        onError={(error) => setMapError(error)}
+      >
+        {mapLoaded ? (
+          <GoogleMap
+            key={mapKey} // Add this line
+            mapContainerStyle={{ width: "100%", height: "350px" }}
+            center={location}
+            zoom={15}
+          >
+            <Marker position={location} />
+          </GoogleMap>
+        ) : mapError ? (
+          <p>Error loading map: {mapError.message}</p>
+        ) : (
+          <p>Loading map...</p>
+        )}
+      </LoadScript>
+    );
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "overview":
@@ -224,25 +418,19 @@ const JobDetails = () => {
                 ${job.location?.address?.postalCode || ""}`}
             </p>
 
-            {location && (
-              <LoadScript
-                googleMapsApiKey={process.env.GOOGLE_MAPS_API_KEY}
-              >
-                <GoogleMap
-                  mapContainerStyle={{ width: "100%", height: "350px" }}
-                  center={location}
-                  zoom={15}
-                >
-                  <Marker position={location} />
-                </GoogleMap>
-              </LoadScript>
-            )}
+            {renderMap()}
           </>
         );
-      case "task":
-        return renderTaskList();
       case "equipment":
         return renderEquipmentList();
+      case "task":
+        return renderTaskList();
+      case "notes":
+        return renderNotesAndComments();
+      case "signatures":
+        return renderSignatures();
+      case "images":
+        return renderImages();
       default:
         return <h4 className="mb-2">Content not available.</h4>;
     }
@@ -337,9 +525,7 @@ const JobDetails = () => {
               <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
                 <a
                   href="#overview"
-                  className={`nav-link ${
-                    activeTab === "overview" ? "active" : ""
-                  }`}
+                  className={`nav-link ${activeTab === "overview" ? "active" : ""}`}
                   onClick={() => setActiveTab("overview")}
                 >
                   Overview
@@ -348,9 +534,7 @@ const JobDetails = () => {
               <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
                 <a
                   href="#equipment"
-                  className={`nav-link ${
-                    activeTab === "equipment" ? "active" : ""
-                  }`}
+                  className={`nav-link ${activeTab === "equipment" ? "active" : ""}`}
                   onClick={() => setActiveTab("equipment")}
                 >
                   Equipment
@@ -363,6 +547,33 @@ const JobDetails = () => {
                   onClick={() => setActiveTab("task")}
                 >
                   Task
+                </a>
+              </ListGroup.Item>
+              <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
+                <a
+                  href="#notes"
+                  className={`nav-link ${activeTab === "notes" ? "active" : ""}`}
+                  onClick={() => setActiveTab("notes")}
+                >
+                  Notes & Comments
+                </a>
+              </ListGroup.Item>
+              <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
+                <a
+                  href="#signatures"
+                  className={`nav-link ${activeTab === "signatures" ? "active" : ""}`}
+                  onClick={() => setActiveTab("signatures")}
+                >
+                  Signatures
+                </a>
+              </ListGroup.Item>
+              <ListGroup.Item as="li" bsPrefix="nav-item ms-0 me-3 mx-3">
+                <a
+                  href="#images"
+                  className={`nav-link ${activeTab === "images" ? "active" : ""}`}
+                  onClick={() => setActiveTab("images")}
+                >
+                  Images
                 </a>
               </ListGroup.Item>
             </ListGroup>
@@ -428,11 +639,11 @@ const JobDetails = () => {
                     }
                   >
                     <Image
-                      src={
-                        worker.profilePicture || "/images/default-avatar.jpg"
-                      }
-                      alt={worker.firstName}
+                      src={worker.profilePicture || defaultAvatar.src}
+                      alt={`${worker.firstName} ${worker.lastName}`}
                       className="avatar-sm avatar rounded-circle me-2"
+                      width={32}
+                      height={32}
                     />
                   </OverlayTrigger>
                 ))}

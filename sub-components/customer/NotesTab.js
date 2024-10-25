@@ -49,7 +49,10 @@ export const NotesTab = ({ customerId }) => {
 
   const handleAddNote = async (e) => {
     e.preventDefault();
-    if (newNote.trim() === '') return;
+    if (newNote.trim() === '') {
+      toast.error('Please enter a note before adding.');
+      return;
+    }
 
     try {
       const noteRef = doc(collection(db, `customers/${customerId}/notes`));
@@ -147,7 +150,7 @@ export const NotesTab = ({ customerId }) => {
                 <InputGroup>
                   <Form.Control
                     as="textarea"
-                    rows={2}
+                    rows={1}
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     placeholder={editingNote ? "Edit your note here..." : "Enter your note here..."}

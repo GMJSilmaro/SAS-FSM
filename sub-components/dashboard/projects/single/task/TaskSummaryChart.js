@@ -14,16 +14,54 @@ const TaskSummaryChart = () => {
   const [chartData, setChartData] = useState([
     {
       name: "Closed",
-      type: "column",
       data: [],
     },
     {
       name: "New",
-      type: "line",
       data: [],
     },
   ]);
-  const [chartOptions, setChartOptions] = useState(baseChartOptions);
+  const [chartOptions, setChartOptions] = useState({
+    ...baseChartOptions,
+    chart: {
+      ...baseChartOptions.chart,
+      type: 'bar',
+      stacked: false,
+    },
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        columnWidth: '55%',
+        endingShape: 'rounded'
+      },
+    },
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      show: true,
+      width: 2,
+      colors: ['transparent']
+    },
+    xaxis: {
+      categories: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    },
+    yaxis: {
+      title: {
+        text: 'Number of Jobs'
+      }
+    },
+    fill: {
+      opacity: 1
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return val + " jobs"
+        }
+      }
+    }
+  });
 
   useEffect(() => {
     // Fetch jobs data from Firebase
@@ -50,35 +88,23 @@ const TaskSummaryChart = () => {
         setChartData([
           {
             name: "Closed",
-            type: "column",
             data: closedJobsCount.map((count) => count || 0), // Fallback to 0 if count is falsy
           },
           {
             name: "New",
-            type: "line",
             data: newJobsCount.map((count) => count || 0), // Fallback to 0 if count is falsy
           },
         ]);
-
-        // Update chart options with x-axis categories
-        setChartOptions((prevOptions) => ({
-          ...prevOptions,
-          xaxis: {
-            categories: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], // Set x-axis categories
-          },
-        }));
       } catch (error) {
         console.error("Error fetching jobs data:", error);
         // Handle the error case by setting default data
         setChartData([
           {
             name: "Closed",
-            type: "column",
             data: [0, 0, 0, 0, 0, 0, 0], // Default to empty data
           },
           {
             name: "New",
-            type: "line",
             data: [0, 0, 0, 0, 0, 0, 0], // Default to empty data
           },
         ]);
@@ -102,7 +128,7 @@ const TaskSummaryChart = () => {
           <ApexCharts
             options={chartOptions}
             series={chartData}
-            type="line" // Keeping the original mixed type chart
+            type="bar"
             height={350}
           />
         ) : (

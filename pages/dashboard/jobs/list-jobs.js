@@ -28,7 +28,9 @@ import {
   BsGeoAlt, 
   BsClipboardCheck, 
   BsExclamationTriangle, 
-  BsPeople 
+  BsPeople, 
+  BsCalendar, 
+  BsClock 
 } from "react-icons/bs";
 
 const ViewJobs = () => {
@@ -249,22 +251,119 @@ const ViewJobs = () => {
     return usersData;
   }, [usersData]);
 
+  const handleRowClick = (row) => {
+    Swal.fire({
+      title: '<strong>Job Details</strong>',
+      html: `
+        <div style="text-align: left; padding: 20px; background-color: #f8f9fa; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #3498db;">#${row.jobNo}</h3>
+            <span style="font-size: 1.2em; font-weight: bold; color: ${row.priority === 'High' ? '#e74c3c' : row.priority === 'Mid' ? '#f39c12' : '#2ecc71'};">${row.priority} Priority</span>
+          </div>
+          <h4 style="margin-top: 0; margin-bottom: 15px; color: #34495e;">${row.jobName}</h4>
+          <p style="margin-bottom: 10px;"><strong>Customer:</strong> ${row.customerName}</p>
+          <p style="margin-bottom: 10px;"><strong>Location:</strong> ${row.locationName}</p>
+          <p style="margin-bottom: 10px;"><strong>Status:</strong> <span style="padding: 3px 8px; border-radius: 12px; background-color: ${getStatusColor(row.jobStatus)}; color: white;">${row.jobStatus}</span></p>
+          <p style="margin-bottom: 10px;"><strong>Assigned Workers:</strong> ${row.workerFullName}</p>
+          <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+            <div>
+              <p style="margin-bottom: 5px;"><strong>Start:</strong></p>
+              <p style="margin: 0;">${formatDate(row.startDate)}</p>
+              <p style="margin: 0;">${formatTime(row.startTime)}</p>
+            </div>
+            <div>
+              <p style="margin-bottom: 5px;"><strong>End:</strong></p>
+              <p style="margin: 0;">${formatDate(row.endDate)}</p>
+              <p style="margin: 0;">${formatTime(row.endTime)}</p>
+            </div>
+          </div>
+        </div>
+      `,
+      showCloseButton: true,
+      showCancelButton: true,
+      showDenyButton: true,
+      focusConfirm: false,
+      confirmButtonText: '<i class="fa fa-eye"></i> View',
+      confirmButtonAriaLabel: 'View',
+      confirmButtonColor: '#3085d6',
+      denyButtonText: '<i class="fa fa-edit"></i> Edit',
+      denyButtonAriaLabel: 'Edit',
+      denyButtonColor: '#ffc107',
+      cancelButtonText: '<i class="fa fa-trash"></i> Remove',
+      cancelButtonAriaLabel: 'Remove',
+      cancelButtonColor: '#d33'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        router.push(`/dashboard/jobs/${row.id}`);
+      } else if (result.isDenied) {
+        router.push(`./update-jobs/${row.id}`);
+      } else if (result.dismiss === Swal.DismissReason.cancel) {
+        const deleteResult = await Swal.fire({
+          title: "Are you sure?",
+          text: "This action cannot be undone.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          cancelButtonColor: "#3085d6",
+          confirmButtonText: "Yes, remove it!",
+        });
+
+        if (deleteResult.isConfirmed) {
+          try {
+            const jobRef = doc(db, "jobs", row.id);
+            await deleteDoc(jobRef);
+            Swal.fire("Deleted!", "The job has been removed.", "success");
+            const updatedJobs = jobs.filter((job) => job.id !== row.id);
+            setJobs(updatedJobs);
+            setFilteredJobs(prevFiltered => 
+              prevFiltered.filter((job) => job.id !== row.id)
+            );
+          } catch (error) {
+            console.error("Delete error:", error);
+            Swal.fire(
+              "Error!",
+              "There was a problem removing the job.",
+              "error"
+            );
+          }
+        }
+      }
+    });
+  };
+
+  // Helper function to get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Created": return "#9e9e9e";
+      case "Confirmed": return "#2196f3";
+      case "Cancelled": return "#f44336";
+      case "Job Started": return "#FFA500";
+      case "Job Complete": return "#32CD32";
+      case "Validate": return "#00bcd4";
+      case "Scheduled": return "#607d8b";
+      default: return "#9e9e9e";
+    }
+  };
+
   const columns = [
     {
       name: "",
       cell: (row) => "",
-      width: "5px",
+      width: "40px", // Keep this minimal width for the empty column
     },
     {
       name: "Job No.",
       cell: (row) => (
-        <div className="d-flex align-items-center">
-          <BsHash className="me-2" />
-          {row.jobNo}
-        </div>
+        <OverlayTrigger
+          overlay={<Tooltip id={`tooltip-${row.id}`}>View Details</Tooltip>}
+        >
+          <div className="d-flex align-items-center" onClick={() => handleRowClick(row)}>
+            <BsHash className="me-2" />
+            {row.jobNo}
+          </div>
+        </OverlayTrigger>
       ),
       sortable: true,
-      width: "110px",
     },
     {
       name: "Job Name",
@@ -275,7 +374,6 @@ const ViewJobs = () => {
         </div>
       ),
       sortable: true,
-      width: "200px",
     },
     {
       name: "Customer Name",
@@ -286,7 +384,6 @@ const ViewJobs = () => {
         </div>
       ),
       sortable: true,
-      width: "200px",
     },
     {
       name: "Location Name",
@@ -297,7 +394,6 @@ const ViewJobs = () => {
         </div>
       ),
       sortable: true,
-      width: "200px",
     },
     {
       name: "Job Status",
@@ -308,29 +404,56 @@ const ViewJobs = () => {
         </div>
       ),
       sortable: false,
-      width: "150px",
     },
     {
       name: "Priority",
       cell: (row) => (
         <div className="d-flex align-items-center">
-          <BsExclamationTriangle className="me-2" />
           {getPriorityBadge(row.priority)}
         </div>
       ),
+      width: "105px",
       sortable: true,
-      width: "110px",
     },
     {
       name: "Assigned",
       cell: (row) => (
         <div className="d-flex align-items-center">
-          <BsPeople className="me-2" />
           <AssignedWorkerCell workerFullName={row.workerFullName} />
         </div>
       ),
       sortable: true,
-      width: "200px",
+    },
+    {
+      name: "Start Date",
+      cell: (row) => (
+        <div className="d-flex align-items-center">
+          <BsCalendar className="me-2" />
+          {formatDate(row.startDate)}
+        </div>
+      ),
+      sortable: true,
+    },
+    {
+      name: "Time",
+      cell: (row) => (
+        <OverlayTrigger
+          placement="top"
+          overlay={
+            <Tooltip id={`tooltip-time-${row.id}`}>
+              Start: {formatDate(row.startDate)} {formatTime(row.startTime)}
+              <br />
+              End: {formatDate(row.endDate)} {formatTime(row.endTime)}
+            </Tooltip>
+          }
+        >
+          <div className="d-flex align-items-center">
+            <BsClock className="me-2" />
+            {formatTime(row.startTime)} - {formatTime(row.endTime)}
+          </div>
+        </OverlayTrigger>
+      ),
+      sortable: true,
     },
   ];
 
@@ -414,57 +537,6 @@ useEffect(() => {
 
   return () => clearTimeout(debounceTimeout);
 }, [search, jobs]);
-
-const handleRowClick = (row) => {
-  Swal.fire({
-    title: "Choose an action",
-    text: "Do you want to view, edit, or remove this job?",
-    icon: "question",
-    showCancelButton: true,
-    showDenyButton: true,
-    confirmButtonText: "View",
-    denyButtonText: "Edit",
-    cancelButtonText: "Remove",
-    backdrop: true,
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      router.push(`/dashboard/jobs/${row.id}`);
-    } else if (result.isDenied) {
-      router.push(`./update-jobs/${row.id}`);
-    } else if (result.isDismissed && result.dismiss === Swal.DismissReason.cancel) {
-      const deleteResult = await Swal.fire({
-        title: "Are you sure?",
-        text: "This action cannot be undone.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: "Yes, remove it!",
-      });
-
-      if (deleteResult.isConfirmed) {
-        try {
-          const jobRef = doc(db, "jobs", row.id);
-          await deleteDoc(jobRef);
-          Swal.fire("Deleted!", "The job has been removed.", "success");
-          // Optimized state updates
-          const updatedJobs = jobs.filter((job) => job.id !== row.id);
-          setJobs(updatedJobs);
-          setFilteredJobs(prevFiltered => 
-            prevFiltered.filter((job) => job.id !== row.id)
-          );
-        } catch (error) {
-          console.error("Delete error:", error);
-          Swal.fire(
-            "Error!",
-            "There was a problem removing the job.",
-            "error"
-          );
-        }
-      }
-    }
-  });
-};
 
 // Initial data fetch
 useEffect(() => {

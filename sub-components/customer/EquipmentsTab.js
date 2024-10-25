@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Spinner, Button, Modal, Form, InputGroup } from 'react-bootstrap';
-import { Search, Eye, FileText } from 'react-bootstrap-icons';
+import { Table, Spinner, Button, Modal, Form, InputGroup, Pagination, Container, Row, Col } from 'react-bootstrap';
+import { Search, Eye } from 'react-bootstrap-icons';
 
 const EquipmentsTab = ({ customerData }) => {
   const [equipments, setEquipments] = useState([]);
@@ -9,6 +9,8 @@ const EquipmentsTab = ({ customerData }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [equipmentsPerPage] = useState(10);
 
   useEffect(() => {
     const fetchEquipments = async () => {
@@ -54,6 +56,11 @@ const EquipmentsTab = ({ customerData }) => {
     )
   );
 
+  const indexOfLastEquipment = currentPage * equipmentsPerPage;
+  const indexOfFirstEquipment = indexOfLastEquipment - equipmentsPerPage;
+  const currentEquipments = filteredEquipments.slice(indexOfFirstEquipment, indexOfLastEquipment);
+  const totalPages = Math.ceil(filteredEquipments.length / equipmentsPerPage);
+
   const handleViewDetails = (equipment) => {
     setSelectedEquipment(equipment);
     setShowModal(true);
@@ -90,44 +97,87 @@ const EquipmentsTab = ({ customerData }) => {
   }
 
   return (
-    <div className="p-4">
+    <Container fluid>
       <h3 className="mb-4">Customer Equipment</h3>
-      <InputGroup className="mb-3">
-        <InputGroup.Text>
-          <Search />
-        </InputGroup.Text>
-        <Form.Control
-          placeholder="Search equipment..."
-          value={searchTerm}
-          onChange={handleSearch}
-        />
-      </InputGroup>
-      <Table striped bordered hover responsive>
-        <thead>
-          <tr>
-            <th>Item Code</th>
-            <th>Item Name</th>
-            <th>Serial No</th>
-            <th>Location</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredEquipments.map((item, index) => (
-            <tr key={index}>
-              <td>{item.ItemCode || 'N/A'}</td>
-              <td>{item.ItemName || 'N/A'}</td>
-              <td>{item.SerialNo || 'N/A'}</td>
-              <td>{item.EquipmentLocation || 'N/A'}</td>
-              <td>
-                <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(item)}>
-                  <Eye className="me-1" /> View Details
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+      <Row className="mb-3">
+        <Col md={6}>
+          <InputGroup>
+            <InputGroup.Text>
+              <Search />
+            </InputGroup.Text>
+            <Form.Control
+              placeholder="Search equipment..."
+              value={searchTerm}
+              onChange={handleSearch}
+            />
+          </InputGroup>
+        </Col>
+      </Row>
+      <Row>
+        <Col>
+          <div className="table-responsive">
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th>Serial No</th>
+                  <th>Location</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentEquipments.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.ItemCode || 'N/A'}</td>
+                    <td>{item.ItemName || 'N/A'}</td>
+                    <td>{item.SerialNo || 'N/A'}</td>
+                    <td>{item.EquipmentLocation || 'N/A'}</td>
+                    <td>
+                      <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(item)}>
+                        <Eye className="me-1" /> View Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </Col>
+      </Row>
+      {totalPages > 1 && (
+        <Row className="mt-3">
+          <Col>
+            <Pagination className="justify-content-center">
+              <Pagination.First 
+                onClick={() => setCurrentPage(1)} 
+                disabled={currentPage === 1}
+              />
+              <Pagination.Prev 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              />
+              {[...Array(totalPages).keys()].map((number) => (
+                <Pagination.Item
+                  key={number + 1}
+                  active={number + 1 === currentPage}
+                  onClick={() => setCurrentPage(number + 1)}
+                >
+                  {number + 1}
+                </Pagination.Item>
+              ))}
+              <Pagination.Next 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              />
+              <Pagination.Last 
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+              />
+            </Pagination>
+          </Col>
+        </Row>
+      )}
 
       <Modal show={showModal} onHide={handleCloseModal} size="lg">
         <Modal.Header closeButton>
@@ -154,7 +204,7 @@ const EquipmentsTab = ({ customerData }) => {
          
         </Modal.Footer>
       </Modal>
-    </div>
+    </Container>
   );
 };
 
