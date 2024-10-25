@@ -432,7 +432,7 @@ const AddNewJobs = () => {
   };
 
   const fetchCoordinates = async (locationName) => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const encodedLocation = encodeURIComponent(locationName);
 
     const response = await fetch(
