@@ -2,11 +2,12 @@ import React, { Fragment, useMemo, useState, useEffect, useCallback, useRef } fr
 import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
-import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill } from 'react-bootstrap-icons';
+import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill, CalendarRange } from 'react-bootstrap-icons';
 import { GeeksSEO, PageHeading } from 'widgets'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
+import moment from 'moment'; // Make sure to install and import moment.js for date calculations
 
 const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0) => {
   try {
@@ -232,20 +233,60 @@ const ViewCustomers = () => {
         </OverlayTrigger>
       )
     },
+
+    {
+      name: 'Contract Duration',
+      selector: row => row.U_ContractStartDate && row.U_ContractEndDate ? 
+        moment(row.U_ContractEndDate).diff(moment(row.U_ContractStartDate), 'months') : null,
+      sortable: true,
+      width: '180px',
+      cell: row => {
+        if (row.U_Contract !== 'Y' || !row.U_ContractStartDate || !row.U_ContractEndDate) {
+          return '-';
+        }
+        const startDate = moment(row.U_ContractStartDate);
+        const endDate = moment(row.U_ContractEndDate);
+        const now = moment();
+        const duration = moment.duration(endDate.diff(now));
+        const months = Math.floor(duration.asMonths());
+        const days = Math.floor(duration.asDays() % 30);
+        const hours = Math.floor(duration.asHours() % 24);
+        const minutes = Math.floor(duration.asMinutes() % 60);
+        
+        let durationText = '';
+        if (months > 0) {
+          durationText = `${months} month${months > 1 ? 's' : ''} left`;
+        } else if (days > 0) {
+          durationText = `${days} day${days > 1 ? 's' : ''} left`;
+        } else if (hours > 0) {
+          durationText = `${hours} hour${hours > 1 ? 's' : ''} left`;
+        } else {
+          durationText = `${minutes} minute${minutes > 1 ? 's' : ''} left`;
+        }
+        
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip id={`tooltip-duration-${row.CardCode}`}>
+              Start: {startDate.format('DD/MM/YYYY')}
+              <br />
+              End: {endDate.format('DD/MM/YYYY')}
+            </Tooltip>}
+          >
+            <span>
+              <CalendarRange className="me-2" />
+              {durationText}
+            </span>
+          </OverlayTrigger>
+        );
+      }
+    },
+    
     { 
-      name: (
-        <OverlayTrigger
-          placement="top"
-          overlay={<Tooltip id="tooltip-contract-column">
-            Indicates whether this customer has a contract with us
-          </Tooltip>}
-        >
-          <span>Contract Customer</span>
-        </OverlayTrigger>
-      ),
-      selector: row => row.U_Contract, 
-      sortable: true, 
-      width: '100px',
+      name: 'Contract',
+      selector: row => row.U_Contract,
+      sortable: true,
+      width: '120px',
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -262,6 +303,7 @@ const ViewCustomers = () => {
         </OverlayTrigger>
       )
     },
+   
     
     { 
       name: 'Actions',
