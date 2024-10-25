@@ -336,8 +336,8 @@ const AddNewJobs = () => {
       // Set the formatted data in state
       setCustomers(formattedOptions);
 
-      // Update the toast to show success
-      toast.success("Customers fetched successfully");
+      // Remove this toast notification
+      // toast.success("Customers fetched successfully");
     } catch (error) {
       console.error("Error fetching customers:", error);
       setCustomers([]);
@@ -353,7 +353,11 @@ const AddNewJobs = () => {
 
   useEffect(() => {
     fetchSchedulingWindows();
-    fetchCustomers();
+    fetchCustomers().then(() => {
+      if (customers.length > 0) {
+        toast.success("Customers fetched successfully");
+      }
+    });
   }, []);
 
   useEffect(() => {

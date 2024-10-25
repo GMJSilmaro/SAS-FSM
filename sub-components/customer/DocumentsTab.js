@@ -1,60 +1,98 @@
-import React from 'react';
-import { Row, Col, Table, Button, Badge } from 'react-bootstrap';
-import { FileText, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Row, Col, Table, Button, Badge, Form, Modal, Spinner, ProgressBar } from 'react-bootstrap';
+import { FileText, Download, Upload } from 'lucide-react';
+import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from 'firebase/storage';
+import { toast } from 'react-toastify';
+import { db } from '../../firebase';
 
 export const DocumentsTab = ({ customerData }) => {
-  // Sample documents data
-  const sampleDocuments = [
-    {
-      id: 1,
-      name: 'Service Agreement Contract',
-      type: 'PDF',
-      uploadDate: '2024-03-15',
-      size: '2.4 MB',
-      status: 'Active',
-      url: '#'
-    },
-    {
-      id: 2,
-      name: 'Warranty Certificate',
-      type: 'PDF',
-      uploadDate: '2024-03-10',
-      size: '1.1 MB',
-      status: 'Active',
-      url: '#'
-    },
-    {
-      id: 3,
-      name: 'Equipment Installation Report',
-      type: 'PDF',
-      uploadDate: '2024-02-28',
-      size: '3.8 MB',
-      status: 'Active',
-      url: '#'
-    },
-    {
-      id: 4,
-      name: 'Maintenance Schedule 2024',
-      type: 'XLSX',
-      uploadDate: '2024-01-15',
-      size: '856 KB',
-      status: 'Active',
-      url: '#'
-    },
-    {
-      id: 5,
-      name: 'Product Specifications',
-      type: 'PDF',
-      uploadDate: '2024-01-10',
-      size: '1.5 MB',
-      status: 'Active',
-      url: '#'
+  const [documents, setDocuments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
+
+  const storage = getStorage();
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, `customers/${customerData.CardCode}/documents`));
+      const docs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setDocuments(docs);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      toast.error('Failed to fetch documents');
     }
-  ];
+  };
+
+  const handleUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setShowUploadModal(true);
+    setUploadProgress(0);
+
+    try {
+      const storageRef = ref(storage, `customers/${customerData.CardCode}/documents/${file.name}`);
+      
+      // Use uploadBytesResumable to track upload progress
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => {
+          console.error('Error uploading document:', error);
+          toast.error('Failed to upload document');
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+
+          const docData = {
+            name: file.name,
+            type: file.name.split('.').pop().toUpperCase(),
+            uploadDate: new Date().toISOString(),
+            size: `${(file.size / 1024).toFixed(2)} KB`,
+            url: downloadURL
+          };
+
+          await addDoc(collection(db, `customers/${customerData.CardCode}/documents`), docData);
+          toast.success('Document uploaded successfully');
+          fetchDocuments();
+          setShowUploadModal(false);
+        }
+      );
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      toast.error('Failed to upload document');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleDownload = (documentUrl) => {
-    // Implement document download logic here
-    console.log('Downloading document:', documentUrl);
+    window.open(documentUrl, '_blank');
+  };
+
+  const handleDelete = async (docId, fileName) => {
+    try {
+      await deleteDoc(doc(db, `customers/${customerData.CardCode}/documents`, docId));
+      const storageRef = ref(storage, `customers/${customerData.CardCode}/documents/${fileName}`);
+      await deleteObject(storageRef);
+      toast.success('Document deleted successfully');
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error('Failed to delete document');
+    }
   };
 
   const getTypeColor = (type) => {
@@ -69,12 +107,32 @@ export const DocumentsTab = ({ customerData }) => {
     return colors[type] || 'secondary';
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current.click();
+  };
+
   return (
     <Row className="p-4">
       <Col>
-        <div className="d-flex align-items-center mb-4">
-          <FileText size={24} className="me-2" />
-          <h3 className="mb-0">Customer Documents</h3>
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div className="d-flex align-items-center">
+            <FileText size={24} className="me-2" />
+            <h3 className="mb-0">Customer Documents</h3>
+          </div>
+          <Button
+            variant="primary"
+            onClick={handleUploadClick}
+            disabled={uploading}
+          >
+            <Upload size={14} className="me-2" />
+            Upload Document
+          </Button>
+          <Form.Control
+            type="file"
+            ref={fileInputRef}
+            className="d-none"
+            onChange={handleUpload}
+          />
         </div>
         <Table striped bordered hover responsive>
           <thead>
@@ -83,11 +141,11 @@ export const DocumentsTab = ({ customerData }) => {
               <th style={{ width: '100px' }}>Type</th>
               <th style={{ width: '150px' }}>Upload Date</th>
               <th style={{ width: '100px' }}>Size</th>
-              <th style={{ width: '100px' }}>Action</th>
+              <th style={{ width: '200px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {sampleDocuments.map((doc) => (
+            {documents.map((doc) => (
               <tr key={doc.id}>
                 <td>
                   <div className="fw-medium">{doc.name}</div>
@@ -102,10 +160,17 @@ export const DocumentsTab = ({ customerData }) => {
                     variant="outline-primary" 
                     size="sm" 
                     onClick={() => handleDownload(doc.url)}
-                    className="d-flex align-items-center gap-2"
+                    className="me-2"
                   >
-                    <Download size={14} />
-                    <span>Download</span>
+                    <Download size={14} className="me-1" />
+                    Download
+                  </Button>
+                  <Button 
+                    variant="outline-danger" 
+                    size="sm" 
+                    onClick={() => handleDelete(doc.id, doc.name)}
+                  >
+                    Delete
                   </Button>
                 </td>
               </tr>
@@ -113,6 +178,16 @@ export const DocumentsTab = ({ customerData }) => {
           </tbody>
         </Table>
       </Col>
+      
+      {/* Upload Modal */}
+      <Modal show={showUploadModal} centered backdrop="static" keyboard={false}>
+        <Modal.Body className="text-center">
+          <h4>Uploading Document</h4>
+          <Spinner animation="border" role="status" className="my-3" />
+          <p>Please wait while your document is being uploaded...</p>
+          <ProgressBar now={uploadProgress} label={`${Math.round(uploadProgress)}%`} className="mt-3" />
+        </Modal.Body>
+      </Modal>
     </Row>
   );
 };

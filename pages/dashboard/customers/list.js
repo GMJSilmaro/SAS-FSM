@@ -1,9 +1,12 @@
-import React, { Fragment, useMemo, useState, useEffect, useCallback } from 'react';
+import React, { Fragment, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
 import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill } from 'react-bootstrap-icons';
 import { GeeksSEO, PageHeading } from 'widgets'
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 const fetchCustomers = async (page = 1, limit = 10, search = '', retryCount = 0) => {
   try {
@@ -78,6 +81,7 @@ const ViewCustomers = () => {
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const router = useRouter();
+  const initialLoadDone = useRef(false);
 
   const loadData = useCallback(async (page, searchTerm = '') => {
     setLoading(true);
@@ -86,10 +90,17 @@ const ViewCustomers = () => {
       const { customers, totalCount } = await fetchCustomers(page, perPage, searchTerm);
       setData(customers);
       setTotalRows(totalCount);
+      if (customers.length > 0 && !initialLoadDone.current) {
+        toast.success(`Successfully loaded ${customers.length} customers`);
+        initialLoadDone.current = true;
+      } else if (customers.length === 0) {
+        toast.info('No customers found');
+      }
     } catch (err) {
       setError(err.message);
       setData([]);
       setTotalRows(0);
+      toast.error(`Error loading customers: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -103,6 +114,9 @@ const ViewCustomers = () => {
     const delayDebounceFn = setTimeout(() => {
       setCurrentPage(1);
       loadData(1, search);
+      if (search) {
+        toast.info(`Searching for "${search}"...`);
+      }
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
@@ -128,6 +142,9 @@ const ViewCustomers = () => {
   };
 
   const handleViewDetails = (customer) => {
+    // Store the customer name in localStorage
+    localStorage.setItem('viewCustomerToast', customer.CardName);
+    // Navigate to the customer details page
     router.push(`/dashboard/customers/${customer.CardCode}`);
   };
 
@@ -364,6 +381,7 @@ const ViewCustomers = () => {
           </Card>
         </Col>
       </Row>
+      <ToastContainer position="top-right" autoClose={3000} />
     </Fragment>
   );
 };

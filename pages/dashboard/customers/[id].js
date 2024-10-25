@@ -7,7 +7,8 @@ import {
   Tabs,
   Tab,
   Breadcrumb,
-  Button
+  Button,
+  Spinner
 } from 'react-bootstrap';
 import { useRouter } from 'next/router';
 import { GeeksSEO } from 'widgets';
@@ -16,6 +17,9 @@ import { ServiceLocationTab } from 'sub-components/customer/ServiceLocationTab';
 import EquipmentsTab from 'sub-components/customer/EquipmentsTab';
 import { DocumentsTab } from 'sub-components/customer/DocumentsTab';
 import { HistoryTab } from 'sub-components/customer/HistoryTab';
+import { NotesTab } from 'sub-components/customer/NotesTab';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ViewCustomer = () => {
   const [activeTab, setActiveTab] = useState('accountInfo');
@@ -24,42 +28,45 @@ const ViewCustomer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
-  const { id } = router.query; // This will be the CardCode
-
+  const { id } = router.query;
+  
   useEffect(() => {
     const fetchCustomerData = async () => {
-      if (id) {
-        try {
-          setLoading(true);
-          // Fetch customer data
-          const response = await fetch(`/api/getCustomerCode?cardCode=${id}`);
-          if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(`Failed to fetch customer details: ${errorData}`);
-          }
-          const customerInfo = await response.json();
-          setCustomerData(customerInfo);
+      if (!id) return;
 
-          // Fetch equipment data
-          const equipmentResponse = await fetch('/api/getEquipments', {
+      setLoading(true);
+      try {
+        const [customerResponse, equipmentResponse] = await Promise.all([
+          fetch(`/api/getCustomerCode?cardCode=${id}`),
+          fetch('/api/getEquipments', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              cardCode: id
-            })
-          });
-          if (equipmentResponse.ok) {
-            const equipmentData = await equipmentResponse.json();
-            setEquipments(equipmentData);
-          }
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          setError(error.message || 'Failed to load data.');
-        } finally {
-          setLoading(false);
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cardCode: id })
+          })
+        ]);
+
+        if (!customerResponse.ok) {
+          throw new Error(`Failed to fetch customer details: ${await customerResponse.text()}`);
         }
+
+        const [customerInfo, equipmentData] = await Promise.all([
+          customerResponse.json(),
+          equipmentResponse.ok ? equipmentResponse.json() : []
+        ]);
+
+        setCustomerData(customerInfo);
+        setEquipments(equipmentData);
+
+        const customerName = localStorage.getItem('viewCustomerToast');
+        if (customerName) {
+          toast.info(`Viewing details for ${customerName}`);
+          localStorage.removeItem('viewCustomerToast');
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError(error.message || 'Failed to load data.');
+      } finally {
+        setLoading(false);
       }
     };
   
@@ -75,19 +82,63 @@ const ViewCustomer = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <Container className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+        <Row>
+          <Col className="text-center">
+            <Spinner animation="border" role="status" variant="primary" style={{ width: '3rem', height: '3rem' }}>
+              <span className="visually-hidden">Loading...</span>
+            </Spinner>
+            <p className="mt-3">Loading customer data...</p>
+          </Col>
+        </Row>
+      </Container>
+    );
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <Container className="mt-5">
+        <Row>
+          <Col>
+            <Card className="text-center">
+              <Card.Body>
+                <Card.Title className="text-danger">Error</Card.Title>
+                <Card.Text>{error}</Card.Text>
+                <Button variant="primary" onClick={() => router.push('/dashboard/customers/list')}>
+                  Back to Customers List
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    );
   }
 
   if (!customerData) {
-    return <div>No customer data found.</div>;
+    return (
+      <Container className="mt-5">
+        <Row>
+          <Col>
+            <Card className="text-center">
+              <Card.Body>
+                <Card.Title>No Data Found</Card.Title>
+                <Card.Text>No customer data found for the given ID.</Card.Text>
+                <Button variant="primary" onClick={() => router.push('/dashboard/customers/list')}>
+                  Back to Customers List
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    );
   }
 
   return (
     <Container>
+      <ToastContainer position="top-right" autoClose={3000} />
       <GeeksSEO title={`View Customer: ${customerData.cardName || ''} | FSM Portal`} />
       <Row>
         <Col lg={12} md={12} sm={12}>
@@ -128,6 +179,9 @@ const ViewCustomer = () => {
                 </Tab>
                 <Tab eventKey="history" title="History">
                   <HistoryTab customerData={customerData} />
+                </Tab>
+                <Tab eventKey="notes" title="Notes">
+                  <NotesTab customerId={id} />
                 </Tab>
               </Tabs>
             </Card.Body>

@@ -38,6 +38,13 @@ const ViewJobs = () => {
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
+   // Add new state for pagination
+   const [currentPage, setCurrentPage] = useState(1);
+   const [jobsPerPage] = useState(10);
+   const [usersData, setUsersData] = useState([]);
+   const [lastFetchTime, setLastFetchTime] = useState(null);
+   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
   // Custom Styles for DataTable
   const customStyles = {
     headCells: {
@@ -124,52 +131,6 @@ const ViewJobs = () => {
     const ampm = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12;
     return `${formattedHour}:${minutes} ${ampm}`;
-  };
-
-  const handleRowClick = (row) => {
-    Swal.fire({
-      title: "Choose an action",
-      text: "Do you want to view, edit, or remove this job?",
-      icon: "question",
-      showCancelButton: true,
-      showDenyButton: true,
-      confirmButtonText: "View",
-      denyButtonText: "Edit",
-      cancelButtonText: "Remove",
-      backdrop: true,
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        router.push(`/dashboard/jobs/${row.id}`);
-      } else if (result.isDenied) {
-        router.push(`./update-jobs/${row.id}`);
-      } else if (result.isDismissed) {
-        const deleteResult = await Swal.fire({
-          title: "Are you sure?",
-          text: "This action cannot be undone.",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonColor: "#d33",
-          cancelButtonColor: "#3085d6",
-          confirmButtonText: "Yes, remove it!",
-        });
-
-        if (deleteResult.isConfirmed) {
-          try {
-            const jobRef = doc(db, "jobs", row.id);
-            await deleteDoc(jobRef);
-            Swal.fire("Deleted!", "The job has been removed.", "success");
-            setJobs(jobs.filter((job) => job.id !== row.id));
-            setFilteredJobs(filteredJobs.filter((job) => job.id !== row.id));
-          } catch (error) {
-            Swal.fire(
-              "Error!",
-              "There was a problem removing the job.",
-              "error"
-            );
-          }
-        }
-      }
-    });
   };
 
   const ActionMenu = ({ jobId }) => {
@@ -283,6 +244,11 @@ const ViewJobs = () => {
     );
   };
 
+   // Add memoized users data
+   const memoizedUsersData = useMemo(() => {
+    return usersData;
+  }, [usersData]);
+
   const columns = [
     {
       name: "",
@@ -368,86 +334,142 @@ const ViewJobs = () => {
     },
   ];
 
-  useEffect(() => {
-    const fetchJobs = async () => {
-      const jobsSnapshot = await getDocs(collection(db, "jobs"));
+// Optimized fetch function with caching
+const fetchData = async () => {
+  try {
+    setLoading(true);
+
+    // Check if we have recent users data
+    const shouldFetchUsers = !lastFetchTime || (Date.now() - lastFetchTime) > CACHE_DURATION;
+
+    let users = usersData;
+    if (shouldFetchUsers) {
       const usersSnapshot = await getDocs(collection(db, "users"));
-
-      const jobsData = jobsSnapshot.docs.map((doc) => ({
+      users = usersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+      setUsersData(users);
+      setLastFetchTime(Date.now());
+    }
 
-      const usersData = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+    // Always fetch jobs as they might change more frequently
+    const jobsSnapshot = await getDocs(collection(db, "jobs"));
+    const jobsData = jobsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-      const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
+    const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
 
-      const mergedData = sortedJobsData.map((job) => {
-        console.log("Job:", job);
-        const workerNames = job.assignedWorkers
-          .map((workerObj) => {
-            const workerId = workerObj.workerId;
-            const worker = usersData.find((user) => user.workerId === workerId);
-            return worker
-              ? `${worker.fullName}`
-              : `Unknown Worker (ID: ${workerId})`;
-          })
-          .join(", ");
+    const mergedData = sortedJobsData.map((job) => {
+      const workerNames = job.assignedWorkers
+        .map((workerObj) => {
+          const workerId = workerObj.workerId;
+          const worker = users.find((user) => user.workerId === workerId);
+          return worker
+            ? `${worker.fullName}`
+            : `Unknown Worker (ID: ${workerId})`;
+        })
+        .join(", ");
 
-        return {
-          ...job,
-          workerFullName: workerNames || "No workers assigned",
-          locationName: job.location?.locationName || "No location name",
-        };
-      });
+      return {
+        ...job,
+        workerFullName: workerNames || "No workers assigned",
+        locationName: job.location?.locationName || "No location name",
+      };
+    });
 
-      setJobs(mergedData);
-      setFilteredJobs(mergedData);
-      setLoading(false);
-    };
+    setJobs(mergedData);
+    setFilteredJobs(mergedData);
+  } catch (error) {
+    console.error("Error fetching data:", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
-    fetchJobs();
-  }, []);
-
-  useEffect(() => {
+// Optimized search with debouncing
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
     if (!search.trim()) {
       setFilteredJobs(jobs);
       return;
     }
 
     const searchLower = search.toLowerCase().trim();
+    const searchableFields = ['jobNo', 'jobName', 'customerName', 'locationName', 
+                            'jobStatus', 'priority', 'workerFullName'];
 
     const result = jobs.filter((job) => {
-      const isMatch = (value) => {
-        if (value == null) return false;
-
-        if (typeof value === "string") {
-          return value.toLowerCase().includes(searchLower);
-        }
-
-        if (typeof value === "number") {
-          return value.toString().includes(searchLower);
-        }
-
-        if (value instanceof Date) {
-          return value.toLocaleDateString().toLowerCase().includes(searchLower);
-        }
-
-        if (typeof value === "object") {
-          return Object.values(value).some(isMatch);
-        }
-
-        return false;
-      };
-
-      return Object.values(job).some(isMatch);
+      return searchableFields.some(field => {
+        const value = job[field];
+        if (!value) return false;
+        return value.toString().toLowerCase().includes(searchLower);
+      });
     });
 
     setFilteredJobs(result);
-  }, [search, jobs]);
+  }, 300); // 300ms debounce delay
+
+  return () => clearTimeout(debounceTimeout);
+}, [search, jobs]);
+
+const handleRowClick = (row) => {
+  Swal.fire({
+    title: "Choose an action",
+    text: "Do you want to view, edit, or remove this job?",
+    icon: "question",
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: "View",
+    denyButtonText: "Edit",
+    cancelButtonText: "Remove",
+    backdrop: true,
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      router.push(`/dashboard/jobs/${row.id}`);
+    } else if (result.isDenied) {
+      router.push(`./update-jobs/${row.id}`);
+    } else if (result.isDismissed && result.dismiss === Swal.DismissReason.cancel) {
+      const deleteResult = await Swal.fire({
+        title: "Are you sure?",
+        text: "This action cannot be undone.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, remove it!",
+      });
+
+      if (deleteResult.isConfirmed) {
+        try {
+          const jobRef = doc(db, "jobs", row.id);
+          await deleteDoc(jobRef);
+          Swal.fire("Deleted!", "The job has been removed.", "success");
+          // Optimized state updates
+          const updatedJobs = jobs.filter((job) => job.id !== row.id);
+          setJobs(updatedJobs);
+          setFilteredJobs(prevFiltered => 
+            prevFiltered.filter((job) => job.id !== row.id)
+          );
+        } catch (error) {
+          console.error("Delete error:", error);
+          Swal.fire(
+            "Error!",
+            "There was a problem removing the job.",
+            "error"
+          );
+        }
+      }
+    }
+  });
+};
+
+// Initial data fetch
+useEffect(() => {
+  fetchData();
+}, []);
 
   const subHeaderComponentMemo = useMemo(
     () => (
@@ -492,17 +514,18 @@ const ViewJobs = () => {
         <Col md={12}>
           <Card>
             <Card.Body className="px-0">
-              <DataTable
-                customStyles={customStyles}
-                columns={columns}
-                data={filteredJobs}
-                pagination
-                highlightOnHover
-                subHeader
-                subHeaderComponent={subHeaderComponentMemo}
-                paginationRowsPerPageOptions={[5, 10, 15, 20, 25, 50]}
-                onRowClicked={handleRowClick}
-              />
+            <DataTable
+        customStyles={customStyles}
+        columns={columns}
+        data={filteredJobs}
+        pagination
+        highlightOnHover
+        subHeader
+        subHeaderComponent={subHeaderComponentMemo}
+        paginationRowsPerPageOptions={[5, 10, 15, 20, 25, 50]}
+        onRowClicked={handleRowClick}
+        progressPending={loading}
+      />
             </Card.Body>
           </Card>
         </Col>

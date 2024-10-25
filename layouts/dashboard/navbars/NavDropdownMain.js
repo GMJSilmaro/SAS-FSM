@@ -56,6 +56,7 @@ const NavDropdownMain = (props) => {
 						{item.menuitem} {item.badge && renderBadge(item.badge)}
 					</span>
 				}
+				show
 			>
 				{item.children.map((submenu) => {
 					if (submenu.header) {
@@ -76,6 +77,7 @@ const NavDropdownMain = (props) => {
 								key={submenu.id}
 								bsPrefix="dropdown-item d-block"
 								className="dropdown-submenu dropend py-0"
+								show
 							>
 								{submenu.children.map((subItem) =>
 									subItem.header ? (
@@ -130,12 +132,7 @@ const NavDropdownMain = (props) => {
 						} else {
 							return (
 								<NavDropdown
-									title={
-										<span>
-											{renderIcon(submenu.icon)}
-											{submenu.menuitem}
-										</span>
-									}
+									title={submenu.menuitem}
 									key={submenuindex}
 									bsPrefix="dropdown-item d-block"
 									className={`dropdown-submenu dropend py-0 `}
@@ -175,9 +172,8 @@ const NavDropdownMain = (props) => {
 															className="btn-sm btn-primary dropdown-item"
 															onClick={(expandedMenu) => onClick(!expandedMenu)}>
 															{/* Third Level menu item */}
-															{renderIcon(submenuitem.icon)}
 															{submenuitem.menuitem}
-															{submenuitem.badge && renderBadge(submenuitem.badge)}
+                              {submenu.badge && renderBadge(submenu.badge)}
 														</NavDropdown.Item>
 													)}
 												</Fragment>
@@ -194,6 +190,7 @@ const NavDropdownMain = (props) => {
 	}
 	return (
 		<Fragment>
+			{/* There is only one setting between NavbarDesktop and NavbarMobile component i.e. show property used with <NavDropdown show> tag */}
 			{hasMounted && isDesktop ? <NavbarDesktop /> : <NavbarMobile />}
 		</Fragment>
 	);
