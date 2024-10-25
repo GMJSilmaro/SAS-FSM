@@ -24,6 +24,7 @@ const WorkersListItems = () => {
   const [filteredWorkers, setFilteredWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [isEditing, setIsEditing] = useState(false); // Add this state
 
   useEffect(() => {
     const fetchWorkers = async () => {
@@ -124,9 +125,11 @@ const WorkersListItems = () => {
           Swal.close();
           router.push(`/dashboard/workers/${row.id}`);
         });
-        document.getElementById('editBtn').addEventListener('click', () => {
+        document.getElementById('editBtn').addEventListener('click', async () => {
+          setIsEditing(true); // Ensure this is called
           Swal.close();
-          router.push(`/dashboard/workers/${row.id}`);
+          await router.push(`/dashboard/workers/${row.id}`);
+          setIsEditing(false); // Ensure this is called
         });
         document.getElementById('removeBtn').addEventListener('click', () => {
           Swal.close();
@@ -435,6 +438,11 @@ const WorkersListItems = () => {
 
   return (
     <Fragment>
+      {isEditing && (
+        <div className="loading-overlay">
+          <Spinner animation="border" variant="primary" />
+        </div>
+      )}
       <Row>
         <Col md={12} xs={12} className="mb-5">
           <Card className="border-0 shadow-sm">
@@ -449,8 +457,8 @@ const WorkersListItems = () => {
                   columns={columns}
                   data={filteredWorkers}
                   pagination
-                  highlightOnHover
-                  pointerOnHover
+                 // highlightOnHover
+                 // pointerOnHover
                   onRowClicked={(row) => handleRowClick(row)}
                   customStyles={customStyles}
                   subHeader
@@ -474,6 +482,20 @@ const WorkersListItems = () => {
         </Col>
       </Row>
       <ToastContainer />
+      <style jsx>{`
+        .loading-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.8);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+        }
+      `}</style>
     </Fragment>
   );
 };

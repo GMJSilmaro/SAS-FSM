@@ -35,6 +35,7 @@ const ViewJobs = () => {
   const [usersData, setUsersData] = useState([]);
   const [lastFetchTime, setLastFetchTime] = useState(null);
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const [editLoading, setEditLoading] = useState(false); // New state for edit loading
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -501,13 +502,19 @@ const ViewJobs = () => {
       },
       didOpen: () => {
         document.getElementById('viewBtn').addEventListener('click', () => {
+          setEditLoading(true); // Set loading state
           Swal.close();
-          router.push(`/dashboard/jobs/${row.id}`);
+          router.push(`/dashboard/jobs/${row.id}`).finally(() => {
+            setEditLoading(false); // Reset loading state after navigation
+          });
         });
   
         document.getElementById('editBtn').addEventListener('click', () => {
+          setEditLoading(true); // Set loading state
           Swal.close();
-          router.push(`./update-jobs/${row.id}`);
+          router.push(`./update-jobs/${row.id}`).finally(() => {
+            setEditLoading(false); // Reset loading state after navigation
+          });
         });
   
         document.getElementById('removeBtn').addEventListener('click', async () => {
@@ -586,6 +593,12 @@ const ViewJobs = () => {
 
   return (
     <Fragment>
+      {editLoading && (
+        <div className="loading-overlay">
+          <Spinner animation="border" variant="primary" />
+          <span className="text-muted ms-2">Redirecting to edit page...</span>
+        </div>
+      )}
       <GeeksSEO title="Job Lists | SAS - SAP B1 Portal" />
 
       <Row>
@@ -622,8 +635,8 @@ const ViewJobs = () => {
                   columns={columns}
                   data={filteredJobs}
                   pagination
-                  highlightOnHover
-                  pointerOnHover
+                 // highlightOnHover
+                 // pointerOnHover
                   onRowClicked={(row) => handleRowClick(row)}
                   customStyles={customStyles}
                   subHeader
@@ -646,6 +659,20 @@ const ViewJobs = () => {
           </Card>
         </Col>
       </Row>
+      <style jsx>{`
+        .loading-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.8);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+        }
+      `}</style>
     </Fragment>
   );
 };

@@ -31,7 +31,7 @@ import {
   FileText,
   QuestionCircle,
 } from "react-bootstrap-icons";
-import { LoadScript, GoogleMap, Marker } from "@react-google-maps/api"; // Google Map import
+import { GoogleMap, Marker, useLoadScript } from "@react-google-maps/api"; // Google Map import
 
 import {
   GridComponent,
@@ -61,26 +61,45 @@ const fetchWorkerDetails = async (workerIds) => {
 
 // Modified geocodeAddress function
 const geocodeAddress = async (address, jobId) => {
-  // Check if coordinates are already cached in the job document
-  const jobDoc = await getDoc(doc(db, "jobs", jobId));
-  const jobData = jobDoc.data();
-  
-  if (jobData.cachedCoordinates) {
-    return jobData.cachedCoordinates;
-  }
+  try {
+    // Check if coordinates are already cached
+    const jobDoc = await getDoc(doc(db, "jobs", jobId));
+    const jobData = jobDoc.data();
+    
+    if (jobData?.cachedCoordinates) {
+      return jobData.cachedCoordinates;
+    }
 
-  const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`);
-  const data = await response.json();
-  if (data.results && data.results.length > 0) {
-    const { lat, lng } = data.results[0].geometry.location;
-    const coordinates = { lat, lng };
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+    );
     
-    // Cache the coordinates in the job document
-    await setDoc(doc(db, "jobs", jobId), { cachedCoordinates: coordinates }, { merge: true });
+    if (!response.ok) {
+      throw new Error(`Geocoding failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
     
-    return coordinates;
+    if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
+      const { lat, lng } = data.results[0].geometry.location;
+      const coordinates = { lat, lng };
+      
+      // Cache the coordinates
+      await setDoc(
+        doc(db, "jobs", jobId), 
+        { cachedCoordinates: coordinates }, 
+        { merge: true }
+      );
+      
+      return coordinates;
+    } else {
+      console.error('Geocoding response error:', data.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return null;
   }
-  return null;
 };
 
 const JobDetails = () => {
@@ -98,6 +117,12 @@ const JobDetails = () => {
   const [mapError, setMapError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [mapKey, setMapKey] = useState(0); // Add this line
+  const [isMapScriptLoaded, setIsMapScriptLoaded] = useState(false);
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    // Add this to ensure the Google Maps script is loaded before using it
+    libraries: ['places']
+  });
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -371,23 +396,53 @@ const JobDetails = () => {
   };
 
   const renderMap = () => {
-    if (!location) {
-      return <p>No location data available for this job.</p>;
+    if (!isLoaded) {
+      return (
+        <div className="d-flex justify-content-center align-items-center" style={{ height: "350px" }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading map...</span>
+          </div>
+        </div>
+      );
     }
 
+    if (loadError) {
+      return (
+        <div className="alert alert-danger" role="alert">
+          Error loading Google Maps. Please check your API key and try again.
+        </div>
+      );
+    }
+
+    if (!location) {
+      return (
+        <div className="alert alert-warning" role="alert">
+          No location data available for this job.
+        </div>
+      );
+    }
+
+    const mapOptions = {
+      zoom: 15,
+      center: location,
+      mapTypeControl: true,
+      streetViewControl: true,
+      fullscreenControl: true
+    };
+
     return (
-      <LoadScript
-        googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-        key={mapKey} // Add this line
-      >
+      <div style={{ height: "350px", width: "100%" }}>
         <GoogleMap
-          mapContainerStyle={{ width: "100%", height: "350px" }}
-          center={location}
-          zoom={15}
+          key={mapKey}
+          mapContainerStyle={{ width: "100%", height: "100%" }}
+          options={mapOptions}
         >
-          <Marker position={location} />
+          <Marker 
+            position={location}
+            title={job.location?.address?.streetAddress || "Job Location"}
+          />
         </GoogleMap>
-      </LoadScript>
+      </div>
     );
   };
 
@@ -419,7 +474,7 @@ const JobDetails = () => {
                 ${job.location?.address?.postalCode || ""}`}
             </p>
 
-            {renderMap()}
+            {/* Remove the renderMap() call from here */}
           </>
         );
       case "equipment":
@@ -596,8 +651,11 @@ const JobDetails = () => {
       <Row>
         <Col xl={6} xs={12} className="mb-4">
           <Card>
-            <Card.Body>{renderTabContent()}</Card.Body>
-            
+            <Card.Body>
+              {renderTabContent()}
+              {/* Move the renderMap() call here, outside of the tab content */}
+              {activeTab === "overview" && renderMap()}
+            </Card.Body>
           </Card>
         </Col>
 
