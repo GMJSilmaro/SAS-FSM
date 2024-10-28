@@ -65,9 +65,15 @@ const debounce = (func, delay) => {
   };
 };
 
-// Update FilterPanel component definition to accept loadData and searchTerm props
+
 const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTerm }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleClear = () => {
+    onClear();
+    // After clearing filters, automatically load default data
+    loadData(1, searchTerm);
+  };
 
   return (
     <Card className="border-0 shadow-sm mb-4">
@@ -75,7 +81,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
         <div className="d-flex justify-content-between align-items-center mb-2">
           <OverlayTrigger
             placement="right"
-            overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} filter panel</Tooltip>}
+            overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} search for customers</Tooltip>}
           >
             <div 
               className="d-flex align-items-center" 
@@ -83,7 +89,24 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
               onClick={() => setIsExpanded(!isExpanded)}
             >
               <Filter size={16} className="me-2 text-primary" />
-              <h6 className="mb-0 me-2">Find</h6>
+              <h6 className="mb-0 me-2" style={{ fontSize: '1rem' }}>
+                Filter
+                {/* Add active filters count */}
+                {Object.values(filters).filter(value => value !== '').length > 0 && (
+                  <Badge 
+                    bg="primary" 
+                    className="ms-2" 
+                    style={{ 
+                      fontSize: '0.75rem', 
+                      verticalAlign: 'middle',
+                      borderRadius: '12px',
+                      padding: '0.25em 0.6em'
+                    }}
+                  >
+                    {Object.values(filters).filter(value => value !== '').length}
+                  </Badge>
+                )}
+              </h6>
               {isExpanded ? (
                 <ChevronUp size={16} className="text-muted" />
               ) : (
@@ -92,25 +115,20 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
             </div>
           </OverlayTrigger>
           <div>
-            <OverlayTrigger
-              placement="top"
-              overlay={<Tooltip>Clear all filters</Tooltip>}
-            >
+           
               <Button 
                 variant="outline-danger" 
                 size="sm"
-                onClick={onClear}
+                onClick={handleClear}
                 className="me-2"
                 disabled={loading}
+                style={{ fontSize: '0.9rem' }}
               >
                 <X size={14} className="me-1" />
                 Clear
               </Button>
-            </OverlayTrigger>
-            <OverlayTrigger
-              placement="top"
-              overlay={<Tooltip>Apply filters</Tooltip>}
-            >
+           
+          
               <Button 
                 variant="primary" 
                 size="sm"
@@ -120,7 +138,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                 <Search size={14} className="me-1" />
                 Search
               </Button>
-            </OverlayTrigger>
+           
           </div>
         </div>
         <div style={{ 
@@ -132,81 +150,144 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
           <Row>
             <Col md={6}>
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1">Customer Code:</Form.Label>
-                <Form.Control
-                  size="sm"
-                  type="text"
-                  value={filters.customerCode}
-                  onChange={(e) => setFilters(prev => ({ ...prev, customerCode: e.target.value }))}
-                />
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Customer Code:</Form.Label>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Enter the unique customer code (e.g. C0001)</Tooltip>}
+                >
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    value={filters.customerCode}
+                    onChange={(e) => setFilters(prev => ({ ...prev, customerCode: e.target.value }))}
+                    placeholder="Enter customer code..."
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  />
+                </OverlayTrigger>
               </Form.Group>
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1">Customer Name:</Form.Label>
-                <Form.Control
-                  size="sm"
-                  type="text"
-                  value={filters.customerName}
-                  onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
-                />
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Customer Name:</Form.Label>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Enter full or partial customer name</Tooltip>}
+                >
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    value={filters.customerName}
+                    onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
+                    placeholder="Search by customer name..."
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  />
+                </OverlayTrigger>
               </Form.Group>
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1">Email:</Form.Label>
-                <Form.Control
-                  size="sm"
-                  type="email"
-                  value={filters.email}
-                  onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
-                />
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Email:</Form.Label>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Enter customer's email address</Tooltip>}
+                >
+                  <Form.Control
+                    size="sm"
+                    type="email"
+                    value={filters.email}
+                    onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="Search by email address..."
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  />
+                </OverlayTrigger>
               </Form.Group>
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1">Phone:</Form.Label>
-                <Form.Control
-                  size="sm"
-                  type="text"
-                  value={filters.phone}
-                  onChange={(e) => setFilters(prev => ({ ...prev, phone: e.target.value }))}
-                />
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Phone:</Form.Label>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Enter phone number (e.g. +65 1234 5678)</Tooltip>}
+                >
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    value={filters.phone}
+                    onChange={(e) => setFilters(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Search by phone number..."
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  />
+                </OverlayTrigger>
               </Form.Group>
+             
             </Col>
             <Col md={6}>
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1">Contract Status:</Form.Label>
-                <Form.Select
-                  size="sm"
-                  value={filters.contractStatus}
-                  onChange={(e) => setFilters(prev => ({ ...prev, contractStatus: e.target.value }))}
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Address:</Form.Label>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Enter street name, building name, postal code etc.</Tooltip>}
                 >
-                  <option value="">All</option>
-                  <option value="Y">With Contract</option>
-                  <option value="N">No Contract</option>
-                </Form.Select>
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    value={filters.address}
+                    onChange={(e) => setFilters(prev => ({ ...prev, address: e.target.value }))}
+                    placeholder="Search by address, postal code..."
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  />
+                </OverlayTrigger>
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Contract Status:</Form.Label>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Filter customers by their contract status</Tooltip>}
+                >
+                  <Form.Select
+                    size="sm"
+                    value={filters.contractStatus}
+                    onChange={(e) => setFilters(prev => ({ ...prev, contractStatus: e.target.value }))}
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  >
+                    <option value="">All Contract Status</option>
+                    <option value="Y">With Contract</option>
+                    <option value="N">No Contract</option>
+                  </Form.Select>
+                </OverlayTrigger>
               </Form.Group>
               <Row className="align-items-end">
                 <Col md={6}>
                   <Form.Group className="mb-2">
-                    <Form.Label className="small mb-1">Country:</Form.Label>
-                    <Form.Select
-                      size="sm"
-                      value={filters.country}
-                      onChange={(e) => setFilters(prev => ({ ...prev, country: e.target.value }))}
+                    <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Country:</Form.Label>
+                    <OverlayTrigger
+                      placement="top"
+                      overlay={<Tooltip>Select customer's country</Tooltip>}
                     >
-                      <option value="">All</option>
-                      <option value="SG">Singapore</option>
-                    </Form.Select>
+                      <Form.Select
+                        size="sm"
+                        value={filters.country}
+                        onChange={(e) => setFilters(prev => ({ ...prev, country: e.target.value }))}
+                        style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                      >
+                        <option value="">All Countries</option>
+                        <option value="SG">Singapore</option>
+                      </Form.Select>
+                    </OverlayTrigger>
                   </Form.Group>
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-2">
-                    <Form.Label className="small mb-1">Status:</Form.Label>
-                    <Form.Select
-                      size="sm"
-                      value={filters.status}
-                      onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                    <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Status:</Form.Label>
+                    <OverlayTrigger
+                      placement="top"
+                      overlay={<Tooltip>Filter by customer account status</Tooltip>}
                     >
-                      <option value="">All</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </Form.Select>
+                      <Form.Select
+                        size="sm"
+                        value={filters.status}
+                        onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                        style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                      >
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </Form.Select>
+                    </OverlayTrigger>
                   </Form.Group>
                 </Col>
               </Row>
@@ -237,25 +318,62 @@ const ViewCustomers = () => {
     phone: '',
     contractStatus: '',
     country: '',
-    status: ''
+    status: '',
+    address: '' // Add this line
   });
 
-  const loadData = useCallback(async (page, search = '') => {
+  const loadData = useCallback(async (page, search = '', forceInitial = false) => {
     if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      const { customers, totalCount } = await fetchCustomers(page, perPage, search, filters, initialLoad);
+      const { customers, totalCount } = await fetchCustomers(
+        page, 
+        perPage, 
+        search, 
+        filters, 
+        forceInitial ? 'true' : initialLoad.toString()
+      );
       setData(customers);
       setTotalRows(totalCount);
       if (customers.length === 0 && (search || Object.values(filters).some(v => v))) {
         toast.info('No customers found for the given criteria');
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Error details:', err);
+      
+      // Handle network errors
+      if (!navigator.onLine) {
+        toast.error('Please check your internet connection and try again.');
+        return;
+      }
+
+      // Try to parse the error response
+      let errorMessage = 'Unable to load customer data. Please try again later.';
+      try {
+        if (typeof err.message === 'string' && err.message.includes('<!DOCTYPE')) {
+          errorMessage = 'The server is currently unavailable. Please try again later.';
+        } else if (err.message) {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.error || errorMessage;
+        }
+      } catch {
+        // If parsing fails, use the default message
+      }
+
+      setError(errorMessage);
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+      });
+      
       setData([]);
       setTotalRows(0);
-      toast.error(`Error loading customers: ${err.message}`);
     } finally {
       setLoading(false);
       setInitialLoad(false);
@@ -315,6 +433,7 @@ const ViewCustomers = () => {
   };
 
   const handleClearFilters = () => {
+    // First reset all filters and search terms
     setFilters({
       customerCode: '',
       customerName: '',
@@ -322,11 +441,18 @@ const ViewCustomers = () => {
       phone: '',
       contractStatus: '',
       country: '',
-      status: ''
+      status: '',
+      address: ''
     });
     setSearchTerm('');
     setDebouncedSearchTerm('');
-    loadData(1, '');
+    setCurrentPage(1); // Reset to first page
+    
+    // Set initialLoad to true to trigger default loading behavior
+    setInitialLoad(true);
+    
+    // Load default data
+    loadData(1, '', true);
   };
 
   const columns = [
@@ -337,7 +463,7 @@ const ViewCustomers = () => {
       minWidth: '50px'
     },
     { 
-      name: 'Code', 
+      name: 'Card Code', 
       selector: row => row.CardCode, 
       sortable: true,
       minWidth: '120px',
@@ -400,7 +526,7 @@ const ViewCustomers = () => {
       name: 'Email', 
       selector: row => row.EmailAddress, 
       sortable: true,
-      minWidth: '180px',
+      minWidth: '240px',
       grow: 1.5,
       cell: row => (
         <OverlayTrigger
@@ -419,7 +545,7 @@ const ViewCustomers = () => {
       selector: row => row.U_ContractEndDate ? 
         moment(row.U_ContractEndDate).diff(moment(row.U_ContractStartDate), 'months') : null,
       sortable: true,
-      minWidth: '160px',
+      minWidth: '180px',
       grow: 1,
       cell: row => {
         if (row.U_Contract !== 'Y' || !row.U_ContractStartDate || !row.U_ContractEndDate) {
@@ -466,7 +592,7 @@ const ViewCustomers = () => {
       name: 'Contract',
       selector: row => row.U_Contract,
       sortable: true,
-      minWidth: '100px',
+      minWidth: '130px',
       grow: 0.5,
       cell: row => (
         <OverlayTrigger
@@ -585,13 +711,12 @@ const ViewCustomers = () => {
       <GeeksSEO title="View Customers | SAS - SAP B1 Portal" />
       <Row>
         <Col lg={12}>
-          <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-            <div className="mb-3">
+          <div className="border-bottom pb-2 mb-4 d-flex align-items-center justify-content-between">
+            <div className="mb-2">
               <h1 className="mb-1 h2 fw-bold">Customers</h1>
               <Breadcrumb>
                 <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
-                <Breadcrumb.Item active>Customer List</Breadcrumb.Item>
+                <Breadcrumb.Item active href="/customers/list">Customers</Breadcrumb.Item>
               </Breadcrumb>
             </div>
           </div>
@@ -642,7 +767,26 @@ const ViewCustomers = () => {
           </Card>
         </Col>
       </Row>
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        toastStyle={{
+          backgroundColor: '#fff',
+          color: '#333',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          borderRadius: '8px',
+          padding: '16px',
+          fontSize: '14px'
+        }}
+      />
     </Fragment>
   );
 };

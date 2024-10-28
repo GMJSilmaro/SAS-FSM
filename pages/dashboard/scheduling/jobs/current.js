@@ -417,10 +417,8 @@ const Calendar = () => {
         <h1 className="mb-1 h2 fw-bold">Current Jobs Calendar</h1>
   
         <Breadcrumb>
-          <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
-          <Breadcrumb.Item href="#">Scheduling</Breadcrumb.Item>
-          <Breadcrumb.Item href="#">Jobs</Breadcrumb.Item>
-          <Breadcrumb.Item active>Current Jobs</Breadcrumb.Item>
+          <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+          <Breadcrumb.Item href="/dashboard/scheduling/jobs/current">Jobs Calendar</Breadcrumb.Item>
         </Breadcrumb>
         <ToastContainer />
         <div style={{ display: "flex", marginTop: '10px' }}>

@@ -24,8 +24,7 @@ const Worker = () => {
 								</h1>
 								<Breadcrumb>
 									<Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-									<Breadcrumb.Item href="/dashboard/workers/list">Workers</Breadcrumb.Item>
-									<Breadcrumb.Item active>List</Breadcrumb.Item>
+									<Breadcrumb.Item href="/dashboard/workers/list">Workers List</Breadcrumb.Item>
 								</Breadcrumb>
 							</div>
 							<div>

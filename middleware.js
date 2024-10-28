@@ -1,126 +1,100 @@
 import { NextResponse } from 'next/server';
 
-const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
-export async function middleware(request) {
-  // Skip the renewal endpoint itself to prevent loops
-  if (request.nextUrl.pathname === '/api/renewSAPB1Session') {
+// Add new constant for cookie options
+const COOKIE_OPTIONS = {
+  path: '/',
+  secure: true,
+  sameSite: 'lax',
+  maxAge: 30 * 60 // 30 minutes in seconds
+};
+
+function handleSessionError(request, error = null) {
+  if (request.nextUrl.pathname === '/authentication/sign-in') {
     return NextResponse.next();
   }
 
-  // Check for inactivity
-  const lastActivity = request.cookies.get('LAST_ACTIVITY');
-  const currentTime = Date.now();
+  console.log('Session Error:', {
+    error: error?.message,
+    path: request.nextUrl.pathname,
+    cookies: request.cookies.getAll().map(c => c.name)
+  });
 
-  if (lastActivity) {
-    const inactiveTime = currentTime - parseInt(lastActivity.value);
-    if (inactiveTime > INACTIVITY_TIMEOUT) {
-      // User has been inactive, log them out
-      const response = NextResponse.redirect(new URL('/authentication/sign-in', request.url));
-      response.cookies.delete('B1SESSION');
-      response.cookies.delete('B1SESSION_EXPIRY');
-      response.cookies.delete('ROUTEID');
-      response.cookies.delete('LAST_ACTIVITY');
-      return response;
-    }
+  const response = NextResponse.redirect(new URL('/authentication/sign-in', request.url));
+  return response;
+}
+
+export async function middleware(request) {
+  // Add debug logging
+  console.log('Middleware Check:', {
+    path: request.nextUrl.pathname,
+    cookies: request.cookies.getAll().map(c => ({ name: c.name, value: c.value.substring(0, 10) + '...' }))
+  });
+
+  const publicPaths = [
+    '/authentication/sign-in',
+    '/api/login',
+    '/api/renewSAPB1Session',
+    '/api/logout',
+    '/_next',
+    '/images',
+    '/favicon.ico'
+  ];
+
+  // Check if the current path should bypass middleware
+  const isPublicPath = publicPaths.some(path => 
+    request.nextUrl.pathname.startsWith(path)
+  );
+
+  if (isPublicPath) {
+    return NextResponse.next();
   }
 
-  // Only check API routes that aren't login or renewal
-  if (request.nextUrl.pathname.startsWith('/api') && 
-      !request.nextUrl.pathname.startsWith('/api/login')) {
-    const b1Session = request.cookies.get('B1SESSION');
-    const sessionExpiry = request.cookies.get('B1SESSION_EXPIRY');
-    const routeId = request.cookies.get('ROUTEID');
+  // Check for all required cookies
+  const b1Session = request.cookies.get('B1SESSION');
+  const sessionExpiry = request.cookies.get('B1SESSION_EXPIRY');
+  const customToken = request.cookies.get('customToken');
+  const uid = request.cookies.get('uid');
 
-    if (!b1Session || !sessionExpiry) {
-      return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
-    }
-
-    const expiryTime = new Date(sessionExpiry.value).getTime();
-    const timeUntilExpiry = expiryTime - currentTime;
-    const fiveMinutesInMilliseconds = 5 * 60 * 1000;
-
-    if (timeUntilExpiry <= fiveMinutesInMilliseconds) {
-      try {
-        const baseUrl = request.nextUrl.origin;
-        
-        // Make the renewal request
-        const renewalResponse = await fetch(`${baseUrl}/api/renewSAPB1Session`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            currentSession: b1Session.value,
-            currentRouteId: routeId?.value
-          })
-        });
-
-        // Check if we actually got a JSON response
-        const contentType = renewalResponse.headers.get('content-type');
-        if (!contentType?.includes('application/json')) {
-          console.error('Received non-JSON response');
-          return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
-        }
-
-        const renewalData = await renewalResponse.json();
-
-        if (!renewalData.newB1Session) {
-          console.error('Invalid renewal data received:', renewalData);
-          return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
-        }
-
-        // Create response with new cookies
-        const nextResponse = NextResponse.next();
-
-        nextResponse.cookies.set('B1SESSION', renewalData.newB1Session, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-          path: '/'
-        });
-
-        nextResponse.cookies.set('B1SESSION_EXPIRY', renewalData.newExpiryTime, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-          path: '/'
-        });
-
-        if (renewalData.newRouteId) {
-          nextResponse.cookies.set('ROUTEID', renewalData.newRouteId, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            path: '/'
-          });
-        }
-
-        // Update last activity time
-        nextResponse.cookies.set('LAST_ACTIVITY', currentTime.toString(), {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-          path: '/'
-        });
-
-        return nextResponse;
-      } catch (error) {
-        console.error('Error during SAP B1 session renewal:', error);
-        return NextResponse.redirect(new URL('/authentication/sign-in', request.url));
-      }
-    }
+  if (!b1Session || !sessionExpiry || !customToken || !uid) {
+    console.log('Missing required cookies:', {
+      hasB1Session: !!b1Session,
+      hasSessionExpiry: !!sessionExpiry,
+      hasCustomToken: !!customToken,
+      hasUid: !!uid
+    });
+    return handleSessionError(request);
   }
 
-  // Don't update LAST_ACTIVITY cookie here
-  return NextResponse.next();
+  // Check session expiry
+  const expiryTime = new Date(sessionExpiry.value).getTime();
+  if (Date.now() >= expiryTime) {
+    console.log('Session expired:', {
+      current: new Date(),
+      expiry: new Date(expiryTime)
+    });
+    return handleSessionError(request, new Error('Session expired'));
+  }
+
+  // Update last activity and extend cookie expiry times
+  const response = NextResponse.next();
+  
+  // Extend all cookie expiry times
+  const currentCookies = request.cookies.getAll();
+  currentCookies.forEach(cookie => {
+    response.cookies.set(cookie.name, cookie.value, {
+      ...COOKIE_OPTIONS,
+      httpOnly: ['B1SESSION', 'B1SESSION_EXPIRY', 'customToken'].includes(cookie.name)
+    });
+  });
+
+  return response;
 }
 
 export const config = {
   matcher: [
-    // Match all API routes except specific ones
-    '/api/((?!renewSAPB1Session|login).)*',
-    // Match all other routes except static files and auth pages
-    '/((?!_next/static|_next/image|favicon.ico|authentication/sign-in).*)'
+    '/((?!authentication/sign-in|_next/static|_next/image|favicon.ico|images).*)',
+    '/api/((?!login|renewSAPB1Session|logout).*)'
   ]
 };

@@ -75,22 +75,32 @@ const QuickMenu = () => {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include', // Important: include credentials
       });
+
       if (response.ok) {
-        document.cookie =
-          "customToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly";
-        document.cookie =
-          "uid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;";
-        document.cookie =
-          "isAdmin=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;";
-        document.cookie =
-          "email=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;";
-        router.push("/authentication/sign-in");
+        // Clear client-side cookies using js-cookie
+        const cookiesToClear = [
+          'customToken',
+          'uid',
+          'isAdmin',
+          'email',
+          'workerId',
+          'LAST_ACTIVITY'
+        ];
+
+        cookiesToClear.forEach(cookie => {
+          Cookies.remove(cookie, { path: '/' });
+        });
+
+        // Force reload to clear any cached state
+        window.location.href = '/authentication/sign-in';
       } else {
         throw new Error("Logout failed");
       }
     } catch (error) {
       console.error("Error logging out:", error.message);
+      toast.error("Failed to logout. Please try again.");
     }
   };
 
