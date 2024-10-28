@@ -49,6 +49,8 @@ import {
 import { faLessThanEqual } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from 'next/router';
 import Swal from 'sweetalert2';
+import quickInfoStyles from '../jobs/calendar.module.css';  // Adjust the path based on your file structure
+import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX } from "react-icons/bs"; 
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -269,12 +271,26 @@ const FieldServiceSchedules = () => {
               ? jobData.endDate.toDate()
               : new Date(jobData.endDate);
 
+          // Align fields with calendar.js
           workerJobs.push({
+            Id: jobDoc.id,
             WorkerId: worker.id,
             Subject: jobData.jobName,
+            JobNo: jobData.jobNo,
+            Customer: jobData.customerName,
+            ServiceLocation: jobData.location?.locationName || "",
             StartTime: startDate,
             EndTime: endDate,
             WorkerName: worker.text,
+            JobStatus: jobData.jobStatus,
+            Description: jobData.jobDescription,
+            Equipments: jobData.equipments?.map(eq => eq.itemName).join(", "),
+            Priority: jobData.priority || "",
+            Category: jobData.category || "N/A",
+            ServiceCall: jobData.serviceCallID || "N/A",
+            Equipment: jobData.equipments?.[0]?.itemName || "N/A",
+            Location: jobData.location?.locationName || "Not specified",
+            ClientName: jobData.customerName || "Not specified"
           });
         });
 
@@ -339,6 +355,83 @@ const FieldServiceSchedules = () => {
     filteredWorkers.some(worker => worker.id === event.WorkerId)
   );
 
+  const quickInfoTemplates = {
+    header: (props) => (
+      <div className={quickInfoStyles.quickInfoHeader}>
+        <span className={quickInfoStyles.timeRange}>
+          {new Date(props.StartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+          {new Date(props.EndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+        <button className={quickInfoStyles.closeButton}>
+          <BsX className={quickInfoStyles.closeIcon} />
+        </button>
+      </div>
+    ),
+    content: (props) => (
+      <div className={quickInfoStyles.quickInfoContent}>
+        <h3 className={quickInfoStyles.eventTitle}>
+          <BsTools className={quickInfoStyles.icon} />
+          {props.Subject}
+        </h3>
+        
+        {/* Time Information */}
+        <div className={quickInfoStyles.infoItem}>
+          <BsClock className={quickInfoStyles.icon} />
+          <span style={{ fontWeight: 600 }}>Duration:</span>
+          <span>
+            {Math.round((new Date(props.EndTime) - new Date(props.StartTime)) / (1000 * 60 * 60))} hours
+            ({new Date(props.StartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+            {new Date(props.EndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+          </span>
+        </div>
+
+        {/* Worker Information */}
+        <div className={quickInfoStyles.infoItem}>
+          <BsFillPersonFill className={quickInfoStyles.icon} />
+          <span style={{ fontWeight: 600 }}>Assigned To:</span>
+          <span className={quickInfoStyles.workerName}>{props.WorkerName}</span>
+        </div>
+
+        {/* Location Information */}
+        <div className={quickInfoStyles.infoItem}>
+          <BsGeoAlt className={quickInfoStyles.icon} />
+          <span style={{ fontWeight: 600 }}>Job Site:</span>
+          <span>{props.Location || 'Not specified'}</span>
+        </div>
+
+        {/* Client/Company Information */}
+        <div className={quickInfoStyles.infoItem}>
+          <BsBuilding className={quickInfoStyles.icon} />
+          <span style={{ fontWeight: 600 }}>Client:</span>
+          <span>{props.ClientName || 'Not specified'}</span>
+        </div>
+
+        {/* Job Status */}
+        <div className={quickInfoStyles.infoItem}>
+          <BsCalendarCheck className={quickInfoStyles.icon} />
+          <span style={{ fontWeight: 600 }}>Status:</span>
+          <span className={`${quickInfoStyles.status} ${quickInfoStyles[props.Status?.toLowerCase() || 'pending']}`}>
+            {props.Status || 'N/A'}
+          </span>
+        </div>
+      </div>
+    ),
+    footer: (props) => (
+      <div className={quickInfoStyles.quickInfoFooter}>
+        <button 
+          className={quickInfoStyles.viewDetailsButton}
+          onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
+        >
+          <span>View Details</span>
+          <svg width="34" height="34" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="37" cy="37" r="35.5" stroke="white" strokeWidth="3"></circle>
+            <path d="M25 35.5C24.1716 35.5 23.5 36.1716 23.5 37C23.5 37.8284 24.1716 38.5 25 38.5V35.5ZM49.0607 38.0607C49.6464 37.4749 49.6464 36.5251 49.0607 35.9393L39.5147 26.3934C38.9289 25.8076 37.9792 25.8076 37.3934 26.3934C36.8076 26.9792 36.8076 27.9289 37.3934 28.5147L45.8787 37L37.3934 45.4853C36.8076 46.0711 36.8076 47.0208 37.3934 47.6066C37.9792 48.1924 38.9289 48.1924 39.5147 47.6066L49.0607 38.0607ZM25 38.5L48 38.5V35.5L25 35.5V38.5Z" fill="white"></path>
+          </svg>
+        </button>
+      </div>
+    )
+  };
+
   if (isLoading) {
     return <LoadingOverlay />;
   }
@@ -402,9 +495,18 @@ const FieldServiceSchedules = () => {
               eventSettings={{
                 dataSource: filteredScheduleData,
                 fields: {
-                  subject: { name: "Subject", title: "Status" },
+                  id: 'Id',
+                  subject: { name: "Subject" },
                   startTime: { name: "StartTime" },
                   endTime: { name: "EndTime" },
+                  description: { name: "Description" },
+                  priority: { name: "Priority" },
+                  category: { name: "Category" },
+                  location: { name: "ServiceLocation" },
+                  customer: { name: "Customer" },
+                  equipment: { name: "Equipment" },
+                  serviceCall: { name: "ServiceCall" },
+                  status: { name: "JobStatus" }
                 },
                 allowEditing: false,
                 allowAdding: false,
@@ -414,9 +516,7 @@ const FieldServiceSchedules = () => {
               eventRendered={(args) => {
                 args.element.style.backgroundColor = getEventColor(args.data);
               }}
-              quickInfoTemplates={{
-                footer: () => { return <div></div>; }
-              }}
+              quickInfoTemplates={quickInfoTemplates}
               cellDoubleClick={handleCellDoubleClick}
             >
               <ResourcesDirective>
