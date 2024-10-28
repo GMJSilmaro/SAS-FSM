@@ -114,6 +114,7 @@
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
+    "@shadcn/ui": "^0.0.4",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.1.0"
   }

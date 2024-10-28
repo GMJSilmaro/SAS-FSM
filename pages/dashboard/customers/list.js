@@ -1,7 +1,7 @@
 'use client'
 
 import React, { Fragment, useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb, Placeholder, Spinner } from 'react-bootstrap';
+import { Col, Row, Card, Button, OverlayTrigger, Tooltip, Badge, Breadcrumb, Placeholder, Spinner, Form } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
 import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill, CalendarRange } from 'react-bootstrap-icons';
@@ -10,12 +10,21 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
 import moment from 'moment'; // Make sure to install and import moment.js for date calculations
-import { Search, X } from 'react-feather'; // Add X icon import
+import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather'; // Update imports
 
-const fetchCustomers = async (page = 1, limit = 10, search = '', initialLoad = 'true') => {
+const fetchCustomers = async (page = 1, limit = 10, search = '', filters = {}, initialLoad = 'true') => {
   try {
     const timestamp = new Date().getTime();
-    let url = `/api/getCustomersList?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&_=${timestamp}&initialLoad=${initialLoad}`;
+    const queryParams = new URLSearchParams({
+      page,
+      limit,
+      search,
+      initialLoad,
+      _: timestamp,
+      ...filters
+    });
+    
+    let url = `/api/getCustomersList?${queryParams.toString()}`;
     
     console.log(`Fetching customers: ${url}`);
     
@@ -56,6 +65,160 @@ const debounce = (func, delay) => {
   };
 };
 
+// Update FilterPanel component definition to accept loadData and searchTerm props
+const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTerm }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <Card className="border-0 shadow-sm mb-4">
+      <Card.Body className="p-3">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <OverlayTrigger
+            placement="right"
+            overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} filter panel</Tooltip>}
+          >
+            <div 
+              className="d-flex align-items-center" 
+              style={{ cursor: 'pointer' }}
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              <Filter size={16} className="me-2 text-primary" />
+              <h6 className="mb-0 me-2">Find</h6>
+              {isExpanded ? (
+                <ChevronUp size={16} className="text-muted" />
+              ) : (
+                <ChevronDown size={16} className="text-muted" />
+              )}
+            </div>
+          </OverlayTrigger>
+          <div>
+            <OverlayTrigger
+              placement="top"
+              overlay={<Tooltip>Clear all filters</Tooltip>}
+            >
+              <Button 
+                variant="outline-danger" 
+                size="sm"
+                onClick={onClear}
+                className="me-2"
+                disabled={loading}
+              >
+                <X size={14} className="me-1" />
+                Clear
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="top"
+              overlay={<Tooltip>Apply filters</Tooltip>}
+            >
+              <Button 
+                variant="primary" 
+                size="sm"
+                onClick={() => loadData(1, searchTerm)}
+                disabled={loading}
+              >
+                <Search size={14} className="me-1" />
+                Search
+              </Button>
+            </OverlayTrigger>
+          </div>
+        </div>
+        <div style={{ 
+          maxHeight: isExpanded ? '1000px' : '0',
+          overflow: 'hidden',
+          transition: 'all 0.3s ease-in-out',
+          opacity: isExpanded ? 1 : 0
+        }}>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Customer Code:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.customerCode}
+                  onChange={(e) => setFilters(prev => ({ ...prev, customerCode: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Customer Name:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.customerName}
+                  onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Email:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="email"
+                  value={filters.email}
+                  onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Phone:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.phone}
+                  onChange={(e) => setFilters(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Contract Status:</Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={filters.contractStatus}
+                  onChange={(e) => setFilters(prev => ({ ...prev, contractStatus: e.target.value }))}
+                >
+                  <option value="">All</option>
+                  <option value="Y">With Contract</option>
+                  <option value="N">No Contract</option>
+                </Form.Select>
+              </Form.Group>
+              <Row className="align-items-end">
+                <Col md={6}>
+                  <Form.Group className="mb-2">
+                    <Form.Label className="small mb-1">Country:</Form.Label>
+                    <Form.Select
+                      size="sm"
+                      value={filters.country}
+                      onChange={(e) => setFilters(prev => ({ ...prev, country: e.target.value }))}
+                    >
+                      <option value="">All</option>
+                      <option value="SG">Singapore</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-2">
+                    <Form.Label className="small mb-1">Status:</Form.Label>
+                    <Form.Select
+                      size="sm"
+                      value={filters.status}
+                      onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                    >
+                      <option value="">All</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Col>
+          </Row>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
+
+// Update ViewCustomers component to include filters state
 const ViewCustomers = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -67,17 +230,26 @@ const ViewCustomers = () => {
   const router = useRouter();
   const [perPage, setPerPage] = useState(10);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [filters, setFilters] = useState({
+    customerCode: '',
+    customerName: '',
+    email: '',
+    phone: '',
+    contractStatus: '',
+    country: '',
+    status: ''
+  });
 
   const loadData = useCallback(async (page, search = '') => {
     if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      const { customers, totalCount } = await fetchCustomers(page, perPage, search, initialLoad);
+      const { customers, totalCount } = await fetchCustomers(page, perPage, search, filters, initialLoad);
       setData(customers);
       setTotalRows(totalCount);
-      if (customers.length === 0 && search) {
-        toast.info('No customers found for the given search criteria');
+      if (customers.length === 0 && (search || Object.values(filters).some(v => v))) {
+        toast.info('No customers found for the given criteria');
       }
     } catch (err) {
       setError(err.message);
@@ -88,7 +260,7 @@ const ViewCustomers = () => {
       setLoading(false);
       setInitialLoad(false);
     }
-  }, [perPage, initialLoad]);
+  }, [perPage, initialLoad, filters, loading]);
 
   useEffect(() => {
     // Load initial data (first 25 records) when component mounts
@@ -142,18 +314,34 @@ const ViewCustomers = () => {
     await loadData(page, debouncedSearchTerm);
   };
 
+  const handleClearFilters = () => {
+    setFilters({
+      customerCode: '',
+      customerName: '',
+      email: '',
+      phone: '',
+      contractStatus: '',
+      country: '',
+      status: ''
+    });
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    loadData(1, '');
+  };
+
   const columns = [
-  
     { 
       name: '#', 
-      selector: (row, index) => ((currentPage - 1) * perPage) + index + 1, 
-      width: '50px' 
+      selector: (row, index) => ((currentPage - 1) * perPage) + index + 1,
+      maxWidth: '60px',
+      minWidth: '50px'
     },
     { 
       name: 'Code', 
       selector: row => row.CardCode, 
-      sortable: true, 
-      width: '150px',
+      sortable: true,
+      minWidth: '120px',
+      grow: 0.5,
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -168,11 +356,11 @@ const ViewCustomers = () => {
     { 
       name: 'Customer Name', 
       selector: row => row.CardName, 
-      sortable: true, 
-      width: '230px',
+      sortable: true,
+      minWidth: '200px',
+      grow: 2,
       cell: row => (
         <div className="d-flex align-items-center">
-         
           {row.CardName}
         </div>
       )
@@ -180,8 +368,9 @@ const ViewCustomers = () => {
     { 
       name: 'Main Address', 
       selector: row => row.MailAddress, 
-      sortable: true, 
-      width: '250px',
+      sortable: true,
+      minWidth: '200px',
+      grow: 2,
       cell: row => (
         <div>
           <HouseFill className="me-2" />
@@ -192,8 +381,9 @@ const ViewCustomers = () => {
     { 
       name: 'Phone', 
       selector: row => row.Phone1, 
-      sortable: true, 
-      width: '150px',
+      sortable: true,
+      minWidth: '130px',
+      grow: 0.8,
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -209,8 +399,9 @@ const ViewCustomers = () => {
     { 
       name: 'Email', 
       selector: row => row.EmailAddress, 
-      sortable: true, 
-      width: '200px',
+      sortable: true,
+      minWidth: '180px',
+      grow: 1.5,
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -223,13 +414,13 @@ const ViewCustomers = () => {
         </OverlayTrigger>
       )
     },
-
     {
       name: 'Contract Duration',
       selector: row => row.U_ContractEndDate ? 
         moment(row.U_ContractEndDate).diff(moment(row.U_ContractStartDate), 'months') : null,
       sortable: true,
-      width: '180px',
+      minWidth: '160px',
+      grow: 1,
       cell: row => {
         if (row.U_Contract !== 'Y' || !row.U_ContractStartDate || !row.U_ContractEndDate) {
           return '-';
@@ -271,12 +462,12 @@ const ViewCustomers = () => {
         );
       }
     },
-    
     { 
       name: 'Contract',
       selector: row => row.U_Contract,
       sortable: true,
-      width: '120px',
+      minWidth: '100px',
+      grow: 0.5,
       cell: row => (
         <OverlayTrigger
           placement="top"
@@ -293,10 +484,10 @@ const ViewCustomers = () => {
         </OverlayTrigger>
       )
     },
-   
-    
     { 
       name: 'Actions',
+      minWidth: '100px',
+      grow: 0.5,
       cell: (row) => (
         <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(row)}>
           <Eye className="me-1" /> View
@@ -411,6 +602,14 @@ const ViewCustomers = () => {
           <Card className="border-0 shadow-sm">
             <Card.Body className="p-4">
               {error && <div className="alert alert-danger mb-4">{error}</div>}
+              <FilterPanel 
+                filters={filters}
+                setFilters={setFilters}
+                onClear={handleClearFilters}
+                loading={loading}
+                loadData={loadData}    /* Add this prop */
+                searchTerm={searchTerm}    /* Add this prop */
+              />
               <DataTable
                 columns={columns}
                 data={data}
@@ -431,8 +630,6 @@ const ViewCustomers = () => {
                   </div>
                 }
                 customStyles={customStyles}
-                subHeader
-                subHeaderComponent={subHeaderComponentMemo}
                 persistTableHead
                 noDataComponent={
                   <div className="text-center py-5">

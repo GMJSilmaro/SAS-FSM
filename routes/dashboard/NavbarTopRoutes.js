@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { HouseDoorFill, PeopleFill, BriefcaseFill, CalendarWeekFill, PersonFill, PersonBadgeFill, PersonLinesFill, ListTask } from 'react-bootstrap-icons';
+import { HouseDoorFill, PeopleFill, BriefcaseFill, CalendarWeekFill, PersonFill, PersonBadgeFill, PersonLinesFill, ListTask, GeoAltFill } from 'react-bootstrap-icons';
 
 const NavbarDefault = [
 	{
@@ -30,6 +30,12 @@ const NavbarDefault = [
 				link: '/dashboard/customers/list',
 				icon: 'PersonFill'
 			},
+			// {
+			// 	id: uuid(),
+			// 	menuitem: 'Locations',
+			// 	link: '/dashboard/customers/locations',
+			// 	icon: 'GeoAltFill'
+			// },
 		],
 		isAuthenticated: true,
 	},
