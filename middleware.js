@@ -39,8 +39,10 @@ export async function middleware(request) {
     '/api/logout',
     '/_next',
     '/images',
-    '/favicon.ico'
-  ];
+    '/favicon.ico',
+    '/styles',
+    '/api'    
+];
 
   // Check if the current path should bypass middleware
   const isPublicPath = publicPaths.some(path => 
@@ -94,7 +96,8 @@ export async function middleware(request) {
 
 export const config = {
   matcher: [
-    '/((?!authentication/sign-in|_next/static|_next/image|favicon.ico|images).*)',
-    '/api/((?!login|renewSAPB1Session|logout).*)'
+      // Update the matcher to explicitly exclude styles
+      '/((?!authentication/sign-in|_next/static|_next/image|favicon.ico|images|styles).*)',
+      '/api/((?!login|renewSAPB1Session|logout).*)'
   ]
 };
