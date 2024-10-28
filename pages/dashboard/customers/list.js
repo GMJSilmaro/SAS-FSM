@@ -6,9 +6,8 @@ import DataTable from 'react-data-table-component';
 import { useRouter } from 'next/router';
 import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFill, CalendarRange } from 'react-bootstrap-icons';
 import { GeeksSEO, PageHeading } from 'widgets'
-import { toast } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer } from 'react-toastify';
 import moment from 'moment'; // Make sure to install and import moment.js for date calculations
 import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather'; // Update imports
 
@@ -118,14 +117,21 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
             {/* Show customer name search only when not expanded */}
             {!isExpanded && (
               <div className="ms-4 flex-grow-1" style={{ maxWidth: '300px' }}>
-                <Form.Control
-                  size="sm"
-                  type="text"
-                  value={filters.customerName}
-                  onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
-                  placeholder="Search by customer name..."
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
-                />
+               <Form.Group className="mb-2">
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip>Enter full or partial customer name</Tooltip>}
+                >
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    value={filters.customerName}
+                    onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
+                    placeholder="Search by customer name..."
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  />
+                </OverlayTrigger>
+              </Form.Group>
               </div>
             )}
           </div>
@@ -349,9 +355,14 @@ const ViewCustomers = () => {
       );
       setData(customers);
       setTotalRows(totalCount);
-      if (customers.length === 0 && (search || Object.values(filters).some(v => v))) {
-        toast.info('No customers found for the given criteria');
+      
+      // Modify the toast notifications to be simpler
+      if (customers.length === 0) {
+        toast.info('No customers found');
+      } else {
+        toast.success(`Found ${totalCount} customers`);
       }
+      
     } catch (err) {
       console.error('Error details:', err);
       
@@ -782,23 +793,16 @@ const ViewCustomers = () => {
       </Row>
       <ToastContainer
         position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop
+        autoClose={3000}
+        hideProgressBar={true}
+        newestOnTop={false}
         closeOnClick
         rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover
         theme="light"
-        toastStyle={{
-          backgroundColor: '#fff',
-          color: '#333',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          borderRadius: '8px',
-          padding: '16px',
-          fontSize: '14px'
-        }}
+        limit={3}
       />
     </Fragment>
   );
