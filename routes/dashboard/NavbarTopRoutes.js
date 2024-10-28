@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { HouseDoorFill, PeopleFill, BriefcaseFill, CalendarWeekFill, PersonFill, PersonBadgeFill, PersonLinesFill, ListTask, GeoAltFill } from 'react-bootstrap-icons';
+import { HouseDoorFill, PeopleFill, BriefcaseFill, CalendarWeekFill, PersonFill, PersonBadgeFill, PersonLinesFill, ListTask } from 'react-bootstrap-icons';
 
 const NavbarDefault = [
 	{
@@ -8,13 +8,7 @@ const NavbarDefault = [
 		link: '#',
 		icon: 'HouseDoorFill',
 		children: [
-			{ 
-				id: uuid(), 
-				menuitem: 'Overview', 
-				link: '/dashboard/overview',
-				target: '_blank',
-				rel: 'noopener noreferrer'
-			},
+			{ id: uuid(), menuitem: 'Overview', link: '/dashboard/overview'},
 		],
 		isAuthenticated: true,
 	},
@@ -34,18 +28,8 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Customers',
 				link: '/dashboard/customers/list',
-				icon: 'PersonFill',
-				target: '_blank',
-				rel: 'noopener noreferrer'
+				icon: 'PersonFill'
 			},
-			// {
-			// 	id: uuid(),
-			// 	menuitem: 'Locations',
-			// 	link: '/dashboard/customers/locations',
-			// 	icon: 'GeoAltFill',
-			// 	target: '_blank',
-			// 	rel: 'noopener noreferrer'
-			// },
 		],
 		isAuthenticated: true,
 	},
@@ -64,18 +48,15 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Workers',
 				link: '/dashboard/workers/list',
-				icon: 'PersonLinesFill',
-				target: '_blank',
-				rel: 'noopener noreferrer'
+				icon: 'PersonLinesFill'
 			},
 			{
 				id: uuid(),
 				menuitem: 'Workers Dispatch',
 				link: '/dashboard/scheduling/workers/schedules',
-				icon: 'CalendarWeekFill',
-				target: '_blank',
-				rel: 'noopener noreferrer'
+				icon: 'CalendarWeekFill'
 			},
+
 		],
 		isAuthenticated: true,
 	},
@@ -94,17 +75,13 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Jobs',
 				link: '/dashboard/jobs/list-jobs',
-				icon: 'ListTask',
-				target: '_blank',
-				rel: 'noopener noreferrer'
+				icon: 'ListTask'
 			},
 			{
 				id: uuid(),
 				menuitem: 'Job Schedules',
 				link: '/dashboard/scheduling/jobs/current',
-				icon: 'CalendarWeekFill',
-				target: '_blank',
-				rel: 'noopener noreferrer'
+				icon: 'CalendarWeekFill'
 			},
 		],
 		isAuthenticated: true,
