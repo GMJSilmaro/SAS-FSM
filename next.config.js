@@ -59,6 +59,27 @@ const nextConfig = {
         source: "/dashboard",
         destination: "/dashboard/overview",
       },
+      // New route rewrites
+      {
+        source: '/dashboard/customers/list',
+        destination: '/dashboard/customers/list',
+      },
+      {
+        source: '/dashboard/workers/list',
+        destination: '/dashboard/workers/list',
+      },
+      {
+        source: '/dashboard/scheduling/workers/schedules',
+        destination: '/dashboard/scheduling/workers/schedules',
+      },
+      {
+        source: '/dashboard/jobs/list-jobs',
+        destination: '/dashboard/jobs/list-jobs',
+      },
+      {
+        source: '/dashboard/scheduling/jobs/current',
+        destination: '/dashboard/scheduling/jobs/current',
+      },
     ];
   },
   
