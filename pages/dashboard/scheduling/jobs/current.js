@@ -16,14 +16,14 @@ import {
 import { ButtonComponent } from "@syncfusion/ej2-react-buttons";
 import { Internationalization } from "@syncfusion/ej2-base";
 import { TextBoxComponent } from "@syncfusion/ej2-react-inputs";
-import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck } from "react-icons/bs"; // Import icons
-import styles from "./calendar.module.css"; // Import the CSS module
+import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX } from "react-icons/bs"; // Import icons
+import styles from "./calendar.module.css";
 import { useRouter } from 'next/router';
 import truncate from 'html-truncate';
-import { ToastContainer, toast } from "react-toastify"; // Import Toastify
+import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Swal from 'sweetalert2';
-import { format } from 'date-fns'; // Make sure to import this at the top of your file
+import { format } from 'date-fns'; 
 
 const Calendar = () => {
     const router = useRouter();
@@ -35,7 +35,7 @@ const Calendar = () => {
   
     useEffect(() => {
       const fetchJobs = async () => {
-        setLoading(true); // Start loading
+        setLoading(true);
         try {
           const jobsSnapshot = await getDocs(collection(db, "jobs"));
           const jobsData = jobsSnapshot.docs.map((doc) => {
@@ -46,20 +46,29 @@ const Calendar = () => {
               JobNo: job.jobNo,
               Customer: job.customerName,
               ServiceLocation: job.location?.locationName || "",
-              AssignedWorkers: job.assignedWorkers.map(worker => worker.contact?.contactFullname || worker.workerId),
+              AssignedWorkers: job.assignedWorkers.map(worker => ({
+                workerId: worker.workerId,
+                fullName: worker.contact?.contactFullname || worker.workerId,
+                profilePicture: worker.contact?.profilePicture || "/images/avatar/NoProfile.png"
+              })),
               StartTime: new Date(job.startDate),
               EndTime: new Date(job.endDate),            
               JobStatus: job.jobStatus,
               Description: job.jobDescription,
-              Equipments: job.equipments.map(eq => eq.itemName).join(", ") // Handling multiple equipments
+              Equipments: job.equipments.map(eq => eq.itemName).join(", "),
+              Priority: job.priority || "",
+              Category: job.category || "N/A",
+              ServiceCall: job.serviceCallID || "N/A",
+              Equipment: job.equipments?.[0]?.itemName || "N/A"
             };
           });
           setEvents(jobsData);
-          setFilteredEvents(jobsData); // Set both filtered and original events
+          console.log(jobsData);
+          setFilteredEvents(jobsData);
         } catch (error) {
           console.error("Error fetching jobs from Firebase:", error);
         } finally {
-          setLoading(false); // Stop loading once data is fetched
+          setLoading(false);
         }
       };
   
@@ -164,29 +173,19 @@ const Calendar = () => {
       };
 
       const headerTemplate = (props) => (
-        <div className={styles["quick-info-header"]}>
-          <div className={styles["quick-info-header-content"]} style={getStatusColor(props.JobStatus)}>
-      
-            {/* Status at the top right */}
-            <div className={styles["quick-info-status"]} style={{
-              position: 'absolute', 
-              right: '25px', 
-              top: '8px', 
-              fontWeight: 'bold'
-            }}>
-              {props.JobStatus || "Unknown Status"}
-            </div>
-      
-            {/* Title and date below the status */}
-            <div className={styles["quick-info-title"]} style={{ flex: 1 }}>
-              {props.elementType === "cell" ? "Add Job" : "Job Details"}
-              <div className={styles["duration-text"]}>
-                {intl.formatDate(props.StartTime, { type: "date", skeleton: "full" })}{" "}
-                ({intl.formatDate(props.StartTime, { skeleton: "hm" })} -{" "}
-                {intl.formatDate(props.EndTime, { skeleton: "hm" })})
-              </div>
-            </div>
-          </div>
+        <div 
+          className={styles.quickInfoHeader}
+          style={getStatusColor(props.JobStatus)} 
+        >
+          <span className={styles.timeRange}>
+            {intl.formatDate(props.StartTime, { skeleton: "hm" })} - {intl.formatDate(props.EndTime, { skeleton: "hm" })}
+          </span>
+          <button 
+            onClick={() => scheduleObj.current.closeQuickInfoPopup()} 
+            className={styles.closeButton}
+          >
+            <BsX className={styles.closeIcon} />
+          </button>
         </div>
       );
       
@@ -198,67 +197,76 @@ const Calendar = () => {
         return tempElement.textContent || tempElement.innerText || '';  // Get plain text content
       };
       
-      const contentTemplate = (props) => {
-        // Remove HTML tags and truncate the plain text
-        const plainTextDescription = stripHtmlTags(props.Description);
-        const truncatedDescription = plainTextDescription.length > 100
-          ? plainTextDescription.substring(0, 100) + '...'
-          : plainTextDescription;
-      
-        return (
-          <div className={styles["quick-info-content"]}>
-            {props.elementType === "cell" ? (
-              <div className="e-cell-content">
-                <div className="content-area">Create a new job...</div>
-              </div>
-            ) : (
-              <div className={styles["event-content"]}>
-                <div className={styles["notes-wrap"]}>
-                  <BsCalendarCheck /> <strong>Job No:</strong> {props.JobNo}
-                </div>
-                <div className={styles["notes-wrap"]}>
-                  <BsCalendarCheck /> <strong>Job Name:</strong> {props.Subject}
-                </div>
-                <div className={styles["notes-wrap"]}>
-                  <BsFillPersonFill /> <strong>Customer:</strong> {props.Customer}
-                </div>
-                <div className={styles["notes-wrap"]}>
-                  <BsGeoAlt /> <strong>Service Location:</strong> {props.ServiceLocation}
-                </div>
-                <div className={styles["notes-wrap"]}>
-                  <BsFillPersonFill /> <strong>Assigned Workers:</strong> {props.AssignedWorkers.join(", ")}
-                </div>
-                <div className={styles["notes-wrap"]}>
-                  {/* Render plain text truncated description */}
-                  <strong>Description:</strong> {truncatedDescription}
-                </div>
-              </div>
-            )}
+      const contentTemplate = (props) => (
+        <div className={styles.quickInfoContent}>
+          <div className={styles.titleContainer} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className={styles.eventTitle} style={{ fontWeight: 600 }}>{props.Subject}</h3>
+            <div className={styles.statusBadge} style={getStatusColor(props.JobStatus)}>
+              {props.JobStatus}
+            </div>
           </div>
-        );
-      };
+          <div className={styles.eventDetails}>
+            <span className={`${styles.priorityTag} ${styles[props.Priority?.toLowerCase()]}`}>
+              {props.Priority}
+            </span>
+            {/* <span className={styles.category}>{props.Category}</span> */}
+            <span className={styles.duration}>
+              <BsClock className={styles.icon} />
+              {calculateDuration(props.StartTime, props.EndTime)}
+              <div className={styles.avatarGroup}>
+                {props.AssignedWorkers.map((worker, index) => (
+                  <OverlayTrigger
+                    key={worker.workerId}
+                    placement="top"
+                    overlay={<Tooltip>{worker.fullName}</Tooltip>}
+                  >
+                    <img 
+                      src={worker.profilePicture || "/images/avatar/NoProfile.png"} 
+                      alt={worker.fullName}
+                      className={styles.avatar}
+                      style={{
+                        marginLeft: index > 0 ? '-10px' : '0',
+                        zIndex: props.AssignedWorkers.length - index
+                      }}
+                    />
+                  </OverlayTrigger>
+                ))}
+              </div>
+            </span>
+          </div>
+          <div className={styles.infoItem}>
+            <BsGeoAlt className={styles.icon} />
+            <span style={{ fontWeight: 600 }}>Location: </span>{props.ServiceLocation}
+          </div>
+          <div className={styles.infoItem}>
+            <BsBuilding className={styles.icon} />
+            <span style={{ fontWeight: 600 }}>Customer: </span>{props.Customer}
+          </div>
+          <div className={styles.infoItem}>
+            <BsTools className={styles.icon} />
+            <span style={{ fontWeight: 600 }}>Equipment: </span>{props.Equipment}
+          </div>
+          <div className={styles.infoItem}>
+            <BsClock className={styles.icon} />
+            <span style={{ fontWeight: 600 }}>Service Call: </span>{props.ServiceCall}
+          </div>
+        </div>
+      );
     
-    const footerTemplate = (props) => {
-        return (
-          <div className={styles["quick-info-footer"]}>
-            {props.elementType === "cell" ? (
-              <div className="cell-footer">
-                <ButtonComponent id="add" cssClass="e-flat" content="Add" isPrimary={true} />
-              </div>
-            ) : (
-              <div className="event-footer">
-                <ButtonComponent 
-                  id="more-details" 
-                  cssClass="e-flat" 
-                  content="More Details" 
-                  isPrimary={true} 
-                  onClick={() => router.push(`/dashboard/jobs/${props.Id}`)} // Navigate to dynamic job page
-                />
-              </div>
-            )}
-          </div>
-        );
-      };
+    const footerTemplate = (props) => (
+        <div className={styles.quickInfoFooter}>
+          <button 
+            className={styles.viewDetailsButton}
+            onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
+          >
+            <span>View Details</span>
+            <svg width="34" height="34" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="37" cy="37" r="35.5" stroke="white" strokeWidth="3"></circle>
+              <path d="M25 35.5C24.1716 35.5 23.5 36.1716 23.5 37C23.5 37.8284 24.1716 38.5 25 38.5V35.5ZM49.0607 38.0607C49.6464 37.4749 49.6464 36.5251 49.0607 35.9393L39.5147 26.3934C38.9289 25.8076 37.9792 25.8076 37.3934 26.3934C36.8076 26.9792 36.8076 27.9289 37.3934 28.5147L45.8787 37L37.3934 45.4853C36.8076 46.0711 36.8076 47.0208 37.3934 47.6066C37.9792 48.1924 38.9289 48.1924 39.5147 47.6066L49.0607 38.0607ZM25 38.5L48 38.5V35.5L25 35.5V38.5Z" fill="white"></path>
+            </svg>
+          </button>
+        </div>
+    );
     
       const onPopupOpen = (args) => {
         // Disable the quick info for cell clicks
@@ -337,6 +345,20 @@ const Calendar = () => {
         }
       }, [router]);
 
+      const calculateDuration = (start, end) => {
+        const diffInMilliseconds = new Date(end) - new Date(start);
+        const hours = Math.floor(diffInMilliseconds / (1000 * 60 * 60));
+        const minutes = Math.floor((diffInMilliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (hours === 0) {
+          return `${minutes}min`;
+        } else if (minutes === 0) {
+          return `${hours}hr`;
+        } else {
+          return `${hours}hr ${minutes}min`;
+        }
+      };
+
   
     return (
       <>
@@ -375,8 +397,21 @@ const Calendar = () => {
                 selectedDate={new Date(2024, 9, 15)}
                 eventSettings={{ 
                   dataSource: filteredEvents,
+                  fields: {
+                    subject: { name: 'Subject' },
+                    startTime: { name: 'StartTime' },
+                    endTime: { name: 'EndTime' },
+                    description: { name: 'Description' },
+                    priority: { name: 'Priority' },
+                    category: { name: 'Category' },
+                    location: { name: 'ServiceLocation' },
+                    customer: { name: 'Customer' },
+                    equipment: { name: 'Equipment' },
+                    serviceCall: { name: 'ServiceCall' }
+                  },
                   allowEditing: false,
-                  allowAdding: false }}
+                  allowAdding: false 
+                }}
                 eventRendered={(args) => {
                   const colorStyle = getStatusColor(args.data.JobStatus);
                   args.element.style.backgroundColor = colorStyle.backgroundColor;
