@@ -52,14 +52,14 @@ const ActivityTracker = () => {
     } finally {
       renewalInProgress.current = false;
     }
-  }, [router]);
+  }, [router, CHECK_INTERVAL]); // Added CHECK_INTERVAL to dependencies
 
   // Check on mount and interval
   useEffect(() => {
     checkAndRenewSession();
     const intervalId = setInterval(checkAndRenewSession, CHECK_INTERVAL);
     return () => clearInterval(intervalId);
-  }, [checkAndRenewSession]);
+  }, [checkAndRenewSession, CHECK_INTERVAL]); // Added CHECK_INTERVAL to dependencies
 
   // Check on tab focus
   useEffect(() => {
