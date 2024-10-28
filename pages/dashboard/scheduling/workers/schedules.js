@@ -459,8 +459,7 @@ const FieldServiceSchedules = () => {
               <h1 className="mb-1 h2 fw-bold">Worker Schedules</h1>
               <Breadcrumb>
                 <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item href="#">Calendar</Breadcrumb.Item>
-                <Breadcrumb.Item active>View Schedules</Breadcrumb.Item>
+                <Breadcrumb.Item href="/dashboard/scheduling/workers/schedules">Worker Calendar</Breadcrumb.Item>
               </Breadcrumb>
             </div>
           </div>

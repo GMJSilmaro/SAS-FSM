@@ -8,7 +8,13 @@ const NavbarDefault = [
 		link: '#',
 		icon: 'HouseDoorFill',
 		children: [
-			{ id: uuid(), menuitem: 'Overview', link: '/dashboard/overview'},
+			{ 
+				id: uuid(), 
+				menuitem: 'Overview', 
+				link: '/dashboard/overview',
+				target: '_blank',
+				rel: 'noopener noreferrer'
+			},
 		],
 		isAuthenticated: true,
 	},
@@ -28,13 +34,17 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Customers',
 				link: '/dashboard/customers/list',
-				icon: 'PersonFill'
+				icon: 'PersonFill',
+				target: '_blank',
+				rel: 'noopener noreferrer'
 			},
 			// {
 			// 	id: uuid(),
 			// 	menuitem: 'Locations',
 			// 	link: '/dashboard/customers/locations',
-			// 	icon: 'GeoAltFill'
+			// 	icon: 'GeoAltFill',
+			// 	target: '_blank',
+			// 	rel: 'noopener noreferrer'
 			// },
 		],
 		isAuthenticated: true,
@@ -54,15 +64,18 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Workers',
 				link: '/dashboard/workers/list',
-				icon: 'PersonLinesFill'
+				icon: 'PersonLinesFill',
+				target: '_blank',
+				rel: 'noopener noreferrer'
 			},
 			{
 				id: uuid(),
 				menuitem: 'Workers Dispatch',
 				link: '/dashboard/scheduling/workers/schedules',
-				icon: 'CalendarWeekFill'
+				icon: 'CalendarWeekFill',
+				target: '_blank',
+				rel: 'noopener noreferrer'
 			},
-
 		],
 		isAuthenticated: true,
 	},
@@ -81,13 +94,17 @@ const NavbarDefault = [
 				id: uuid(),
 				menuitem: 'Jobs',
 				link: '/dashboard/jobs/list-jobs',
-				icon: 'ListTask'
+				icon: 'ListTask',
+				target: '_blank',
+				rel: 'noopener noreferrer'
 			},
 			{
 				id: uuid(),
 				menuitem: 'Job Schedules',
 				link: '/dashboard/scheduling/jobs/current',
-				icon: 'CalendarWeekFill'
+				icon: 'CalendarWeekFill',
+				target: '_blank',
+				rel: 'noopener noreferrer'
 			},
 		],
 		isAuthenticated: true,

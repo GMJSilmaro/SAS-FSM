@@ -18,7 +18,8 @@ export default async function handler(req, res) {
     phone = '',
     contractStatus = '',
     country = '',
-    status = ''
+    status = '',
+    address = ''
   } = req.query;
 
   let b1session = req.cookies.B1SESSION;
@@ -78,6 +79,9 @@ export default async function handler(req, res) {
     if (status) {
       filterConditions.push(`Valid eq '${status === 'active' ? 'Y' : 'N'}'`);
     }
+    if (address) {
+      filterConditions.push(`(contains(Address, '${address}') or contains(MailAddress, '${address}'))`);
+    }
     
     // If there's a general search term, add it to the conditions
     if (search) {
@@ -107,8 +111,8 @@ export default async function handler(req, res) {
 
     const queryData = await queryResponse.json();
 
-    // Update the count URL to include the same filters
-    const countUrl = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners/$count${filterQuery ? '?' + filterQuery : ''}`;
+    // Get total count
+    const countUrl = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners/$count?$filter=contains(CardName, '${search}')`;
     const countResponse = await fetch(countUrl, {
       method: 'GET',
       headers: {

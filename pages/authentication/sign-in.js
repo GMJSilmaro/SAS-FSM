@@ -4,10 +4,8 @@ import { Col, Row, Card, Form, Button, Image } from 'react-bootstrap';
 import { signInWithEmailAndPassword } from 'firebase/auth';  
 import { auth } from '../../firebase';  
 import Cookies from 'js-cookie';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { ClipLoader } from 'react-spinners';  // For the loading spinner
-import Swal from 'sweetalert2';  // For SweetAlert2
+import { toast } from 'react-toastify';
+import { ClipLoader } from 'react-spinners';
 
 const SignIn = () => {
   const [email, setEmail] = useState(''); 
@@ -20,83 +18,64 @@ const SignIn = () => {
     setLoading(true);
     
     try {
-      // Step 1: Authenticate with Firebase
+      // Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const token = await userCredential.user.getIdToken();
 
-      console.log('Firebase authentication successful');
-    
-      // Get Firebase token (optional for frontend use)
-      const token = await user.getIdToken();
-      Cookies.set('customToken', token, { secure: true, sameSite: 'Lax' });
-  
-      // Step 2: Send credentials to your backend to log in to SAP B1 and handle session cookies
+      // Backend Authentication
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,  // Include Firebase token for backend validation (if needed)
         },
         body: JSON.stringify({ email, password }),
-        credentials: 'include', // Ensures cookies like B1SESSION are sent and stored
+        credentials: 'include',
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Login failed');
       }
-  
+
       const data = await response.json();
-      console.log('Backend login response:', data);
-  
 
-      if (!data.isAdmin) {
-        throw new Error('Access denied. You must be an admin to log in.');
-      }
-  
+      // Set cookies with proper attributes
+      const cookieOptions = {
+        secure: true,
+        sameSite: 'Lax',
+        path: '/',
+        expires: 1 // 1 day
+      };
 
-      Cookies.set('uid', data.uid, { secure: true, sameSite: 'None' });
-      Cookies.set('email', email, { secure: true, sameSite: 'None' });
-      Cookies.set('workerId', data.workerId, { secure: true, sameSite: 'None' });
-      Cookies.set('isAdmin', data.isAdmin, { secure: true, sameSite: 'None' });
+      // Set all cookies
+      Cookies.set('customToken', data.customToken, cookieOptions);
+      Cookies.set('uid', data.uid, cookieOptions);
+      Cookies.set('email', email, cookieOptions);
+      Cookies.set('workerId', data.workerId, cookieOptions);
+      Cookies.set('isAdmin', data.isAdmin, cookieOptions);
+      
+      toast.success('Login successful!');
 
+      // Ensure cookies are set before redirect
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      Swal.fire({
-        title: 'Welcome!',
-        text: `Welcome back, ${data.fullName}!`,
-        icon: 'success',
-        confirmButtonText: 'OK'
-      }).then(() => {
-        // Redirect after the SweetAlert closes
-        router.push('/dashboard/overview');
-      });
-
-
-      toast.success('You have successfully logged in.');
-
+      // Force a hard redirect to dashboard
+      window.location.href = '/dashboard/overview';
+      
     } catch (error) {
       console.error('Login error:', error);
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-        toast.error('Invalid email or password. Please try again.');
-      } else if (error.code === 'auth/invalid-email') {
-        toast.error('Invalid email format. Please enter a valid email.');
-      } else {
-        toast.error(error.message || 'An error occurred during login. Please try again.');
-      }
-    } finally {
+      toast.error(error.message || 'Login failed. Please try again.');
       setLoading(false);
     }
-    
   };
-  
+
   return (
     <Fragment>
-      <ToastContainer /> {/* Add the ToastContainer to render toasts */}
       <Row className="align-items-center justify-content-center g-0 min-vh-100">
         <Col lg={5} md={5} className="py-8 py-xl-0">
           <Card>
             <Card.Body className="p-6">
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div className="mb-4 text-center">
                 <Image src="/images/SAS-LOGO.png" alt="SAS Logo" height={150} width={250} />
               </div>
               <Form onSubmit={handleSubmit}>
@@ -105,26 +84,36 @@ const SignIn = () => {
                     <Form.Label>Email</Form.Label>
                     <Form.Control
                       type="email"
-                      placeholder="Email"
+                      placeholder="Enter your email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      disabled={loading}
                     />
                   </Col>
                   <Col lg={12} md={12} className="mb-3">
                     <Form.Label>Password</Form.Label>
                     <Form.Control
                       type="password"
-                      placeholder="**************"
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      disabled={loading}
                     />
                   </Col>
                   <Col lg={12} md={12} className="mb-0 d-grid gap-2">
-                    <Button variant="primary" type="submit" disabled={loading}>
+                    <Button 
+                      variant="primary" 
+                      type="submit" 
+                      disabled={loading}
+                      className="py-2"
+                    >
                       {loading ? (
-                        <ClipLoader color="#ffffff" size={25} /> 
+                        <div className="d-flex align-items-center justify-content-center">
+                          <ClipLoader color="#ffffff" size={20} />
+                          <span className="ms-2">Signing In...</span>
+                        </div>
                       ) : (
                         'Sign In'
                       )}
