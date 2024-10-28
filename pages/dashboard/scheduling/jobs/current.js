@@ -76,76 +76,128 @@ const Calendar = () => {
     }, []);
   
     const onDragStop = async (args) => {
-        const { Id, StartTime, EndTime, Subject } = args.data; // Extract event details
+        const { Id, StartTime, EndTime, Subject } = args.data;
         const currentView = scheduleObj.current.currentView;
-    
+
         try {
-          // Reference to the document in Firestore
-          const jobRef = doc(db, "jobs", Id);
-    
-          let updatedStartTime, updatedEndTime;
-    
-          if (currentView === 'Month') {
-            // For Month view, keep the original time and only update the date
-            const originalStart = new Date(events.find(e => e.Id === Id).StartTime);
-            const originalEnd = new Date(events.find(e => e.Id === Id).EndTime);
-    
-            updatedStartTime = new Date(StartTime.setHours(originalStart.getHours(), originalStart.getMinutes()));
-            updatedEndTime = new Date(EndTime.setHours(originalEnd.getHours(), originalEnd.getMinutes()));
-          } else {
-            // For Day and Week views, update both date and time
-            updatedStartTime = StartTime;
-            updatedEndTime = EndTime;
-          }
-    
-          // Update the document with the new start and end times
-          await updateDoc(jobRef, {
-            startDate: updatedStartTime.toISOString(),
-            endDate: updatedEndTime.toISOString(),
-          });
-    
-          toast.success(`Job ${Id} ${Subject} updated successfully.`);
-          
+            const jobRef = doc(db, "jobs", Id);
+
+            let updatedStartTime, updatedEndTime;
+
+            if (currentView === 'Month') {
+                const originalStart = new Date(events.find(e => e.Id === Id).StartTime);
+                const originalEnd = new Date(events.find(e => e.Id === Id).EndTime);
+
+                updatedStartTime = new Date(StartTime.setHours(originalStart.getHours(), originalStart.getMinutes()));
+                updatedEndTime = new Date(EndTime.setHours(originalEnd.getHours(), originalEnd.getMinutes()));
+            } else {
+                updatedStartTime = StartTime;
+                updatedEndTime = EndTime;
+            }
+
+            // Update Firestore
+            await updateDoc(jobRef, {
+                startDate: updatedStartTime.toISOString(),
+                endDate: updatedEndTime.toISOString(),
+            });
+
+            // Update local state
+            const updatedEvents = events.map(event => {
+                if (event.Id === Id) {
+                    return {
+                        ...event,
+                        StartTime: updatedStartTime,
+                        EndTime: updatedEndTime
+                    };
+                }
+                return event;
+            });
+
+            setEvents(updatedEvents);
+            setFilteredEvents(
+                searchTerm ? 
+                updatedEvents.filter(event => 
+                    event.Subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    event.JobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    event.Customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    event.ServiceLocation.toLowerCase().includes(searchTerm.toLowerCase())
+                ) : 
+                updatedEvents
+            );
+
+            // Force schedule component to refresh
+            scheduleObj.current.refreshEvents();
+
+            toast.success(`Job ${Id} ${Subject} updated successfully.`);
         } catch (error) {
-          toast.error("Failed to update job. Please try again.");
+            console.error("Error updating job:", error);
+            toast.error("Failed to update job. Please try again.");
+            
+            // Revert the drag if there's an error
+            scheduleObj.current.refreshEvents();
         }
     };
   
-    // Resize event handler to update startDate and endDate in Firebase
     const onResizeStop = async (args) => {
-        const { Id, StartTime, EndTime } = args.data; // Extract event details
+        const { Id, StartTime, EndTime } = args.data;
         const currentView = scheduleObj.current.currentView;
-    
+
         try {
-          // Reference to the document in Firestore
-          const jobRef = doc(db, "jobs", Id);
-    
-          let updatedStartTime, updatedEndTime;
-    
-          if (currentView === 'Month') {
-            // For Month view, keep the original time and only update the date
-            const originalStart = new Date(events.find(e => e.Id === Id).StartTime);
-            const originalEnd = new Date(events.find(e => e.Id === Id).EndTime);
-    
-            updatedStartTime = new Date(StartTime.setHours(originalStart.getHours(), originalStart.getMinutes()));
-            updatedEndTime = new Date(EndTime.setHours(originalEnd.getHours(), originalEnd.getMinutes()));
-          } else {
-            // For Day and Week views, update both date and time
-            updatedStartTime = StartTime;
-            updatedEndTime = EndTime;
-          }
-    
-          // Update the document with the new start and end times
-          await updateDoc(jobRef, {
-            startDate: updatedStartTime.toISOString(),
-            endDate: updatedEndTime.toISOString(),
-          });
-    
-          toast.success(`Job ${Id} updated successfully.`);
-          console.log(`Job ${Id} updated in Firebase.`);
+            const jobRef = doc(db, "jobs", Id);
+
+            let updatedStartTime, updatedEndTime;
+
+            if (currentView === 'Month') {
+                const originalStart = new Date(events.find(e => e.Id === Id).StartTime);
+                const originalEnd = new Date(events.find(e => e.Id === Id).EndTime);
+
+                updatedStartTime = new Date(StartTime.setHours(originalStart.getHours(), originalStart.getMinutes()));
+                updatedEndTime = new Date(EndTime.setHours(originalEnd.getHours(), originalEnd.getMinutes()));
+            } else {
+                updatedStartTime = StartTime;
+                updatedEndTime = EndTime;
+            }
+
+            // Update Firestore
+            await updateDoc(jobRef, {
+                startDate: updatedStartTime.toISOString(),
+                endDate: updatedEndTime.toISOString(),
+            });
+
+            // Update local state
+            const updatedEvents = events.map(event => {
+                if (event.Id === Id) {
+                    return {
+                        ...event,
+                        StartTime: updatedStartTime,
+                        EndTime: updatedEndTime
+                    };
+                }
+                return event;
+            });
+
+            setEvents(updatedEvents);
+            setFilteredEvents(
+                searchTerm ? 
+                updatedEvents.filter(event => 
+                    event.Subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    event.JobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    event.Customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    event.ServiceLocation.toLowerCase().includes(searchTerm.toLowerCase())
+                ) : 
+                updatedEvents
+            );
+
+            // Force schedule component to refresh
+            scheduleObj.current.refreshEvents();
+
+            toast.success(`Job ${Id} updated successfully.`);
         } catch (error) {
-          console.error("Error updating job in Firebase:", error);
-          toast.error("Failed to update job. Please try again.");
+            console.error("Error updating job:", error);
+            toast.error("Failed to update job. Please try again.");
+            
+            // Revert the resize if there's an error
+            scheduleObj.current.refreshEvents();
         }
     };
 
