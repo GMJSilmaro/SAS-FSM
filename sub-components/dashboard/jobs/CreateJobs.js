@@ -272,32 +272,9 @@ const AddNewJobs = () => {
   const [jobNo, setJobNo] = useState("0000");
   const [validated, setValidated] = useState(false);
   const [activeKey, setActiveKey] = useState("summary");
-
-  // const fetchCustomers = async () => {
-  //   try {
-  //     const response = await fetch("/api/getCustomers");
-  //     if (!response.ok) {
-  //       throw new Error("Failed to fetch customers");
-  //     }
-  //     const data = await response.json();
-  //     if (!Array.isArray(data)) {
-  //       throw new Error("Unexpected response format");
-  //     }
-  //     const formattedOptions = data.map((item) => ({
-  //       value: item.cardCode,
-  //       label: item.cardCode + " - " + item.cardName,
-  //       cardName: item.cardName,
-  //     }));
-  //     setCustomers(formattedOptions);
-  //   } catch (error) {
-  //     console.error("Error fetching customers:", error);
-  //     setCustomers([]); // Ensure options is an array
-  //   }
-  // };
-
-  // useEffect(() => {
-  //   fetchCustomers();
-  // }, []);
+  const [isLoading, setIsLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRY_ATTEMPTS = 3;
 
   const forceLogout = async () => {
     try {
@@ -378,70 +355,124 @@ const AddNewJobs = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch("/api/getCustomers");
+      setIsLoading(true);
+      toast.info("Fetching customers...", { autoClose: 2000 });
 
-      // Check if the response is redirected to login page
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch("/api/getCustomers", {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle session expiration
       if (response.redirected) {
         toast.error("Session expired. Redirecting to login...");
-        forceLogout();
+        await forceLogout();
         return;
       }
 
-      // Check if the response is OK
+      // Handle non-OK responses
       if (!response.ok) {
-        throw new Error("Failed to fetch customers");
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Check content type to ensure it's JSON
+      // Validate response type
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        const responseText = await response.text();
-        console.error("Unexpected content type, raw response:", responseText);
-        throw new Error("Received non-JSON response");
+        throw new Error("Invalid response format: Expected JSON");
       }
 
-      // Parse the response to JSON
       const data = await response.json();
 
-      // Validate if the response is an array
+      // Validate data structure
       if (!Array.isArray(data)) {
-        throw new Error("Unexpected response format. Expected an array.");
+        throw new Error("Invalid data format: Expected array");
       }
 
-      // Format the fetched customer data into options
+      // Format and set customer data
       const formattedOptions = data.map((item) => ({
         value: item.cardCode,
-        label: item.cardCode + " - " + item.cardName,
+        label: `${item.cardCode} - ${item.cardName}`,
         cardName: item.cardName,
       }));
 
-      // Set the formatted data in state
       setCustomers(formattedOptions);
+      setIsLoading(false);
+      setRetryCount(0); // Reset retry count on success
 
-      // Remove this toast notification
-      // toast.success("Customers fetched successfully");
+      if (formattedOptions.length === 0) {
+        toast.warning("No customers found in the database");
+      } else {
+        toast.success(`Successfully loaded ${formattedOptions.length} customers`);
+      }
+
     } catch (error) {
       console.error("Error fetching customers:", error);
       setCustomers([]);
-      toast.error(`Error fetching customers: ${error.message}`);
+      setIsLoading(false);
 
-      // Add auto-refresh logic here
-      setTimeout(() => {
-        toast.info("Attempting to refresh the page...");
-        window.location.reload();
-      }, 5000); // Wait for 5 seconds before refreshing
+      // Handle specific errors
+      if (error.name === 'AbortError') {
+        toast.error("Request timed out. Retrying...", {
+          autoClose: 2000
+        });
+      } else {
+        toast.error(`Failed to fetch customers: ${error.message}`, {
+          autoClose: 3000
+        });
+      }
+
+      // Implement retry logic
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff
+        toast.info(`Retrying in ${retryDelay/1000} seconds...`, {
+          autoClose: retryDelay
+        });
+        
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          fetchCustomers();
+        }, retryDelay);
+      } else {
+        toast.error("Maximum retry attempts reached. Reloading page...", {
+          autoClose: 2000
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
     }
   };
-
   useEffect(() => {
-    fetchSchedulingWindows();
-    fetchCustomers().then(() => {
-      if (customers.length > 0) {
-        toast.success("Customers fetched successfully");
+    let isMounted = true;
+  
+    const initializeData = async () => {
+      if (isMounted) {
+        await fetchSchedulingWindows();
+        
+        if (isMounted) {
+          await fetchCustomers(); // Remove the toast from here
+        }
+        
+        if (isMounted) {
+          await fetchJobContactTypes();
+        }
       }
-    });
-    fetchJobContactTypes();
-  }, []);
+    };
+  
+    initializeData();
+  
+    return () => {
+      isMounted = false;
+    };
+  }, [retryCount]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -1556,7 +1587,11 @@ const AddNewJobs = () => {
                 options={customers}
                 value={selectedCustomer}
                 onChange={handleCustomerChange}
-                placeholder="Enter Customer Name"
+                placeholder={isLoading ? "Loading customers..." : "Enter Customer Name"}
+                isDisabled={isLoading}
+                noOptionsMessage={() => 
+                  isLoading ? "Loading..." : "No customers found"
+                }
               />
             </Form.Group>
           </Row>
