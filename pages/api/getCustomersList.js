@@ -8,7 +8,18 @@ export default async function handler(req, res) {
   }
 
   const { SAP_SERVICE_LAYER_BASE_URL } = process.env;
-  const { page = 1, limit = 10, search = '' } = req.query;
+  const { 
+    page = 1, 
+    limit = 10, 
+    search = '',
+    customerCode = '',
+    customerName = '',
+    email = '',
+    phone = '',
+    contractStatus = '',
+    country = '',
+    status = ''
+  } = req.query;
 
   let b1session = req.cookies.B1SESSION;
   let routeid = req.cookies.ROUTEID;
@@ -42,7 +53,43 @@ export default async function handler(req, res) {
 
   try {
     const skip = (page - 1) * limit;
-    const url = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners?$skip=${skip}&$top=${limit}&$filter=contains(CardName, '${search}')`;
+    
+    // Build filter conditions
+    let filterConditions = [];
+    
+    if (customerCode) {
+      filterConditions.push(`contains(CardCode, '${customerCode}')`);
+    }
+    if (customerName) {
+      filterConditions.push(`contains(CardName, '${customerName}')`);
+    }
+    if (email) {
+      filterConditions.push(`contains(EmailAddress, '${email}')`);
+    }
+    if (phone) {
+      filterConditions.push(`contains(Phone1, '${phone}')`);
+    }
+    if (contractStatus) {
+      filterConditions.push(`U_Contract eq '${contractStatus}'`);
+    }
+    if (country) {
+      filterConditions.push(`Country eq '${country}'`);
+    }
+    if (status) {
+      filterConditions.push(`Valid eq '${status === 'active' ? 'Y' : 'N'}'`);
+    }
+    
+    // If there's a general search term, add it to the conditions
+    if (search) {
+      filterConditions.push(`(contains(CardCode, '${search}') or contains(CardName, '${search}'))`);
+    }
+
+    // Combine all conditions with 'and'
+    const filterQuery = filterConditions.length > 0 
+      ? `$filter=${filterConditions.join(' and ')}` 
+      : '';
+
+    const url = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners?$skip=${skip}&$top=${limit}${filterQuery ? '&' + filterQuery : ''}`;
 
     // Fetch the business partners using the session cookies
     const queryResponse = await fetch(url, {
@@ -60,8 +107,8 @@ export default async function handler(req, res) {
 
     const queryData = await queryResponse.json();
 
-    // Get total count
-    const countUrl = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners/$count?$filter=contains(CardName, '${search}')`;
+    // Update the count URL to include the same filters
+    const countUrl = `${SAP_SERVICE_LAYER_BASE_URL}BusinessPartners/$count${filterQuery ? '?' + filterQuery : ''}`;
     const countResponse = await fetch(countUrl, {
       method: 'GET',
       headers: {

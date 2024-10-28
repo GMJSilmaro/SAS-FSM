@@ -193,7 +193,21 @@ const ViewJobs = () => {
       selector: (row) => row.jobNo,
       sortable: true,
       width: "100px",
-      cell: row => <span className="badge bg-light text-dark">{row.jobNo}</span>
+      cell: row => (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip>Click to view job details for #{row.jobNo}</Tooltip>}
+        >
+          <Link href={`/dashboard/jobs/${row.id}`} passHref>
+            <span 
+              className="badge bg-light text-primary cursor-pointer"
+              onClick={(e) => e.stopPropagation()} // Prevents row click event
+            >
+              {row.jobNo}
+            </span>
+          </Link>
+        </OverlayTrigger>
+      )
     },
     {
       name: "Job Name",
@@ -203,9 +217,22 @@ const ViewJobs = () => {
       cell: (row) => (
         <OverlayTrigger
           placement="top"
-          overlay={<Tooltip>{row.jobName}</Tooltip>}
+          overlay={
+            <Tooltip>
+              <div>Click to view details for:</div>
+              <div><strong>{row.jobName}</strong></div>
+            </Tooltip>
+          }
         >
-          <div className="fw-semibold text-dark text-truncate" style={{ maxWidth: "130px" }}>{row.jobName}</div>
+          <Link href={`/dashboard/jobs/${row.id}`} passHref>
+            <div 
+              className="fw-semibold text-primary text-truncate cursor-pointer" 
+              style={{ maxWidth: "130px" }}
+              onClick={(e) => e.stopPropagation()} // Prevents row click event
+            >
+              {row.jobName}
+            </div>
+          </Link>
         </OverlayTrigger>
       ),
     },
