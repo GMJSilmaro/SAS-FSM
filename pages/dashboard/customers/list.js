@@ -79,66 +79,79 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
     <Card className="border-0 shadow-sm mb-4">
       <Card.Body className="p-3">
         <div className="d-flex justify-content-between align-items-center mb-2">
-          <OverlayTrigger
-            placement="right"
-            overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} search for customers</Tooltip>}
-          >
-            <div 
-              className="d-flex align-items-center" 
-              style={{ cursor: 'pointer' }}
-              onClick={() => setIsExpanded(!isExpanded)}
+          <div className="d-flex align-items-center flex-grow-1">
+            <OverlayTrigger
+              placement="right"
+              overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} search for customers</Tooltip>}
             >
-              <Filter size={16} className="me-2 text-primary" />
-              <h6 className="mb-0 me-2" style={{ fontSize: '1rem' }}>
-                Filter
-                {/* Add active filters count */}
-                {Object.values(filters).filter(value => value !== '').length > 0 && (
-                  <Badge 
-                    bg="primary" 
-                    className="ms-2" 
-                    style={{ 
-                      fontSize: '0.75rem', 
-                      verticalAlign: 'middle',
-                      borderRadius: '12px',
-                      padding: '0.25em 0.6em'
-                    }}
-                  >
-                    {Object.values(filters).filter(value => value !== '').length}
-                  </Badge>
+              <div 
+                className="d-flex align-items-center" 
+                style={{ cursor: 'pointer' }}
+                onClick={() => setIsExpanded(!isExpanded)}
+              >
+                <Filter size={16} className="me-2 text-primary" />
+                <h6 className="mb-0 me-2" style={{ fontSize: '1rem' }}>
+                  Filter
+                  {Object.values(filters).filter(value => value !== '').length > 0 && (
+                    <Badge 
+                      bg="primary" 
+                      className="ms-2" 
+                      style={{ 
+                        fontSize: '0.75rem', 
+                        verticalAlign: 'middle',
+                        borderRadius: '12px',
+                        padding: '0.25em 0.6em'
+                      }}
+                    >
+                      {Object.values(filters).filter(value => value !== '').length}
+                    </Badge>
+                  )}
+                </h6>
+                {isExpanded ? (
+                  <ChevronUp size={16} className="text-muted" />
+                ) : (
+                  <ChevronDown size={16} className="text-muted" />
                 )}
-              </h6>
-              {isExpanded ? (
-                <ChevronUp size={16} className="text-muted" />
-              ) : (
-                <ChevronDown size={16} className="text-muted" />
-              )}
-            </div>
-          </OverlayTrigger>
+              </div>
+            </OverlayTrigger>
+
+            {/* Show customer name search only when not expanded */}
+            {!isExpanded && (
+              <div className="ms-4 flex-grow-1" style={{ maxWidth: '300px' }}>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.customerName}
+                  onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
+                  placeholder="Search by customer name..."
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                />
+              </div>
+            )}
+          </div>
+
           <div>
-           
-              <Button 
-                variant="outline-danger" 
-                size="sm"
-                onClick={handleClear}
-                className="me-2"
-                disabled={loading}
-                style={{ fontSize: '0.9rem' }}
-              >
-                <X size={14} className="me-1" />
-                Clear
-              </Button>
-           
-          
-              <Button 
-                variant="primary" 
-                size="sm"
-                onClick={() => loadData(1, searchTerm)}
-                disabled={loading}
-              >
-                <Search size={14} className="me-1" />
-                Search
-              </Button>
-           
+            <Button 
+              variant="outline-danger" 
+              size="sm"
+              onClick={handleClear}
+              className="me-2"
+              disabled={loading}
+              style={{ fontSize: '0.9rem' }}
+            >
+              <X size={14} className="me-1" />
+              Clear
+            </Button>
+            
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => loadData(1, searchTerm)}
+              disabled={loading}
+            >
+              <Search size={14} className="me-1" />
+              Search
+            </Button>
           </div>
         </div>
         <div style={{ 
