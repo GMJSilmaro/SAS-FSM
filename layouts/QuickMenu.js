@@ -34,6 +34,7 @@ import {
   FaExclamationCircle,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 import "react-toastify/dist/ReactToastify.css";
 
 const QuickMenu = () => {
@@ -74,38 +75,57 @@ const QuickMenu = () => {
 
   // Sign out function
   const handleSignOut = async () => {
-    try {
-      const response = await fetch("/api/logout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Important: include credentials
-      });
+    // Show SweetAlert confirmation dialog
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You will be logged out of your account!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, log me out!",
+      cancelButtonText: "No, stay logged in",
+    });
 
-      if (response.ok) {
-        // Clear client-side cookies using js-cookie
-        const cookiesToClear = [
-          "customToken",
-          "uid",
-          "isAdmin",
-          "email",
-          "workerId",
-          "LAST_ACTIVITY",
-        ];
-
-        cookiesToClear.forEach((cookie) => {
-          Cookies.remove(cookie, { path: "/" });
+    // If the user confirmed, proceed with logout
+    if (result.isConfirmed) {
+      try {
+        const response = await fetch("/api/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Important: include credentials
         });
 
-        // Force reload to clear any cached state
-        window.location.href = "/authentication/sign-in";
-      } else {
-        throw new Error("Logout failed");
+        if (response.ok) {
+          // Clear client-side cookies using js-cookie
+          const cookiesToClear = [
+            "customToken",
+            "uid",
+            "isAdmin",
+            "email",
+            "workerId",
+            "LAST_ACTIVITY",
+          ];
+
+          cookiesToClear.forEach((cookie) => {
+            Cookies.remove(cookie, { path: "/" });
+          });
+
+          // Force reload to clear any cached state
+          window.location.href = "/authentication/sign-in";
+        } else {
+          throw new Error("Logout failed");
+        }
+      } catch (error) {
+        console.error("Error logging out:", error.message);
+        Swal.fire({
+          icon: "error",
+          title: "Logout Failed",
+          text: "Please try again.",
+        });
       }
-    } catch (error) {
-      console.error("Error logging out:", error.message);
-      toast.error("Failed to logout. Please try again.");
     }
   };
 
