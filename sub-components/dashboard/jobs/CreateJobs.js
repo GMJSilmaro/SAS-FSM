@@ -613,207 +613,6 @@ const AddNewJobs = () => {
     setSelectedWorkers(selectedOptions);
   };
 
-  // const handleCustomerChange = async (selectedOption) => {
-  //   console.log("handleCustomerChange called with:", selectedOption);
-
-  //   setSelectedContact(null);
-  //   setSelectedLocation(null);
-  //   setSelectedCustomer(selectedOption);
-  //   setSelectedServiceCall(null);
-  //   setSelectedSalesOrder(null);
-
-  //   const selectedCustomer = customers.find(
-  //     (option) => option.value === selectedOption.value
-  //   );
-
-  //   console.log("Selected customer:", selectedCustomer);
-
-  //   setFormData((prevFormData) => ({
-  //     ...prevFormData,
-  //     customerName: selectedCustomer ? selectedCustomer.label : "",
-  //   }));
-
-  //   try {
-  //     console.log("Fetching related data for customer:", selectedOption.value);
-
-  //     // Fetch contacts
-  //     const contactsResponse = await fetch("/api/getContacts", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!contactsResponse.ok) {
-  //       throw new Error("Failed to fetch contacts");
-  //     }
-
-  //     const contactsData = await contactsResponse.json();
-  //     console.log("Fetched contacts:", contactsData);
-
-  //     const formattedContacts = contactsData.map((item) => ({
-  //       value: item.contactId,
-  //       label: item.contactId,
-  //       ...item,
-  //     }));
-  //     setContacts(formattedContacts);
-
-  //     if (formattedContacts.length === 0) {
-  //       toast.warning("No contacts found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedContacts.length} contacts.`);
-  //     }
-
-  //     // Fetch job contact types
-  //     try {
-  //       const jobContactTypeResponse = await fetch("/api/getJobContactType", {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           cardCode: selectedOption.value,
-  //         }),
-  //       });
-
-  //       if (!jobContactTypeResponse.ok) {
-  //         const errorData = await jobContactTypeResponse.json();
-  //         throw new Error(`Failed to fetch job contact types: ${errorData.message || jobContactTypeResponse.statusText}`);
-  //       }
-
-  //       const jobContactTypeData = await jobContactTypeResponse.json();
-  //       console.log("Fetched job contact types:", jobContactTypeData);
-
-  //       const formattedJobContactTypes = jobContactTypeData.map((item) => ({
-  //         value: item.code,
-  //         label: item.name
-  //       }));
-
-  //       setJobContactTypes(formattedJobContactTypes);
-
-  //       setSelectedJobContactType(null);
-  //       setFormData(prevData => ({
-  //         ...prevData,
-  //         jobContactType: {
-  //           code: "",
-  //           name: ""
-  //         }
-  //       }));
-
-  //       if (formattedJobContactTypes.length === 0) {
-  //         toast.warning("No job contact types found for this customer.");
-  //       } else {
-  //         toast.success(`Successfully fetched ${formattedJobContactTypes.length} job contact types.`);
-  //       }
-
-  //     } catch (error) {
-  //       console.error("Error fetching job contact types:", error);
-  //       toast.error(`Failed to fetch job contact types: ${error.message}`);
-  //       setJobContactTypes([]);
-  //     }
-
-  //     // Fetch locations for the customer
-  //     const locationsResponse = await fetch("/api/getLocation", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!locationsResponse.ok) {
-  //       throw new Error("Failed to fetch locations");
-  //     }
-
-  //     const locationsData = await locationsResponse.json();
-  //     console.log("Fetched locations:", locationsData);
-
-  //     const formattedLocations = locationsData.map((item) => ({
-  //       value: item.siteId,
-  //       label: item.siteId,
-  //       ...item,
-  //     }));
-  //     setLocations(formattedLocations);
-
-  //     if (formattedLocations.length === 0) {
-  //       toast.warning("No locations found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedLocations.length} locations.`);
-  //     }
-
-  //     // Fetch equipments for the customer
-  //     const equipmentsResponse = await fetch("/api/getEquipments", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!equipmentsResponse.ok) {
-  //       throw new Error("Failed to fetch equipments");
-  //     }
-
-  //     const equipmentsData = await equipmentsResponse.json();
-  //     console.log("Fetched equipments:", equipmentsData);
-
-  //     const formattedEquipments = equipmentsData.map((item) => ({
-  //       value: item.ItemCode,
-  //       label: item.ItemCode,
-  //       ...item,
-  //     }));
-  //     setEquipments(formattedEquipments);
-
-  //     if (formattedEquipments.length === 0) {
-  //       toast.warning("No equipments found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`);
-  //     }
-
-  //     // Fetch service calls for the customer
-  //     const serviceCallResponse = await fetch("/api/getServiceCall", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!serviceCallResponse.ok) {
-  //       throw new Error("Failed to fetch service calls");
-  //     }
-
-  //     const serviceCallsData = await serviceCallResponse.json();
-  //     console.log("Fetched service calls:", serviceCallsData);
-
-  //     const formattedServiceCalls = serviceCallsData.map((item) => ({
-  //       value: item.serviceCallID,
-  //       label: item.serviceCallID + " - " + item.subject,
-  //     }));
-  //     setServiceCalls(formattedServiceCalls);
-
-  //     if (formattedServiceCalls.length === 0) {
-  //       toast.warning("No service calls found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`);
-  //     }
-
-  //     // Clear sales orders when customer changes
-  //     setSalesOrders([]);
-
-  //   } catch (error) {
-  //     console.error("Error in handleCustomerChange:", error);
-  //     toast.error(`Error: ${error.message}`);
-  //     setContacts([]);
-  //     setLocations([]);
-  //     setEquipments([]);
-  //     setServiceCalls([]);
-  //     setSalesOrders([]);
-  //     setJobContactTypes([]);
-  //   }
-  // };
-
   const handleCustomerChange = async (selectedOption) => {
     console.log("handleCustomerChange called with:", selectedOption);
 
@@ -1503,44 +1302,89 @@ const AddNewJobs = () => {
         console.log("No matching user found for the current UID");
       }
 
-      const jobCreatedNotificationRef = collection(db, `notifications`);
+      const generateNotificationId = async () => {
+        const notificationsRef = collection(db, "notifications");
+        const querySnapshot = await getDocs(notificationsRef);
 
+        // Get the latest ID number, assuming IDs are in the format 'N-001'
+        let latestIdNum = 0;
+
+        querySnapshot.forEach((doc) => {
+          const docId = doc.id; // e.g., N-001
+          const match = docId.match(/N-(\d+)/);
+          if (match) {
+            const idNum = parseInt(match[1]);
+            if (idNum > latestIdNum) {
+              latestIdNum = idNum;
+            }
+          }
+        });
+
+        // Increment the latest number
+        latestIdNum += 1;
+        const newNotificationId = `N-${String(latestIdNum).padStart(3, "0")}`; // Ensure it has leading zeros
+        console.log("Generated Notification ID:", newNotificationId);
+        return newNotificationId;
+      };
+
+      const notificationId = await generateNotificationId();
+
+      // Use the notificationId as the document ID
       const jobCreatedNotificationEntry = {
+        notificationId: notificationId,
+        hidden: false, // Set hidden field to true
+        jobID: jobNo,
+        message: `Job ${
+          formData.jobName || "Unnamed Job"
+        } was created by ${fullName}.`,
+        notificationType: "Job Created", // Notification type for job creation
+        timestamp: Timestamp.now(),
+        read: true, // Set read field to true
         userID: "all",
         workerId: "all",
-        jobID: jobNo,
-        notificationType: "Job Created", // Notification type for job creation
-        message: `Job ${formData.jobName} was created by ${fullName}.`,
-        timestamp: Timestamp.now(),
         readBy: {},
       };
 
-      const docRefCreated = await addDoc(
-        jobCreatedNotificationRef,
-        jobCreatedNotificationEntry
-      );
-      console.log(
-        `Job Created notification added with ID: ${docRefCreated.id}`
+      // Create the document reference with notificationId
+      const jobCreatedNotificationRef = doc(
+        db,
+        `notifications`,
+        notificationId
       );
 
+      // Save the notification to Firestore
+      await setDoc(jobCreatedNotificationRef, jobCreatedNotificationEntry);
+      console.log(`Job Created notification added with ID: ${notificationId}`);
+
+      // For assigned workers
       assignedWorkers.forEach(async (worker) => {
-        const notificationRef = collection(db, `notifications`);
-
-        // Define the notification entry for each worker
         const notificationEntry = {
           userID: userId || "unknown",
+          notificationId: notificationId,
+          hidden: false,
           workerId: worker.workerId,
           jobID: jobNo,
           notificationType: "Job Assigned",
           message: `You have been assigned to Job ${formData.jobName}.`,
           timestamp: Timestamp.now(), // Current timestamp
           read: false, // Initially unread
+          readBy: {},
         };
 
-        // Add the notification entry for the current worker using `addDoc` to generate an auto ID
-        const docRef = await addDoc(notificationRef, notificationEntry);
+        // Generate a notification ID for each worker
+        const workerNotificationId = await generateNotificationId();
+
+        // Create the document reference with workerNotificationId
+        const workerNotificationRef = doc(
+          db,
+          `notifications`,
+          workerNotificationId
+        );
+
+        // Save the notification to Firestore
+        await setDoc(workerNotificationRef, notificationEntry);
         console.log(
-          `Notification created for worker ${worker.workerId} with ID: ${docRef.id}`
+          `Notification created for worker ${worker.workerId} with ID: ${workerNotificationId}`
         );
       });
 

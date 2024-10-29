@@ -27,7 +27,12 @@ import {
 } from "firebase/firestore";
 import DotBadge from "components/bootstrap/DotBadge";
 import { format } from "date-fns";
-import { FaBell, FaBriefcase, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
+import {
+  FaBell,
+  FaBriefcase,
+  FaCheckCircle,
+  FaExclamationCircle,
+} from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -75,26 +80,26 @@ const QuickMenu = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: 'include', // Important: include credentials
+        credentials: "include", // Important: include credentials
       });
 
       if (response.ok) {
         // Clear client-side cookies using js-cookie
         const cookiesToClear = [
-          'customToken',
-          'uid',
-          'isAdmin',
-          'email',
-          'workerId',
-          'LAST_ACTIVITY'
+          "customToken",
+          "uid",
+          "isAdmin",
+          "email",
+          "workerId",
+          "LAST_ACTIVITY",
         ];
 
-        cookiesToClear.forEach(cookie => {
-          Cookies.remove(cookie, { path: '/' });
+        cookiesToClear.forEach((cookie) => {
+          Cookies.remove(cookie, { path: "/" });
         });
 
         // Force reload to clear any cached state
-        window.location.href = '/authentication/sign-in';
+        window.location.href = "/authentication/sign-in";
       } else {
         throw new Error("Logout failed");
       }
@@ -112,6 +117,8 @@ const QuickMenu = () => {
       if (!workerID) return;
 
       const notificationsRef = collection(db, "notifications");
+
+      // Fetch notifications where workerId is either the current worker or "all"
       const q = query(
         notificationsRef,
         where("workerId", "in", [workerID, "all"]),
@@ -126,12 +133,14 @@ const QuickMenu = () => {
             id: doc.id,
             ...doc.data(),
           }));
-          setNotifications(notificationData);
 
-          const unreadNotifications = notificationData.filter(
-            (item) => !item.read
-          ).length;
-          setUnreadCount(unreadNotifications);
+          // Filter notifications to include only those that are visible
+          const filteredNotifications = notificationData.filter(
+            (notification) => notification.hidden !== true // Include if 'hidden' is not set or false
+          );
+
+          // Set notifications state with filtered notifications
+          setNotifications(filteredNotifications);
         },
         (error) => {
           console.error("Error fetching notifications: ", error.message);
@@ -141,6 +150,7 @@ const QuickMenu = () => {
         }
       );
 
+      // Cleanup listener on component unmount
       return () => unsubscribe();
     }, [workerID, setUnreadCount]);
 
@@ -219,32 +229,39 @@ const QuickMenu = () => {
       }
     }, [notifications, setUnreadCount]);
 
-    const hideNotification = useCallback(async (notificationId) => {
-      try {
-        // Update the notification in Firestore to mark it as hidden
-        await updateDoc(doc(db, "notifications", notificationId), { hidden: true });
+    const hideNotification = useCallback(
+      async (notificationId) => {
+        try {
+          // Update the notification in Firestore to mark it as hidden
+          await updateDoc(doc(db, "notifications", notificationId), {
+            hidden: true,
+          });
 
-        // Update local state
-        setNotifications((prevNotifications) => 
-          prevNotifications.filter((item) => item.id !== notificationId)
-        );
+          // Update local state
+          setNotifications((prevNotifications) =>
+            prevNotifications.filter((item) => item.id !== notificationId)
+          );
 
-        // Update unread count if the hidden notification was unread
-        const hiddenNotification = notifications.find(n => n.id === notificationId);
-        if (hiddenNotification && !hiddenNotification.read) {
-          setUnreadCount((prevCount) => prevCount - 1);
+          // Update unread count if the hidden notification was unread
+          const hiddenNotification = notifications.find(
+            (n) => n.id === notificationId
+          );
+          if (hiddenNotification && !hiddenNotification.read) {
+            setUnreadCount((prevCount) => prevCount - 1);
+          }
+
+          toast.success("Notification hidden successfully!", {
+            position: "top-right",
+          });
+        } catch (error) {
+          console.error("Error hiding notification: ", error.message);
+          toast.error("Failed to hide notification. Please try again.", {
+            position: "top-right",
+          });
         }
-
-        toast.success("Notification hidden successfully!", {
-          position: "top-right",
-        });
-      } catch (error) {
-        console.error("Error hiding notification: ", error.message);
-        toast.error("Failed to hide notification. Please try again.", {
-          position: "top-right",
-        });
-      }
-    }, [notifications, setUnreadCount]);
+      },
+      [notifications, setUnreadCount]
+    );
 
     return (
       <>
@@ -283,16 +300,19 @@ const QuickMenu = () => {
                     )}
                   </div>
                   <div className="flex-grow-1">
-                    <h6 className="mb-1">{item.notificationType}  {!item.read && (
+                    <h6 className="mb-1">
+                      {item.notificationType}{" "}
+                      {!item.read && (
                         <Badge bg="primary" pill className="ms-2">
                           New
                         </Badge>
-                      )}</h6>
+                      )}
+                    </h6>
                     <p className="mb-1 text-muted">{item.message}</p>
                     <div className="d-flex align-items-center text-muted">
                       <FaBriefcase size={12} className="me-1" />
                       <small>{item.jobID}</small>
-                     
+
                       <span className="mx-2">•</span>
                       <small>
                         {format(
@@ -393,81 +413,83 @@ const QuickMenu = () => {
           </Dropdown.Menu>
         </Dropdown>
         {/* User Dropdown */}
-<Dropdown as="li" className="ms-2 pe-4">
-  <Dropdown.Toggle
-    as="a"
-    bsPrefix=" "
-    className="rounded-circle"
-    id="dropdownUser"
-    style={{ 
-      position: 'relative', 
-      display: 'inline-block',
-      paddingRight: '20px'  // Add padding to the right
-    }}
-  >
-    <div className="avatar avatar-md avatar-indicators avatar-online">
-      {userDetails && userDetails.profilePicture ? (
-        <Image
-          alt="avatar"
-          src={userDetails.profilePicture}
-          className="rounded-circle"
-        />
-      ) : (
-        <Image alt="avatar" src="" className="rounded-circle" />
-      )}
-    </div>
-    {userDetails && (
-      <div 
-        style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          top: '100%',
-          marginTop: '4px',
-          whiteSpace: 'nowrap',
-          textAlign: 'center',
-          marginRight: '20px'  // Add margin to the right of the text
-        }}
-      >
-        <span className="text-dark small fw-bold">{userDetails.fullName}</span>
-      </div>
-    )}
-  </Dropdown.Toggle>
-  <Dropdown.Menu
-    className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
-    align="end"
-    aria-labelledby="dropdownUser"
-    show={hasMounted && isDesktop ? true : false}
-  >
-    <Dropdown.Item className="mt-3">
-      <div className="d-flex">
-        {userDetails && (
-          <div>
-            <h5 className="mb-1">{userDetails.fullName}</h5>
-            <p className="mb-0 text-muted">{userDetails.email}</p>
-          </div>
-        )}
-      </div>
-    </Dropdown.Item>
-    <Dropdown.Divider />
-    <Dropdown.Item
-      eventKey="2"
-      onClick={() => router.push("/dashboard/profile/myprofile")}
-    >
-      <i className="fe fe-user me-2"></i> Profile
-    </Dropdown.Item>
-    <Dropdown.Item
-      eventKey="3"
-      onClick={() => router.push("/dashboard/settings")}
-    >
-      <i className="fe fe-settings me-2"></i> Settings
-    </Dropdown.Item>
-    <Dropdown.Divider />
-    <Dropdown.Item className="mb-3" onClick={handleSignOut}>
-      <i className="fe fe-power me-2"></i> Sign Out
-    </Dropdown.Item>
-  </Dropdown.Menu>
-</Dropdown>
+        <Dropdown as="li" className="ms-2 pe-4">
+          <Dropdown.Toggle
+            as="a"
+            bsPrefix=" "
+            className="rounded-circle"
+            id="dropdownUser"
+            style={{
+              position: "relative",
+              display: "inline-block",
+              paddingRight: "20px", // Add padding to the right
+            }}
+          >
+            <div className="avatar avatar-md avatar-indicators avatar-online">
+              {userDetails && userDetails.profilePicture ? (
+                <Image
+                  alt="avatar"
+                  src={userDetails.profilePicture}
+                  className="rounded-circle"
+                />
+              ) : (
+                <Image alt="avatar" src="" className="rounded-circle" />
+              )}
+            </div>
+            {userDetails && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  top: "100%",
+                  marginTop: "4px",
+                  whiteSpace: "nowrap",
+                  textAlign: "center",
+                  marginRight: "20px", // Add margin to the right of the text
+                }}
+              >
+                <span className="text-dark small fw-bold">
+                  {userDetails.fullName}
+                </span>
+              </div>
+            )}
+          </Dropdown.Toggle>
+          <Dropdown.Menu
+            className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
+            align="end"
+            aria-labelledby="dropdownUser"
+            show={hasMounted && isDesktop ? true : false}
+          >
+            <Dropdown.Item className="mt-3">
+              <div className="d-flex">
+                {userDetails && (
+                  <div>
+                    <h5 className="mb-1">{userDetails.fullName}</h5>
+                    <p className="mb-0 text-muted">{userDetails.email}</p>
+                  </div>
+                )}
+              </div>
+            </Dropdown.Item>
+            <Dropdown.Divider />
+            <Dropdown.Item
+              eventKey="2"
+              onClick={() => router.push("/dashboard/profile/myprofile")}
+            >
+              <i className="fe fe-user me-2"></i> Profile
+            </Dropdown.Item>
+            <Dropdown.Item
+              eventKey="3"
+              onClick={() => router.push("/dashboard/settings")}
+            >
+              <i className="fe fe-settings me-2"></i> Settings
+            </Dropdown.Item>
+            <Dropdown.Divider />
+            <Dropdown.Item className="mb-3" onClick={handleSignOut}>
+              <i className="fe fe-power me-2"></i> Sign Out
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown>
       </ListGroup>
     </Fragment>
   );
