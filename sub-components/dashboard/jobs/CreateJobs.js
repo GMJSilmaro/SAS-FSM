@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -34,11 +34,12 @@ import JobTask from "./tabs/JobTasklist";
 import { useRouter } from "next/router";
 import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from "widgets";
 import { getAuth } from "firebase/auth";
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { OverlayTrigger, Tooltip } from "react-bootstrap";
 
 const AddNewJobs = () => {
   const router = useRouter();
-  const { startDate, endDate, startTime, endTime, workerId, scheduleSession } = router.query;
+  const { startDate, endDate, startTime, endTime, workerId, scheduleSession } =
+    router.query;
 
   useEffect(() => {
     if (router.isReady) {
@@ -68,13 +69,23 @@ const AddNewJobs = () => {
 
       // Handle worker selection if workerId is provided
       if (workerId) {
-        const selectedWorker = workers.find(worker => worker.value === workerId);
+        const selectedWorker = workers.find(
+          (worker) => worker.value === workerId
+        );
         if (selectedWorker) {
           setSelectedWorkers([selectedWorker]);
         }
       }
     }
-  }, [router.isReady, startDate, endDate, startTime, endTime, workerId, scheduleSession]);
+  }, [
+    router.isReady,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    workerId,
+    scheduleSession,
+  ]);
 
   const timestamp = Timestamp.now();
 
@@ -179,7 +190,7 @@ const AddNewJobs = () => {
     },
     jobContactType: {
       code: "",
-      name: ""
+      name: "",
     },
   });
   const initialFormData = {
@@ -263,7 +274,7 @@ const AddNewJobs = () => {
     },
     jobContactType: {
       code: "",
-      name: ""
+      name: "",
     },
   };
 
@@ -325,27 +336,30 @@ const AddNewJobs = () => {
   const fetchJobContactTypes = async () => {
     try {
       const jobContactTypeResponse = await fetch("/api/getJobContactType", {
-        method: 'POST',
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-        }
+        },
       });
-  
+
       if (!jobContactTypeResponse.ok) {
         const errorData = await jobContactTypeResponse.json();
-        throw new Error(`Failed to fetch job contact types: ${errorData.message || jobContactTypeResponse.statusText}`);
+        throw new Error(
+          `Failed to fetch job contact types: ${
+            errorData.message || jobContactTypeResponse.statusText
+          }`
+        );
       }
-  
+
       const jobContactTypeData = await jobContactTypeResponse.json();
       console.log("Fetched job contact types:", jobContactTypeData);
-  
+
       const formattedJobContactTypes = jobContactTypeData.map((item) => ({
         value: item.code,
-        label: item.name
+        label: item.name,
       }));
-      
+
       setJobContactTypes(formattedJobContactTypes);
-  
     } catch (error) {
       console.error("Error fetching job contact types:", error);
       toast.error(`Failed to fetch job contact types: ${error.message}`);
@@ -364,9 +378,9 @@ const AddNewJobs = () => {
       const response = await fetch("/api/getCustomers", {
         signal: controller.signal,
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
       });
 
       clearTimeout(timeoutId);
@@ -410,39 +424,40 @@ const AddNewJobs = () => {
       if (formattedOptions.length === 0) {
         toast.warning("No customers found in the database");
       } else {
-        toast.success(`Successfully loaded ${formattedOptions.length} customers`);
+        toast.success(
+          `Successfully loaded ${formattedOptions.length} customers`
+        );
       }
-
     } catch (error) {
       console.error("Error fetching customers:", error);
       setCustomers([]);
       setIsLoading(false);
 
       // Handle specific errors
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         toast.error("Request timed out. Retrying...", {
-          autoClose: 2000
+          autoClose: 2000,
         });
       } else {
         toast.error(`Failed to fetch customers: ${error.message}`, {
-          autoClose: 3000
+          autoClose: 3000,
         });
       }
 
       // Implement retry logic
       if (retryCount < MAX_RETRY_ATTEMPTS) {
         const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff
-        toast.info(`Retrying in ${retryDelay/1000} seconds...`, {
-          autoClose: retryDelay
+        toast.info(`Retrying in ${retryDelay / 1000} seconds...`, {
+          autoClose: retryDelay,
         });
-        
+
         setTimeout(() => {
-          setRetryCount(prev => prev + 1);
+          setRetryCount((prev) => prev + 1);
           fetchCustomers();
         }, retryDelay);
       } else {
         toast.error("Maximum retry attempts reached. Reloading page...", {
-          autoClose: 2000
+          autoClose: 2000,
         });
         setTimeout(() => {
           window.location.reload();
@@ -452,23 +467,23 @@ const AddNewJobs = () => {
   };
   useEffect(() => {
     let isMounted = true;
-  
+
     const initializeData = async () => {
       if (isMounted) {
         await fetchSchedulingWindows();
-        
+
         if (isMounted) {
           await fetchCustomers(); // Remove the toast from here
         }
-        
+
         if (isMounted) {
           await fetchJobContactTypes();
         }
       }
     };
-  
+
     initializeData();
-  
+
     return () => {
       isMounted = false;
     };
@@ -657,7 +672,7 @@ const AddNewJobs = () => {
   //         headers: {
   //           "Content-Type": "application/json",
   //         },
-  //         body: JSON.stringify({ 
+  //         body: JSON.stringify({
   //           cardCode: selectedOption.value,
   //         }),
   //       });
@@ -674,9 +689,9 @@ const AddNewJobs = () => {
   //         value: item.code,
   //         label: item.name
   //       }));
-        
+
   //       setJobContactTypes(formattedJobContactTypes);
-        
+
   //       setSelectedJobContactType(null);
   //       setFormData(prevData => ({
   //         ...prevData,
@@ -801,28 +816,28 @@ const AddNewJobs = () => {
 
   const handleCustomerChange = async (selectedOption) => {
     console.log("handleCustomerChange called with:", selectedOption);
-  
+
     setSelectedContact(null);
     setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
     setSelectedServiceCall(null);
     setSelectedSalesOrder(null);
-  
+
     const selectedCustomer = customers.find(
       (option) => option.value === selectedOption.value
     );
-  
+
     console.log("Selected customer:", selectedCustomer);
-  
+
     setFormData((prevFormData) => ({
       ...prevFormData,
       customerName: selectedCustomer ? selectedCustomer.label : "",
     }));
-  
+
     // Fetch related data for the selected customer
     try {
       console.log("Fetching related data for customer:", selectedOption.value);
-  
+
       // Fetch contacts for the customer
       const contactsResponse = await fetch("/api/getContacts", {
         method: "POST",
@@ -831,27 +846,29 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!contactsResponse.ok) {
         throw new Error("Failed to fetch contacts");
       }
-  
+
       const contactsData = await contactsResponse.json();
       console.log("Fetched contacts:", contactsData);
-  
+
       const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
         label: item.contactId,
         ...item,
       }));
       setContacts(formattedContacts);
-  
+
       if (formattedContacts.length === 0) {
         toast.warning("No contacts found for this customer.");
       } else {
-        toast.success(`Successfully fetched ${formattedContacts.length} contacts.`);
+        toast.success(
+          `Successfully fetched ${formattedContacts.length} contacts.`
+        );
       }
-  
+
       // Fetch locations for the customer
       const locationsResponse = await fetch("/api/getLocation", {
         method: "POST",
@@ -860,27 +877,29 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!locationsResponse.ok) {
         throw new Error("Failed to fetch locations");
       }
-  
+
       const locationsData = await locationsResponse.json();
       console.log("Fetched locations:", locationsData);
-  
+
       const formattedLocations = locationsData.map((item) => ({
         value: item.siteId,
         label: item.siteId,
         ...item,
       }));
       setLocations(formattedLocations);
-  
+
       if (formattedLocations.length === 0) {
         toast.warning("No locations found for this customer.");
       } else {
-        toast.success(`Successfully fetched ${formattedLocations.length} locations.`);
+        toast.success(
+          `Successfully fetched ${formattedLocations.length} locations.`
+        );
       }
-  
+
       // Fetch equipments for the customer
       const equipmentsResponse = await fetch("/api/getEquipments", {
         method: "POST",
@@ -889,27 +908,29 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!equipmentsResponse.ok) {
         throw new Error("Failed to fetch equipments");
       }
-  
+
       const equipmentsData = await equipmentsResponse.json();
       console.log("Fetched equipments:", equipmentsData);
-  
+
       const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
         label: item.ItemCode,
         ...item,
       }));
       setEquipments(formattedEquipments);
-  
+
       if (formattedEquipments.length === 0) {
         toast.warning("No equipments found for this customer.");
       } else {
-        toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`);
+        toast.success(
+          `Successfully fetched ${formattedEquipments.length} equipments.`
+        );
       }
-  
+
       // Fetch service calls for the customer
       const serviceCallResponse = await fetch("/api/getServiceCall", {
         method: "POST",
@@ -918,29 +939,30 @@ const AddNewJobs = () => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!serviceCallResponse.ok) {
         throw new Error("Failed to fetch service calls");
       }
-  
+
       const serviceCallsData = await serviceCallResponse.json();
       console.log("Fetched service calls:", serviceCallsData);
-  
+
       const formattedServiceCalls = serviceCallsData.map((item) => ({
         value: item.serviceCallID,
         label: item.serviceCallID + " - " + item.subject,
       }));
       setServiceCalls(formattedServiceCalls);
-  
+
       if (formattedServiceCalls.length === 0) {
         toast.warning("No service calls found for this customer.");
       } else {
-        toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`);
+        toast.success(
+          `Successfully fetched ${formattedServiceCalls.length} service calls.`
+        );
       }
-  
+
       // Clear sales orders when customer changes
       setSalesOrders([]);
-  
     } catch (error) {
       console.error("Error in handleCustomerChange:", error);
       toast.error(`Error: ${error.message}`);
@@ -954,13 +976,13 @@ const AddNewJobs = () => {
 
   const handleJobContactTypeChange = (selectedOption) => {
     setSelectedJobContactType(selectedOption);
-    
-    setFormData(prevData => ({
+
+    setFormData((prevData) => ({
       ...prevData,
       jobContactType: {
         code: selectedOption ? selectedOption.value : "",
-        name: selectedOption ? selectedOption.label : ""
-      }
+        name: selectedOption ? selectedOption.label : "",
+      },
     }));
   };
 
@@ -1040,60 +1062,66 @@ const AddNewJobs = () => {
   };
 
   const handleSelectedServiceCallChange = async (selectedServiceCall) => {
-    console.log("handleSelectedServiceCallChange called with:", selectedServiceCall);
+    console.log(
+      "handleSelectedServiceCallChange called with:",
+      selectedServiceCall
+    );
     setSelectedServiceCall(selectedServiceCall);
-    
+
     if (selectedCustomer && selectedServiceCall) {
       try {
-        console.log('Fetching sales orders with:', {
+        console.log("Fetching sales orders with:", {
           cardCode: selectedCustomer.value,
-          serviceCallID: selectedServiceCall.value
+          serviceCallID: selectedServiceCall.value,
         });
-  
+
         const salesOrderResponse = await fetch("/api/getSalesOrder", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             cardCode: selectedCustomer.value,
-            serviceCallID: selectedServiceCall.value 
+            serviceCallID: selectedServiceCall.value,
           }),
         });
-  
+
         if (!salesOrderResponse.ok) {
           const errorData = await salesOrderResponse.json();
-          console.error('Sales order fetch error:', errorData);
-          toast.error(`Error fetching sales orders: ${errorData.error || 'Unknown error'}`);
+          console.error("Sales order fetch error:", errorData);
+          toast.error(
+            `Error fetching sales orders: ${errorData.error || "Unknown error"}`
+          );
           setSalesOrders([]);
           return;
         }
-  
+
         const response = await salesOrderResponse.json();
         console.log("Fetched sales orders:", response);
-  
+
         if (!response.value) {
-          console.error('Unexpected response format:', response);
-          toast.error('Unexpected response format from server');
+          console.error("Unexpected response format:", response);
+          toast.error("Unexpected response format from server");
           setSalesOrders([]);
           return;
         }
-  
+
         const formattedSalesOrders = response.value.map((item) => ({
           value: item.DocNum.toString(),
           label: `${item.DocNum} - ${getStatusText(item.DocStatus)}`,
           docTotal: item.DocTotal,
-          docStatus: item.DocStatus
+          docStatus: item.DocStatus,
         }));
-        
+
         setSalesOrders(formattedSalesOrders);
-  
+
         if (formattedSalesOrders.length === 0) {
           toast.warning("No sales orders found for this service call.");
         } else {
-          toast.success(`Successfully fetched ${formattedSalesOrders.length} sales orders.`);
+          toast.success(
+            `Successfully fetched ${formattedSalesOrders.length} sales orders.`
+          );
         }
-
       } catch (error) {
         console.error("Error fetching sales orders:", error);
         toast.error(`Error: ${error.message}`);
@@ -1103,13 +1131,13 @@ const AddNewJobs = () => {
       setSalesOrders([]); // Clear sales orders if either customer or service call is not selected
     }
   };
-  
+
   // Helper function to convert status codes to readable text
   const getStatusText = (status) => {
     const statusMap = {
-      'O': 'Open',
-      'C': 'Closed',
-      'P': 'Pending'
+      O: "Open",
+      C: "Closed",
+      P: "Pending",
     };
     return statusMap[status] || status;
   };
@@ -1198,10 +1226,10 @@ const AddNewJobs = () => {
     }));
 
     // If the scheduleSession is changed to 'custom', make sure the time inputs are editable
-    if (name === 'scheduleSession' && value === 'custom') {
-      setFormData(prevState => ({
+    if (name === "scheduleSession" && value === "custom") {
+      setFormData((prevState) => ({
         ...prevState,
-        scheduleSession: 'custom',
+        scheduleSession: "custom",
         // You might want to reset times here or keep the existing ones
       }));
     }
@@ -1396,9 +1424,38 @@ const AddNewJobs = () => {
             formData.customerSignature.signatureTimestamp || null,
         },
       };
+
+      const updatedHistoryData = {
+        ...formData,
+        jobID: jobNo,
+        jobNo: jobNo,
+        serviceCallID: selectedServiceCall ? selectedServiceCall.value : "",
+        salesOrderID: selectedSalesOrder ? selectedSalesOrder.value : "",
+        assignedWorkers,
+        customerID: selectedCustomer ? selectedCustomer.value : "",
+        startDate: formattedStartDateTime,
+        endDate: formattedEndDateTime,
+
+        // location: selectedLocation
+        //   ? {
+        //       locationName: selectedLocation.label,
+        //       address: {
+        //         streetNo: selectedLocation.streetNo || "",
+        //         streetAddress: selectedLocation.street || "",
+        //         block: selectedLocation.block || "",
+        //         city: selectedLocation.city || "",
+        //         stateProvince: selectedLocation.stateProvince || "",
+        //         postalCode: selectedLocation.postalCode || "",
+        //       },
+        //     }
+        //   : null,
+      };
       // Save the job document
       const jobRef = doc(db, "jobs", jobNo);
       await setDoc(jobRef, updatedFormData);
+
+      const jobHistoryRef = doc(db, "jobHistory", jobNo);
+      await setDoc(jobHistoryRef, updatedHistoryData);
 
       // Step 1: Get the authenticated user's UID
       const auth = getAuth();
@@ -1565,21 +1622,26 @@ const AddNewJobs = () => {
           <Row className="mb-3">
             <Form.Group as={Col} md="7" controlId="customerList">
               <Form.Label>
-                Search Customer{' '}
+                Search Customer{" "}
                 <OverlayTrigger
                   placement="right"
                   overlay={
                     <Tooltip id="customer-search-tooltip">
                       <div className="text-start">
-                        <strong>Customer Search:</strong><br/>
-                        • Search by customer code or name<br/>
-                        • Selection will load related contacts and locations<br/>
-                        • Required to proceed with job creation
+                        <strong>Customer Search:</strong>
+                        <br />
+                        • Search by customer code or name
+                        <br />
+                        • Selection will load related contacts and locations
+                        <br />• Required to proceed with job creation
                       </div>
                     </Tooltip>
                   }
                 >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
                 </OverlayTrigger>
               </Form.Label>
               <Select
@@ -1587,9 +1649,11 @@ const AddNewJobs = () => {
                 options={customers}
                 value={selectedCustomer}
                 onChange={handleCustomerChange}
-                placeholder={isLoading ? "Loading customers..." : "Enter Customer Name"}
+                placeholder={
+                  isLoading ? "Loading customers..." : "Enter Customer Name"
+                }
                 isDisabled={isLoading}
-                noOptionsMessage={() => 
+                noOptionsMessage={() =>
                   isLoading ? "Loading..." : "No customers found"
                 }
               />
@@ -1603,21 +1667,26 @@ const AddNewJobs = () => {
           <Row className="mb-3">
             <Form.Group as={Col} md="3" controlId="jobWorker">
               <Form.Label>
-                Select Contact ID{' '}
+                Select Contact ID{" "}
                 <OverlayTrigger
                   placement="right"
                   overlay={
                     <Tooltip id="contact-tooltip">
                       <div className="text-start">
-                        <strong>Contact Information:</strong><br/>
-                        • Shows contacts linked to selected customer<br/>
-                        • Auto-fills contact details<br/>
-                        • Required for job communication
+                        <strong>Contact Information:</strong>
+                        <br />
+                        • Shows contacts linked to selected customer
+                        <br />
+                        • Auto-fills contact details
+                        <br />• Required for job communication
                       </div>
                     </Tooltip>
                   }
                 >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
                 </OverlayTrigger>
               </Form.Label>
               <Select
@@ -1718,21 +1787,26 @@ const AddNewJobs = () => {
               <Row className="mb-3">
                 <Form.Group as={Col} md="4" controlId="jobLocation">
                   <Form.Label>
-                    Select Location ID{' '}
+                    Select Location ID{" "}
                     <OverlayTrigger
                       placement="right"
                       overlay={
                         <Tooltip id="location-tooltip">
                           <div className="text-start">
-                            <strong>Location Details:</strong><br/>
-                            • Shows addresses linked to customer<br/>
-                            • Auto-fills complete address<br/>
-                            • Used for job site information
+                            <strong>Location Details:</strong>
+                            <br />
+                            • Shows addresses linked to customer
+                            <br />
+                            • Auto-fills complete address
+                            <br />• Used for job site information
                           </div>
                         </Tooltip>
                       }
                     >
-                      <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                      <i
+                        className="fe fe-help-circle text-muted"
+                        style={{ cursor: "pointer" }}
+                      ></i>
                     </OverlayTrigger>
                   </Form.Label>
                   <Select
@@ -1927,78 +2001,101 @@ const AddNewJobs = () => {
                 <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
               </Form.Select>
             </Form.Group> */}
-           <Form.Group as={Col} md="3" controlId="serviceCall">
-            <Form.Label>
-              Service Call{' '}
-              <OverlayTrigger
-                placement="right"
-                overlay={
-                  <Tooltip id="service-call-tooltip">
-                    <div className="text-start">
-                      <strong>Service Call Information:</strong><br/>
-                      • Shows active service calls for customer<br/>
-                      • Links job to existing service request<br/>
-                      • Required for service-related jobs
-                    </div>
-                  </Tooltip>
-                }
-              >
-                <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-              </OverlayTrigger>
-            </Form.Label>
-            <Select
-              instanceId="service-call-select"
-              options={serviceCalls}
-              value={selectedServiceCall}
-              onChange={handleSelectedServiceCallChange}
-              placeholder="Select Service Call"
-            />
-          </Form.Group>
+            <Form.Group as={Col} md="3" controlId="serviceCall">
+              <Form.Label>
+                Service Call{" "}
+                <OverlayTrigger
+                  placement="right"
+                  overlay={
+                    <Tooltip id="service-call-tooltip">
+                      <div className="text-start">
+                        <strong>Service Call Information:</strong>
+                        <br />
+                        • Shows active service calls for customer
+                        <br />
+                        • Links job to existing service request
+                        <br />• Required for service-related jobs
+                      </div>
+                    </Tooltip>
+                  }
+                >
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
+                </OverlayTrigger>
+              </Form.Label>
+              <Select
+                instanceId="service-call-select"
+                options={serviceCalls}
+                value={selectedServiceCall}
+                onChange={handleSelectedServiceCallChange}
+                placeholder="Select Service Call"
+              />
+            </Form.Group>
 
-          <Form.Group as={Col} md="3" controlId="salesOrder">
-            <Form.Label>
-              Sales Order{' '}
-              <OverlayTrigger
-                placement="right"
-                overlay={
-                  <Tooltip id="sales-order-tooltip">
-                    <div className="text-start">
-                      <strong>Sales Order Information:</strong><br/>
-                      • Only shows orders linked to selected service call<br/>
-                      • Displays order number and status<br/>
-                      • Select a service call first to view available orders
-                    </div>
-                  </Tooltip>
+            <Form.Group as={Col} md="3" controlId="salesOrder">
+              <Form.Label>
+                Sales Order{" "}
+                <OverlayTrigger
+                  placement="right"
+                  overlay={
+                    <Tooltip id="sales-order-tooltip">
+                      <div className="text-start">
+                        <strong>Sales Order Information:</strong>
+                        <br />
+                        • Only shows orders linked to selected service call
+                        <br />
+                        • Displays order number and status
+                        <br />• Select a service call first to view available
+                        orders
+                      </div>
+                    </Tooltip>
+                  }
+                >
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
+                </OverlayTrigger>
+              </Form.Label>
+              <Select
+                instanceId="sales-order-select"
+                options={salesOrders}
+                value={selectedSalesOrder}
+                onChange={(selectedOption) =>
+                  setSelectedSalesOrder(selectedOption)
                 }
-              >
-                <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-              </OverlayTrigger>
-            </Form.Label>
-            <Select
-              instanceId="sales-order-select"
-              options={salesOrders}
-              value={selectedSalesOrder}
-              onChange={(selectedOption) => setSelectedSalesOrder(selectedOption)}
-              placeholder={selectedServiceCall ? "Select Sales Order" : "Select Service Call first"}
-              isDisabled={!selectedServiceCall}
-              noOptionsMessage={() => selectedServiceCall 
-                ? "No sales orders found for this service call"
-                : "Please select a service call first"
-              }
-            />
-            {!selectedServiceCall && (
-              <div className="mt-1 d-flex align-items-center text-muted">
-                <i className="fe fe-info me-1" style={{ fontSize: '14px' }}></i>
-                <small style={{ 
-                  fontStyle: 'italic',
-                  color: '#6c757d',
-                  lineHeight: '1.2'
-                }}>
-                  Please select a service call to view available sales orders
-                </small>
-              </div>
-            )}
-          </Form.Group>
+                placeholder={
+                  selectedServiceCall
+                    ? "Select Sales Order"
+                    : "Select Service Call first"
+                }
+                isDisabled={!selectedServiceCall}
+                noOptionsMessage={() =>
+                  selectedServiceCall
+                    ? "No sales orders found for this service call"
+                    : "Please select a service call first"
+                }
+              />
+              {!selectedServiceCall && (
+                <div className="mt-1 d-flex align-items-center text-muted">
+                  <i
+                    className="fe fe-info me-1"
+                    style={{ fontSize: "14px" }}
+                  ></i>
+                  <small
+                    style={{
+                      fontStyle: "italic",
+                      color: "#6c757d",
+                      lineHeight: "1.2",
+                    }}
+                  >
+                    Please select a service call to view available sales orders
+                  </small>
+                </div>
+              )}
+            </Form.Group>
 
             <Form.Group as={Col} md="3" controlId="jobContactType">
               <Form.Label>Job Contact Type</Form.Label>
@@ -2022,10 +2119,9 @@ const AddNewJobs = () => {
                 </small>
               )}
             </Form.Group>
-
           </Row>
           <Row className="mb-3">
-          <Form.Group as={Col} controlId="jobName" className="mb-3">
+            <Form.Group as={Col} controlId="jobName" className="mb-3">
               <Form.Label>Job Name</Form.Label>
               <Form.Control
                 type="text"
@@ -2046,21 +2142,26 @@ const AddNewJobs = () => {
           <Row className="mb-3">
             <Form.Group as={Col} md="4" controlId="jobCategory">
               <Form.Label>
-                Job Priority{' '}
+                Job Priority{" "}
                 <OverlayTrigger
                   placement="right"
                   overlay={
                     <Tooltip id="priority-tooltip">
                       <div className="text-start">
-                        <strong>Priority Levels:</strong><br/>
-                        • Low: Regular maintenance/non-urgent<br/>
-                        • Mid: Standard response time<br/>
-                        • High: Urgent attention required
+                        <strong>Priority Levels:</strong>
+                        <br />
+                        • Low: Regular maintenance/non-urgent
+                        <br />
+                        • Mid: Standard response time
+                        <br />• High: Urgent attention required
                       </div>
                     </Tooltip>
                   }
                 >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
                 </OverlayTrigger>
               </Form.Label>
               <Form.Select
@@ -2099,21 +2200,26 @@ const AddNewJobs = () => {
 
             <Form.Group as={Col} md="4" controlId="jobWorker">
               <Form.Label>
-                Assigned Worker{' '}
+                Assigned Worker{" "}
                 <OverlayTrigger
                   placement="right"
                   overlay={
                     <Tooltip id="worker-tooltip">
                       <div className="text-start">
-                        <strong>Worker Assignment:</strong><br/>
-                        • Select multiple workers if needed<br/>
-                        • System checks schedule conflicts<br/>
-                        • At least one worker required
+                        <strong>Worker Assignment:</strong>
+                        <br />
+                        • Select multiple workers if needed
+                        <br />
+                        • System checks schedule conflicts
+                        <br />• At least one worker required
                       </div>
                     </Tooltip>
                   }
                 >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
                 </OverlayTrigger>
               </Form.Label>
               <Select
@@ -2149,22 +2255,28 @@ const AddNewJobs = () => {
             </Form.Group>
             <Form.Group as={Col} md="4" controlId="scheduleSession">
               <Form.Label>
-                Schedule Session{' '}
+                Schedule Session{" "}
                 <OverlayTrigger
                   placement="right"
                   overlay={
                     <Tooltip id="schedule-tooltip">
                       <div className="text-start">
-                        <strong>Schedule Information:</strong><br/>
-                        • Predefined time slots available<br/>
-                        • Custom scheduling option<br/>
-                        • Auto-calculates duration<br/>
-                        • Checks for scheduling conflicts
+                        <strong>Schedule Information:</strong>
+                        <br />
+                        • Predefined time slots available
+                        <br />
+                        • Custom scheduling option
+                        <br />
+                        • Auto-calculates duration
+                        <br />• Checks for scheduling conflicts
                       </div>
                     </Tooltip>
                   }
                 >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
                 </OverlayTrigger>
               </Form.Label>
               <Form.Select
