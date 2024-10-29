@@ -38,42 +38,91 @@ import { OverlayTrigger, Tooltip } from "react-bootstrap";
 
 const AddNewJobs = () => {
   const router = useRouter();
+
+  const [workers, setWorkers] = useState([]);
+  const [selectedWorkers, setSelectedWorkers] = useState([]);
   const { startDate, endDate, startTime, endTime, workerId, scheduleSession } =
     router.query;
 
   useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const usersCollection = collection(db, "users");
+        const usersSnapshot = await getDocs(usersCollection);
+        const usersList = usersSnapshot.docs.map((doc) => ({
+          value: doc.id,
+          label:
+            doc.data().workerId +
+            " - " +
+            doc.data().firstName +
+            " " +
+            doc.data().lastName,
+        }));
+        setWorkers(usersList);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
     if (router.isReady) {
+      console.log("Router is ready. Current formData:", formData);
       let updatedFormData = { ...formData };
 
+      // Update form data with router query parameters
       if (startDate) {
         updatedFormData.startDate = startDate;
+        console.log("Updated startDate:", startDate);
       }
-
       if (endDate) {
         updatedFormData.endDate = endDate;
+        console.log("Updated endDate:", endDate);
       }
-
       if (startTime) {
         updatedFormData.startTime = startTime;
+        console.log("Updated startTime:", startTime);
       }
-
       if (endTime) {
         updatedFormData.endTime = endTime;
+        console.log("Updated endTime:", endTime);
       }
-
       if (scheduleSession) {
         updatedFormData.scheduleSession = scheduleSession;
+        console.log("Updated scheduleSession:", scheduleSession);
       }
 
       setFormData(updatedFormData);
+      console.log("FormData after updates:", updatedFormData);
+
+      // Log the workerId and workers
+      console.log("Worker ID from router:", workerId);
+      console.log("Current workers array:", workers);
 
       // Handle worker selection if workerId is provided
-      if (workerId) {
+      if (workerId && workers.length > 0) {
+        console.log("Attempting to find worker with ID:", workerId);
+
+        // Find the worker by ID in the workers array
         const selectedWorker = workers.find(
           (worker) => worker.value === workerId
         );
+
         if (selectedWorker) {
-          setSelectedWorkers([selectedWorker]);
+          setSelectedWorkers((prevSelected) => {
+            const alreadySelected = prevSelected.some(
+              (worker) => worker.value === workerId
+            );
+            if (!alreadySelected) {
+              console.log("Selected worker found:", selectedWorker);
+              return [...prevSelected, selectedWorker]; // Add the found worker
+            }
+            return prevSelected; // Return previous state if already selected
+          });
+        } else {
+          console.log("No worker found with ID:", workerId);
         }
       }
     }
@@ -85,14 +134,13 @@ const AddNewJobs = () => {
     endTime,
     workerId,
     scheduleSession,
+    workers, // Add workers dependency to ensure it updates when workers are fetched
   ]);
 
   const timestamp = Timestamp.now();
 
   const [schedulingWindows, setSchedulingWindows] = useState([]); // State for scheduling windows
 
-  const [workers, setWorkers] = useState([]);
-  const [selectedWorkers, setSelectedWorkers] = useState([]);
   const [tasks, setTasks] = useState([]); // Initialize tasks
 
   const [serviceCalls, setServiceCalls] = useState([]);
@@ -488,29 +536,6 @@ const AddNewJobs = () => {
       isMounted = false;
     };
   }, [retryCount]);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const usersCollection = collection(db, "users");
-        const usersSnapshot = await getDocs(usersCollection);
-        const usersList = usersSnapshot.docs.map((doc) => ({
-          value: doc.id,
-          label:
-            doc.data().workerId +
-            " - " +
-            doc.data().firstName +
-            " " +
-            doc.data().lastName,
-        }));
-        setWorkers(usersList);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
-    };
-
-    fetchUsers();
-  }, []);
 
   const formatDateTime = (date, time) => {
     return `${date}T${time}:00`; // Combining date and time

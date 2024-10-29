@@ -153,6 +153,7 @@ const FieldServiceSchedules = () => {
                 startTime: startTime.toTimeString().split(" ")[0],
                 endTime: endTime.toTimeString().split(" ")[0],
                 workerId: workerId,
+                workerName: workerName,
                 scheduleSession: "Custom",
               },
             });
