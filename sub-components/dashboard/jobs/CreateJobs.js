@@ -1989,23 +1989,117 @@ const AddNewJobs = () => {
               )}
             </Form.Group>
           </Row>
+          <Row className="mb-3"></Row>
+
           <Row className="mb-3">
-            <Form.Group as={Col} controlId="jobName" className="mb-3">
-              <Form.Label>Job Name</Form.Label>
+            <Form.Group as={Col} md="4" controlId="startDate">
+              <Form.Label>Start Date</Form.Label>
               <Form.Control
-                type="text"
-                name="jobName"
-                value={formData.jobName}
+                type="date"
+                name="startDate"
+                value={formData.startDate}
                 onChange={handleInputChange}
-                placeholder="Enter Job Name"
+                placeholder="Enter start date"
               />
             </Form.Group>
-            <Form.Group controlId="description" className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <ReactQuillEditor
-                initialValue={formData.jobDescription} // Pass the initial value
-                onDescriptionChange={handleDescriptionChange} // Handle changes
+            <Form.Group as={Col} md="4" controlId="endDate">
+              <Form.Label>End Date</Form.Label>
+              <Form.Control
+                type="date"
+                name="endDate"
+                value={formData.endDate}
+                onChange={handleInputChange}
+                placeholder="Enter end date"
               />
+            </Form.Group>
+            <Form.Group as={Col} md="4" controlId="scheduleSession">
+              <Form.Label>
+                Schedule Session{" "}
+                <OverlayTrigger
+                  placement="right"
+                  overlay={
+                    <Tooltip id="schedule-tooltip">
+                      <div className="text-start">
+                        <strong>Schedule Information:</strong>
+                        <br />
+                        • Predefined time slots available
+                        <br />
+                        • Custom scheduling option
+                        <br />
+                        • Auto-calculates duration
+                        <br />• Checks for scheduling conflicts
+                      </div>
+                    </Tooltip>
+                  }
+                >
+                  <i
+                    className="fe fe-help-circle text-muted"
+                    style={{ cursor: "pointer" }}
+                  ></i>
+                </OverlayTrigger>
+              </Form.Label>
+              <Form.Select
+                name="scheduleSession"
+                value={formData.scheduleSession}
+                onChange={handleScheduleSessionChange}
+                aria-label="Select schedule session"
+              >
+                <option value="">Select a session</option>
+                <option value="">Custom</option>
+                {schedulingWindows.map((window) => (
+                  <option key={window.id} value={window.label}>
+                    {window.label} ({window.timeStart} to {window.timeEnd})
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          </Row>
+
+          <Row className="mb-3">
+            <Form.Group as={Col} md="4" controlId="startTime">
+              <Form.Label>Start Time</Form.Label>
+              <Form.Control
+                type="time"
+                name="startTime"
+                value={formData.startTime}
+                onChange={handleInputChange}
+                readOnly={formData.scheduleSession !== "custom"}
+              />
+            </Form.Group>
+
+            <Form.Group as={Col} md="4" controlId="endTime">
+              <Form.Label>End Time</Form.Label>
+              <Form.Control
+                type="time"
+                name="endTime"
+                value={formData.endTime}
+                onChange={handleInputChange}
+                readOnly={formData.scheduleSession !== "custom"}
+              />
+            </Form.Group>
+
+            <Form.Group as={Col} md="3" controlId="estimatedDuration">
+              <Form.Label>Estimated Duration</Form.Label>
+              <InputGroup>
+                <Form.Control
+                  type="number"
+                  name="estimatedDurationHours"
+                  value={formData.estimatedDurationHours}
+                  onChange={handleInputChange}
+                  placeholder="Hours"
+                  readOnly={formData.scheduleSession !== "custom"}
+                />
+                <InputGroup.Text>h</InputGroup.Text>
+                <Form.Control
+                  type="number"
+                  name="estimatedDurationMinutes"
+                  value={formData.estimatedDurationMinutes}
+                  onChange={handleInputChange}
+                  placeholder="Minutes"
+                  readOnly={formData.scheduleSession !== "custom"}
+                />
+                <InputGroup.Text>m</InputGroup.Text>
+              </InputGroup>
             </Form.Group>
           </Row>
           <Row className="mb-3">
@@ -2100,117 +2194,27 @@ const AddNewJobs = () => {
                 placeholder="Search Worker"
               />
             </Form.Group>
-          </Row>
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="startDate">
-              <Form.Label>Start Date</Form.Label>
+
+            <Form.Group as={Col} controlId="jobName" className="mb-3">
+              <Form.Label>Job Name</Form.Label>
               <Form.Control
-                type="date"
-                name="startDate"
-                value={formData.startDate}
+                type="text"
+                name="jobName"
+                value={formData.jobName}
                 onChange={handleInputChange}
-                placeholder="Enter start date"
-              />
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="endDate">
-              <Form.Label>End Date</Form.Label>
-              <Form.Control
-                type="date"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleInputChange}
-                placeholder="Enter end date"
-              />
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="scheduleSession">
-              <Form.Label>
-                Schedule Session{" "}
-                <OverlayTrigger
-                  placement="right"
-                  overlay={
-                    <Tooltip id="schedule-tooltip">
-                      <div className="text-start">
-                        <strong>Schedule Information:</strong>
-                        <br />
-                        • Predefined time slots available
-                        <br />
-                        • Custom scheduling option
-                        <br />
-                        • Auto-calculates duration
-                        <br />• Checks for scheduling conflicts
-                      </div>
-                    </Tooltip>
-                  }
-                >
-                  <i
-                    className="fe fe-help-circle text-muted"
-                    style={{ cursor: "pointer" }}
-                  ></i>
-                </OverlayTrigger>
-              </Form.Label>
-              <Form.Select
-                name="scheduleSession"
-                value={formData.scheduleSession}
-                onChange={handleScheduleSessionChange}
-                aria-label="Select schedule session"
-              >
-                <option value="">Select a session</option>
-                <option value="">Custom</option>
-                {schedulingWindows.map((window) => (
-                  <option key={window.id} value={window.label}>
-                    {window.label} ({window.timeStart} to {window.timeEnd})
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Row>
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="startTime">
-              <Form.Label>Start Time</Form.Label>
-              <Form.Control
-                type="time"
-                name="startTime"
-                value={formData.startTime}
-                onChange={handleInputChange}
-                readOnly={formData.scheduleSession !== "custom"}
+                placeholder="Enter Job Name"
               />
             </Form.Group>
 
-            <Form.Group as={Col} md="4" controlId="endTime">
-              <Form.Label>End Time</Form.Label>
-              <Form.Control
-                type="time"
-                name="endTime"
-                value={formData.endTime}
-                onChange={handleInputChange}
-                readOnly={formData.scheduleSession !== "custom"}
+            <Form.Group controlId="description" className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <ReactQuillEditor
+                initialValue={formData.jobDescription} // Pass the initial value
+                onDescriptionChange={handleDescriptionChange} // Handle changes
               />
             </Form.Group>
-
-            <Form.Group as={Col} md="3" controlId="estimatedDuration">
-              <Form.Label>Estimated Duration</Form.Label>
-              <InputGroup>
-                <Form.Control
-                  type="number"
-                  name="estimatedDurationHours"
-                  value={formData.estimatedDurationHours}
-                  onChange={handleInputChange}
-                  placeholder="Hours"
-                  readOnly={formData.scheduleSession !== "custom"}
-                />
-                <InputGroup.Text>h</InputGroup.Text>
-                <Form.Control
-                  type="number"
-                  name="estimatedDurationMinutes"
-                  value={formData.estimatedDurationMinutes}
-                  onChange={handleInputChange}
-                  placeholder="Minutes"
-                  readOnly={formData.scheduleSession !== "custom"}
-                />
-                <InputGroup.Text>m</InputGroup.Text>
-              </InputGroup>
-            </Form.Group>
           </Row>
+
           <hr className="my-4" />
           {/* <p className="text-muted">Notification:</p>
           <Row className="mt-3">
