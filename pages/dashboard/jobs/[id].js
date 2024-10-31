@@ -114,6 +114,17 @@ const geocodeAddress = async (address, jobId) => {
   }
 };
 
+// Add this helper function near the top with other helper functions
+const formatTime = (timeString) => {
+  if (!timeString) return "N/A";
+  // Convert 24h format to 12h format with AM/PM
+  const [hours, minutes] = timeString.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
 const JobDetails = () => {
   const router = useRouter();
   const { id } = router.query; // Extract job ID from URL
@@ -505,22 +516,22 @@ const JobDetails = () => {
         </Card>
 
         <ListGroup variant="flush">
-           {/* Add search input */}
- <InputGroup className="mb-3">
-          <InputGroup.Text>
-            <Search />
-          </InputGroup.Text>
-          <Form.Control
-            type="text"
-            placeholder="Search notes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
+          <InputGroup className="mb-3">
+            <InputGroup.Text>
+              <Search />
+            </InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="Search notes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </InputGroup>
           {currentNotes.map((note) => (
             <ListGroup.Item key={note.id} className="border-bottom py-3">
-              <div className="d-flex justify-content-between align-items-start">
-                <div className="me-3">
+              <Row>
+                {/* Left side: Note content, tags, and email */}
+                <Col xs={9}>
                   {editingNote && editingNote.id === note.id ? (
                     <>
                       <Form.Control
@@ -545,24 +556,28 @@ const JobDetails = () => {
                           ))}
                         </div>
                       )}
+                      <small className="text-muted d-block mt-2">
+                        By: {note.userEmail}
+                      </small>
                     </>
                   )}
-                  <small className="text-muted">
-                    {note.createdAt.toLocaleString() || 'Date not available'} 
-                    ({formatDistanceToNow(note.createdAt, { addSuffix: true })})
-                  </small>
-                  <div>
-                    <small className="text-muted">By: {note.userEmail}</small>
+                </Col>
+
+                {/* Right side: Date and action buttons */}
+                <Col xs={3} className="text-end">
+                  <div className="mb-2">
+                    <small className="text-muted d-block">
+                      {note.createdAt.toLocaleString() || 'Date not available'}
+                    </small>
                   </div>
-                </div>
-                <div>
+                  
                   {editingNote && editingNote.id === note.id ? (
-                    <>
+                    <div>
                       <Button 
                         variant="success" 
                         size="sm"
                         onClick={() => handleEditTechnicianNote(editingNote)}
-                        className="me-2"
+                        className="me-1 mb-1"
                       >
                         Save
                       </Button>
@@ -570,17 +585,18 @@ const JobDetails = () => {
                         variant="secondary" 
                         size="sm"
                         onClick={() => setEditingNote(null)}
+                        className="mb-1"
                       >
                         Cancel
                       </Button>
-                    </>
+                    </div>
                   ) : (
-                    <>
+                    <div>
                       <Button 
                         variant="outline-primary" 
                         size="sm"
                         onClick={() => setEditingNote(note)}
-                        className="me-2"
+                        className="me-1 mb-1"
                       >
                         Edit
                       </Button>
@@ -588,13 +604,14 @@ const JobDetails = () => {
                         variant="outline-danger" 
                         size="sm"
                         onClick={() => handleDeleteTechnicianNote(note.id)}
+                        className="mb-1"
                       >
                         Delete
                       </Button>
-                    </>
+                    </div>
                   )}
-                </div>
-              </div>
+                </Col>
+              </Row>
             </ListGroup.Item>
           ))}
         </ListGroup>
@@ -1135,6 +1152,21 @@ const JobDetails = () => {
                   </p>
                 </div>
               </div>
+              {job.startTime && (
+                <div className="d-flex justify-content-between align-items-center mt-2">
+                  <div className="d-flex align-items-center">
+                    <Clock size={16} className="text-primary" />
+                    <div className="ms-2">
+                      <h5 className="mb-0 text-body">Start Time</h5>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-dark mb-0 fw-semi-bold">
+                      {formatTime(job.startTime)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </Card.Body>
             <Card.Body className="border-top py-3">
               <div className="d-flex justify-content-between align-items-center">
@@ -1150,7 +1182,46 @@ const JobDetails = () => {
                   </p>
                 </div>
               </div>
+              {job.endTime && (
+                <div className="d-flex justify-content-between align-items-center mt-2">
+                  <div className="d-flex align-items-center">
+                    <Clock size={16} className="text-primary" />
+                    <div className="ms-2">
+                      <h5 className="mb-0 text-body">End Time</h5>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-dark mb-0 fw-semi-bold">
+                      {formatTime(job.endTime)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </Card.Body>
+            {/* Multiple Days Indicator */}
+            {job.startDate && job.endDate && (
+              <Card.Body className="border-top py-3 bg-light">
+                <div className="d-flex justify-content-between align-items-center">
+                  <div className="d-flex align-items-center">
+                    <Calendar4 size={16} className="text-primary" />
+                    <div className="ms-2">
+                      <h5 className="mb-0 text-body">Duration</h5>
+                    </div>
+                  </div>
+                  <div>
+                    <Badge bg={
+                      new Date(job.endDate).getDate() - new Date(job.startDate).getDate() > 0 
+                        ? "warning" 
+                        : "info"
+                    }>
+                      {new Date(job.endDate).getDate() - new Date(job.startDate).getDate() > 0
+                        ? `${new Date(job.endDate).getDate() - new Date(job.startDate).getDate() + 1} Days`
+                        : "Single Day"}
+                    </Badge>
+                  </div>
+                </div>
+              </Card.Body>
+            )}
             <Card.Body className="border-top py-3">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center">

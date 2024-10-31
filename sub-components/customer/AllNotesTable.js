@@ -12,6 +12,10 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
   const [editedContent, setEditedContent] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(10);
+  const [sortConfig, setSortConfig] = useState({
+    key: 'createdAt',
+    direction: 'desc'
+  });
 
   const filteredNotes = notes.filter(note =>
     note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -19,9 +23,40 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
     note.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const sortedNotes = [...filteredNotes].sort((a, b) => {
+    if (sortConfig.key === 'createdAt') {
+      const dateA = a.createdAt?.toDate() || new Date();
+      const dateB = b.createdAt?.toDate() || new Date();
+      return sortConfig.direction === 'asc' 
+        ? dateA - dateB 
+        : dateB - dateA;
+    }
+    if (sortConfig.key === 'tags') {
+      const tagsA = a.tags?.join(', ') || '';
+      const tagsB = b.tags?.join(', ') || '';
+      return sortConfig.direction === 'asc'
+        ? tagsA.localeCompare(tagsB)
+        : tagsB.localeCompare(tagsA);
+    }
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
+  const requestSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
   const indexOfLastNote = currentPage * notesPerPage;
   const indexOfFirstNote = indexOfLastNote - notesPerPage;
-  const currentNotes = filteredNotes.slice(indexOfFirstNote, indexOfLastNote);
+  const currentNotes = sortedNotes.slice(indexOfFirstNote, indexOfLastNote);
   const totalPages = Math.ceil(filteredNotes.length / notesPerPage);
 
   const startEditing = (note) => {
@@ -97,10 +132,18 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
             <Table striped bordered hover>
               <thead>
                 <tr>
-                  <th>Content</th>
-                  <th>User</th>
-                  <th>Date</th>
-                  <th>Tags</th>
+                  <th onClick={() => requestSort('content')} style={{ cursor: 'pointer' }}>
+                    Content {sortConfig.key === 'content' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => requestSort('userEmail')} style={{ cursor: 'pointer' }}>
+                    User {sortConfig.key === 'userEmail' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => requestSort('createdAt')} style={{ cursor: 'pointer' }}>
+                    Date {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => requestSort('tags')} style={{ cursor: 'pointer' }}>
+                    Tags {sortConfig.key === 'tags' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>

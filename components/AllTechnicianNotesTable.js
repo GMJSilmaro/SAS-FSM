@@ -5,11 +5,37 @@ import { formatDistanceToNow } from 'date-fns';
 
 export const AllTechnicianNotesTable = ({ notes, onClose, jobId }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({
+    key: 'createdAt',
+    direction: 'desc'
+  });
 
   const filteredNotes = notes.filter(note =>
     note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
     note.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const sortedNotes = [...filteredNotes].sort((a, b) => {
+    if (sortConfig.key === 'createdAt') {
+      return sortConfig.direction === 'asc' 
+        ? a.createdAt - b.createdAt 
+        : b.createdAt - a.createdAt;
+    }
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
+  const requestSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
 
   return (
     <div>
@@ -33,13 +59,19 @@ export const AllTechnicianNotesTable = ({ notes, onClose, jobId }) => {
       <Table striped bordered hover>
         <thead>
           <tr>
-            <th>Note</th>
-            <th>Created By</th>
-            <th>Date</th>
+            <th onClick={() => requestSort('content')} style={{ cursor: 'pointer' }}>
+              Note {sortConfig.key === 'content' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
+            <th onClick={() => requestSort('userEmail')} style={{ cursor: 'pointer' }}>
+              Created By {sortConfig.key === 'userEmail' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
+            <th onClick={() => requestSort('createdAt')} style={{ cursor: 'pointer' }}>
+              Date {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
           </tr>
         </thead>
         <tbody>
-          {filteredNotes.map((note) => (
+          {sortedNotes.map((note) => (
             <tr key={note.id}>
               <td>{note.content}</td>
               <td>{note.userEmail}</td>

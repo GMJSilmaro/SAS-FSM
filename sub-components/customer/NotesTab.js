@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Card, ListGroup, Row, Col, InputGroup, Modal, Toast, ToastContainer, Pagination } from 'react-bootstrap';
+import { Form, Button, Card, ListGroup, Row, Col, InputGroup, Modal, Toast, ToastContainer, Pagination, Badge } from 'react-bootstrap';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Trash, PencilSquare, Plus, Save, X, Tags, Search } from 'react-bootstrap-icons';
@@ -198,38 +198,90 @@ export const NotesTab = ({ customerId }) => {
 
                 <ListGroup variant="flush">
                   {currentNotes.map((note) => (
-                    <ListGroup.Item 
-                      key={note.id} 
-                      className="border-bottom py-3"
-                    >
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div className="me-3">
-                          <p className="mb-1">{note.content}</p>
-                          <small className="text-muted">
-                            {note.createdAt?.toDate().toLocaleString() || 'Date not available'} 
-                            ({formatDistanceToNow(note.createdAt?.toDate() || new Date(), { addSuffix: true })})
-                          </small>
-                          <div>
-                            <small className="text-muted">By: {note.userEmail}</small>
+                    <ListGroup.Item key={note.id} className="border-bottom py-3">
+                      <Row>
+                        {/* Left side: Note content, tags, and email */}
+                        <Col xs={9}>
+                          {editingNote && editingNote.id === note.id ? (
+                            <>
+                              <Form.Control
+                                as="textarea"
+                                rows={3}
+                                value={editingNote.content}
+                                onChange={(e) => setEditingNote({...editingNote, content: e.target.value})}
+                              />
+                              <Button variant="outline-secondary" onClick={() => setShowTagModal(true)} className="mt-2">
+                                <Tags /> Edit Tags
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <p className="mb-1">{note.content}</p>
+                              {note.tags && note.tags.length > 0 && (
+                                <div className="mb-2">
+                                  {note.tags.map((tag, index) => (
+                                    <Badge key={index} bg="secondary" className="me-1">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                              <small className="text-muted d-block mt-2">
+                                By: {note.userEmail}
+                              </small>
+                            </>
+                          )}
+                        </Col>
+
+                        {/* Right side: Date and action buttons */}
+                        <Col xs={3} className="text-end">
+                          <div className="mb-2">
+                            <small className="text-muted d-block">
+                              {note.createdAt?.toDate().toLocaleString() || 'Date not available'}
+                            </small>
                           </div>
-                          <div>
-                            {note.tags && note.tags.map((tag, index) => (
-                              <span key={index} className="badge bg-secondary me-1">{tag}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <Button 
-                            variant="outline-danger" 
-                            size="sm"
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="me-2"
-                          >
-                            <Trash />
-                          </Button>
-                    
-                        </div>
-                      </div>
+                          
+                          {editingNote && editingNote.id === note.id ? (
+                            <div>
+                              <Button 
+                                variant="success" 
+                                size="sm"
+                                onClick={() => handleEditNote(editingNote)}
+                                className="me-1 mb-1"
+                              >
+                                <Save /> Save
+                              </Button>
+                              <Button 
+                                variant="secondary" 
+                                size="sm"
+                                onClick={() => setEditingNote(null)}
+                                className="mb-1"
+                              >
+                                <X /> Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <div>
+                              <Button 
+                                variant="outline-primary" 
+                                size="sm"
+                                onClick={() => setEditingNote(note)}
+                                className="me-1 mb-1"
+                              >
+                                <PencilSquare /> Edit
+                              </Button>
+                              <Button 
+                                variant="outline-danger" 
+                                size="sm"
+                                onClick={() => handleDeleteNote(note.id)}
+                                className="mb-1"
+                              >
+                                <Trash /> Delete
+                              </Button>
+                            </div>
+                          )}
+                        </Col>
+                      </Row>
                     </ListGroup.Item>
                   ))}
                 </ListGroup>
@@ -280,7 +332,7 @@ export const NotesTab = ({ customerId }) => {
             </Card>
           </Col>
           <Col md={4}>
-            <Card className="shadow-sm mb-4">
+            {/* <Card className="shadow-sm mb-4">
               <Card.Header className="bg-light">
                 <h5 className="mb-0">Latest Note</h5>
               </Card.Header>
@@ -305,7 +357,7 @@ export const NotesTab = ({ customerId }) => {
                   <p className="text-muted">No notes available</p>
                 )}
               </Card.Body>
-            </Card>
+            </Card> */}
             <Card className="shadow-sm mb-4">
               <Card.Header className="bg-light">
                 <h5 className="mb-0">Add Note</h5>
