@@ -71,6 +71,39 @@ const EquipmentsTab = ({ customerData }) => {
     setSelectedEquipment(null);
   };
 
+  const findServiceLocation = (locationName) => {
+    if (!customerData?.BPAddresses) return 'N/A';
+    
+    // First try to find by AddressName
+    const location = customerData.BPAddresses.find(
+      addr => addr.AddressName?.toLowerCase() === locationName?.toLowerCase()
+    );
+
+    // If not found, try to match with default shipping or billing address
+    let defaultLocation = !location ? customerData.BPAddresses.find(addr => 
+      (locationName?.toLowerCase() === 'ship to' && addr.AddressType === 'bo_ShipTo') ||
+      (locationName?.toLowerCase() === 'bill to' && addr.AddressType === 'bo_BillTo')
+    ) : location;
+
+    if (!defaultLocation && customerData.BPAddresses.length > 0) {
+      // If still not found, use the first address as fallback
+      defaultLocation = customerData.BPAddresses[0];
+    }
+
+    if (!defaultLocation) return 'N/A';
+    
+    const parts = [
+      defaultLocation.Street,
+      defaultLocation.Block,
+      defaultLocation.ZipCode,
+      defaultLocation.City,
+      defaultLocation.State,
+      defaultLocation.Country
+    ].filter(Boolean);
+
+    return parts.join(', ');
+  };
+
   if (loading) {
     return (
       <div className="p-4 text-center">
@@ -124,6 +157,7 @@ const EquipmentsTab = ({ customerData }) => {
                   <th>Model Series</th>
                   <th>Serial No</th>
                   <th>Location</th>
+                  <th>Service Location Address</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -135,6 +169,7 @@ const EquipmentsTab = ({ customerData }) => {
                     <td>{item.ModelSeries || 'N/A'}</td>
                     <td>{item.SerialNo || 'N/A'}</td>
                     <td>{item.EquipmentLocation || 'N/A'}</td>
+                    <td>{findServiceLocation(item.EquipmentLocation)}</td>
                     <td>
                       <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(item)}>
                         <Eye className="me-1" /> View Details

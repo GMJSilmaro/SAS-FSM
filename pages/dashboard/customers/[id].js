@@ -196,9 +196,9 @@ const ViewCustomer = () => {
                 <Tab eventKey="equipments" title="Equipments">
                     <EquipmentsTab customerData={customerData} equipments={equipments} />
                 </Tab>
-                <Tab eventKey="history" title="Jobs">
-                  <HistoryTab customerData={customerData} />
-                </Tab>
+                <Tab eventKey="history" title="Job History">
+                  <HistoryTab customerData={customerData} customerID={id} />
+                </Tab>
                 <Tab eventKey="quotations" title="Quotations">
                   <QuotationsTab customerId={id} />
                 </Tab>

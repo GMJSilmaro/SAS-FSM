@@ -30,6 +30,12 @@ const NavbarDefault = [
 				link: '/dashboard/customers/list',
 				icon: 'PersonFill'
 			},
+			{
+				id: uuid(),
+				menuitem: 'Service Locations',
+				link: '/dashboard/locations/list',
+				icon: 'GeoAltFill'
+			},
 		],
 		isAuthenticated: true,
 	},

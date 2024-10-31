@@ -444,6 +444,43 @@
       padding: 1rem;
     }
   }
+
+  /* Add these styles to your CSS file */
+.table {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table thead th {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  color: #495057;
+  font-weight: 600;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+
+.badge {
+  padding: 8px 12px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Improve responsive behavior */
+@media (max-width: 768px) {
+  .table-responsive {
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+}
   
 
 // /// COLOR!
