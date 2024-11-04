@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Row, Col, Table, Button, Badge, Form, Modal, Spinner, ProgressBar } from 'react-bootstrap';
-import { FileText, Download, Upload } from 'lucide-react';
+import { Row, Col, Table, Button, Badge, Form, Modal, Spinner, ProgressBar, Container, InputGroup } from 'react-bootstrap';
+import { FileText, Download, Upload, Search, XCircle } from 'lucide-react';
 import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from 'firebase/storage';
 import { toast } from 'react-toastify';
@@ -15,8 +15,19 @@ export const DocumentsTab = ({ customerData }) => {
   const fileInputRef = useRef(null);
   const [viewDocumentHtml, setViewDocumentHtml] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   const storage = getStorage();
+
+  const headerStyle = {
+    cursor: 'pointer',
+    userSelect: 'none',
+    backgroundColor: '#f8f9fa',
+    position: 'relative',
+    padding: '12px 8px',
+  };
 
   useEffect(() => {
     fetchDocuments();
@@ -139,83 +150,141 @@ export const DocumentsTab = ({ customerData }) => {
     fileInputRef.current.click();
   };
 
+  const handleSort = (field) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+    }
+  };
+
+  const getSortIcon = (direction) => {
+    return direction === 'asc' ? '↑' : '↓';
+  };
+
+  const sortedDocuments = [...documents].sort((a, b) => {
+    if (sortField === 'name') {
+      return a.name.localeCompare(b.name);
+    } else if (sortField === 'type') {
+      return a.type.localeCompare(b.type);
+    } else if (sortField === 'uploadDate') {
+      return new Date(a.uploadDate).getTime() - new Date(b.uploadDate).getTime();
+    } else if (sortField === 'size') {
+      return a.size.localeCompare(b.size);
+    } else {
+      return 0;
+    }
+  });
+
   return (
-    <Row className="p-4">
-      <Col>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div className="d-flex align-items-center">
-            <FileText size={24} className="me-2" />
-            <h3 className="mb-0">Customer Documents</h3>
+    <Container fluid>
+      <Row className="p-4">
+        <Col>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div className="d-flex align-items-center">
+              <FileText size={24} className="me-2" />
+              <h3 className="mb-0">Customer Documents</h3>
+            </div>
+            <Button
+              variant="primary"
+              onClick={handleUploadClick}
+              disabled={uploading}
+            >
+              <Upload size={14} className="me-2" />
+              Upload Document
+            </Button>
+            <Form.Control
+              type="file"
+              ref={fileInputRef}
+              className="d-none"
+              onChange={handleUpload}
+            />
           </div>
-          <Button
-            variant="primary"
-            onClick={handleUploadClick}
-            disabled={uploading}
-          >
-            <Upload size={14} className="me-2" />
-            Upload Document
-          </Button>
-          <Form.Control
-            type="file"
-            ref={fileInputRef}
-            className="d-none"
-            onChange={handleUpload}
-          />
-        </div>
-        <Table striped bordered hover responsive>
-          <thead>
-            <tr>
-              <th>Document Name</th>
-              <th style={{ width: '100px' }}>Type</th>
-              <th style={{ width: '150px' }}>Upload Date</th>
-              <th style={{ width: '100px' }}>Size</th>
-              <th style={{ width: '200px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((doc) => (
-              <tr key={doc.id}>
-                <td>
-                  <div className="fw-medium">{doc.name}</div>
-                </td>
-                <td>
-                  <Badge bg={getTypeColor(doc.type)}>{doc.type}</Badge>
-                </td>
-                <td>{new Date(doc.uploadDate).toLocaleDateString()}</td>
-                <td>{doc.size}</td>
-                <td>
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm" 
-                    onClick={() => handleView(doc)}
-                    className="me-2"
-                    disabled={loading}
-                  >
-                    View
+          <Row className="mb-3">
+            <Col md={6}>
+              <InputGroup>
+                <InputGroup.Text>
+                  <Search />
+                </InputGroup.Text>
+                <Form.Control
+                  placeholder="Search documents..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>
+                    <XCircle />
                   </Button>
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm" 
-                    onClick={() => handleDownload(doc.url)}
-                    className="me-2"
-                  >
-                    <Download size={14} className="me-1" />
-                    Download
-                  </Button>
-                  <Button 
-                    variant="outline-danger" 
-                    size="sm" 
-                    onClick={() => handleDelete(doc.id, doc.name)}
-                  >
-                    Delete
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </Col>
-      
+                )}
+              </InputGroup>
+            </Col>
+          </Row>
+
+          <div className="table-responsive">
+            <Table striped bordered hover className="shadow-sm">
+              <thead className="bg-light">
+                <tr>
+                  <th onClick={() => handleSort('name')} style={headerStyle}>
+                    Document Name {sortField === 'name' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('type')} style={headerStyle}>
+                    Type {sortField === 'type' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('uploadDate')} style={headerStyle}>
+                    Upload Date {sortField === 'uploadDate' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('size')} style={headerStyle}>
+                    Size {sortField === 'size' && getSortIcon(sortDirection)}
+                  </th>
+                  <th style={{ width: '200px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedDocuments.map((doc) => (
+                  <tr key={doc.id} className="align-middle">
+                    <td>
+                      <div className="fw-medium">{doc.name}</div>
+                    </td>
+                    <td>
+                      <Badge bg={getTypeColor(doc.type)}>{doc.type}</Badge>
+                    </td>
+                    <td>{new Date(doc.uploadDate).toLocaleDateString()}</td>
+                    <td>{doc.size}</td>
+                    <td>
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        onClick={() => handleView(doc)}
+                        className="me-2"
+                        disabled={loading}
+                      >
+                        View
+                      </Button>
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        onClick={() => handleDownload(doc.url)}
+                        className="me-2"
+                      >
+                        <Download size={14} className="me-1" />
+                        Download
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm" 
+                        onClick={() => handleDelete(doc.id, doc.name)}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </Col>
+      </Row>
+
       {/* Upload Modal */}
       <Modal show={showUploadModal} centered backdrop="static" keyboard={false}>
         <Modal.Body className="text-center">
@@ -235,7 +304,7 @@ export const DocumentsTab = ({ customerData }) => {
           <div dangerouslySetInnerHTML={{ __html: viewDocumentHtml }} />
         </Modal.Body>
       </Modal>
-    </Row>
+    </Container>
   );
 };
 

@@ -11,11 +11,12 @@ import {
   InputGroup,
   Pagination,
   Container,
+  Button,
 } from "react-bootstrap";
 import { History } from "lucide-react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
-import { Search } from 'react-bootstrap-icons';
+import { Search, XCircle } from 'react-bootstrap-icons';
 import { useRouter } from 'next/router';
 import { toast } from 'react-toastify';
 
@@ -28,6 +29,8 @@ export const HistoryTab = ({ customerID }) => {
   const [jobsPerPage] = useState(10);
   const router = useRouter();
   const [loadingJobId, setLoadingJobId] = useState(null);
+  const [sortField, setSortField] = useState('id');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   // Function to fetch users from Firestore
   const fetchUsers = async () => {
@@ -118,13 +121,42 @@ export const HistoryTab = ({ customerID }) => {
     }
   };
 
+  const handleSort = (field) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+    }
+  };
+
+  const getSortIcon = (direction) => {
+    return direction === 'asc' ? '↑' : '↓';
+  };
+
+  const headerStyle = {
+    cursor: 'pointer',
+    userSelect: 'none',
+    backgroundColor: '#f8f9fa',
+    position: 'relative',
+    padding: '12px 8px',
+  };
+
   return (
     <Container fluid className="p-4">
       <Row className="mb-4">
         <Col>
-          <div className="d-flex align-items-center">
-            <History size={24} className="me-2" />
-            <h3 className="mb-0">Job History</h3>
+          <div className="d-flex align-items-center justify-content-between">
+            <div className="d-flex align-items-center">
+              <History size={24} className="me-2" />
+              <h3 className="mb-0">Job History</h3>
+            </div>
+            <Button 
+              variant="primary"
+              onClick={() => router.push(`/dashboard/jobs/create-jobs?customerCode=${customerID}`)}
+              className="d-flex align-items-center"
+            >
+              <span className="me-1">+</span> New Job
+            </Button>
           </div>
         </Col>
       </Row>
@@ -141,6 +173,11 @@ export const HistoryTab = ({ customerID }) => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>
+                <XCircle />
+              </Button>
+            )}
           </InputGroup>
         </Col>
       </Row>
@@ -153,22 +190,38 @@ export const HistoryTab = ({ customerID }) => {
         <>
           <div className="table-responsive">
             <Table striped bordered hover className="shadow-sm">
-              <thead>
+              <thead className="bg-light">
                 <tr>
-                  <th>Job ID</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Location</th>
-                  <th>Description</th>
-                  <th>Technician</th>
-                  <th>Duration</th>
-                  <th>Status</th>
+                  <th onClick={() => handleSort('id')} style={headerStyle}>
+                    Job ID {sortField === 'id' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('startDate')} style={headerStyle}>
+                    Date {sortField === 'startDate' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('jobContactType')} style={headerStyle}>
+                    Type {sortField === 'jobContactType' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('location')} style={headerStyle}>
+                    Location {sortField === 'location' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('jobDescription')} style={headerStyle}>
+                    Description {sortField === 'jobDescription' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('assignedWorkers')} style={headerStyle}>
+                    Technician {sortField === 'assignedWorkers' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('estimatedDurationHours')} style={headerStyle}>
+                    Duration {sortField === 'estimatedDurationHours' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('jobStatus')} style={headerStyle}>
+                    Status {sortField === 'jobStatus' && getSortIcon(sortDirection)}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {currentJobs.length > 0 ? (
                   currentJobs.map((job) => (
-                    <tr key={job.id}>
+                    <tr key={job.id} className="align-middle">
                       <td>
                         <OverlayTrigger
                           placement="top"

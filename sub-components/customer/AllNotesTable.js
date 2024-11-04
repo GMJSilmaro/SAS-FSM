@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import { Table, Button, Form, InputGroup, Pagination, Container, Row, Col } from 'react-bootstrap';
 import { formatDistanceToNow } from 'date-fns';
-import { Trash, PencilSquare, Search, ArrowLeft, Check, X } from 'react-bootstrap-icons';
+import { Trash, PencilSquare, Search, ArrowLeft, Check, X, CaretUpFill, CaretDownFill } from 'react-bootstrap-icons';
 import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { toast } from 'react-toastify';
+
+const headerStyle = {
+  cursor: 'pointer',
+  userSelect: 'none',
+  backgroundColor: '#f8f9fa',
+  position: 'relative',
+  padding: '12px 8px',
+};
 
 export const AllNotesTable = ({ notes, onClose, customerId }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,10 +20,8 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
   const [editedContent, setEditedContent] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(10);
-  const [sortConfig, setSortConfig] = useState({
-    key: 'createdAt',
-    direction: 'desc'
-  });
+  const [sortField, setSortField] = useState('createdAt');
+  const [sortDirection, setSortDirection] = useState('desc');
 
   const filteredNotes = notes.filter(note =>
     note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -23,40 +29,25 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
     note.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const sortedNotes = [...filteredNotes].sort((a, b) => {
-    if (sortConfig.key === 'createdAt') {
-      const dateA = a.createdAt?.toDate() || new Date();
-      const dateB = b.createdAt?.toDate() || new Date();
-      return sortConfig.direction === 'asc' 
-        ? dateA - dateB 
-        : dateB - dateA;
-    }
-    if (sortConfig.key === 'tags') {
-      const tagsA = a.tags?.join(', ') || '';
-      const tagsB = b.tags?.join(', ') || '';
-      return sortConfig.direction === 'asc'
-        ? tagsA.localeCompare(tagsB)
-        : tagsB.localeCompare(tagsA);
-    }
-    if (a[sortConfig.key] < b[sortConfig.key]) {
-      return sortConfig.direction === 'asc' ? -1 : 1;
-    }
-    if (a[sortConfig.key] > b[sortConfig.key]) {
-      return sortConfig.direction === 'asc' ? 1 : -1;
-    }
-    return 0;
-  });
+  const sortNotes = (notes) => {
+    return [...notes].sort((a, b) => {
+      let compareA = a[sortField];
+      let compareB = b[sortField];
 
-  const requestSort = (key) => {
-    setSortConfig((current) => ({
-      key,
-      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
-    }));
+      if (sortField === 'createdAt') {
+        compareA = a.createdAt?.toDate() || new Date();
+        compareB = b.createdAt?.toDate() || new Date();
+      }
+
+      if (compareA < compareB) return sortDirection === 'asc' ? -1 : 1;
+      if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
   };
 
   const indexOfLastNote = currentPage * notesPerPage;
   const indexOfFirstNote = indexOfLastNote - notesPerPage;
-  const currentNotes = sortedNotes.slice(indexOfFirstNote, indexOfLastNote);
+  const currentNotes = sortNotes(filteredNotes).slice(indexOfFirstNote, indexOfLastNote);
   const totalPages = Math.ceil(filteredNotes.length / notesPerPage);
 
   const startEditing = (note) => {
@@ -97,6 +88,17 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
     }
   };
 
+  const getSortIcon = (direction) => {
+    return direction === 'asc' ? 
+      <CaretUpFill className="ms-1" /> : 
+      <CaretDownFill className="ms-1" />;
+  };
+
+  const handleSort = (field) => {
+    setSortDirection(sortField === field && sortDirection === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+  };
+
   return (
     <Container fluid>
       <Row className="mb-3">
@@ -130,19 +132,19 @@ export const AllNotesTable = ({ notes, onClose, customerId }) => {
         <Col>
           <div className="table-responsive">
             <Table striped bordered hover>
-              <thead>
+              <thead className="bg-light">
                 <tr>
-                  <th onClick={() => requestSort('content')} style={{ cursor: 'pointer' }}>
-                    Content {sortConfig.key === 'content' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => handleSort('content')} style={headerStyle}>
+                    Content {sortField === 'content' && getSortIcon(sortDirection)}
                   </th>
-                  <th onClick={() => requestSort('userEmail')} style={{ cursor: 'pointer' }}>
-                    User {sortConfig.key === 'userEmail' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => handleSort('userEmail')} style={headerStyle}>
+                    User {sortField === 'userEmail' && getSortIcon(sortDirection)}
                   </th>
-                  <th onClick={() => requestSort('createdAt')} style={{ cursor: 'pointer' }}>
-                    Date {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => handleSort('createdAt')} style={headerStyle}>
+                    Date {sortField === 'createdAt' && getSortIcon(sortDirection)}
                   </th>
-                  <th onClick={() => requestSort('tags')} style={{ cursor: 'pointer' }}>
-                    Tags {sortConfig.key === 'tags' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => handleSort('tags')} style={headerStyle}>
+                    Tags {sortField === 'tags' && getSortIcon(sortDirection)}
                   </th>
                   <th>Actions</th>
                 </tr>

@@ -411,9 +411,28 @@ const QuickMenu = () => {
           alt="avatar"
           src={userDetails.profilePicture}
           className="rounded-circle"
+          width={40}
+          height={40}
+          style={{
+            objectFit: 'cover',
+            border: '2px solid #e5e9f2',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
         />
       ) : (
-        <Image alt="avatar" src="" className="rounded-circle" />
+        <Image
+          alt="default avatar"
+          src="/images/avatar/default-avatar.png" // Make sure to add this default image to your public folder
+          className="rounded-circle"
+          width={40}
+          height={40}
+          style={{
+            objectFit: 'cover',
+            border: '2px solid #e5e9f2',
+            backgroundColor: '#f8f9fa',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        />
       )}
     </div>
     {userDetails && (

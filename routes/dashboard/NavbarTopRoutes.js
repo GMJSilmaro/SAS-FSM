@@ -85,7 +85,7 @@ const NavbarDefault = [
 			},
 			{
 				id: uuid(),
-				menuitem: 'Job Schedules',
+				menuitem: 'Jobs Calendar',
 				link: '/dashboard/scheduling/jobs/current',
 				icon: 'CalendarWeekFill'
 			},

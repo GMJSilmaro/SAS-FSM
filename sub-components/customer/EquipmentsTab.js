@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Spinner, Button, Modal, Form, InputGroup, Pagination, Container, Row, Col } from 'react-bootstrap';
-import { Search, Eye } from 'react-bootstrap-icons';
+import { Search, Eye, CaretUpFill, CaretDownFill, XCircle } from 'react-bootstrap-icons';
+
+const headerStyle = {
+  cursor: 'pointer',
+  userSelect: 'none',
+  backgroundColor: '#f8f9fa',
+  position: 'relative',
+  padding: '12px 8px',
+};
 
 const EquipmentsTab = ({ customerData }) => {
   const [equipments, setEquipments] = useState([]);
@@ -11,6 +19,8 @@ const EquipmentsTab = ({ customerData }) => {
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [equipmentsPerPage] = useState(10);
+  const [sortField, setSortField] = useState('ItemCode');
+  const [sortDirection, setSortDirection] = useState('desc');
 
   useEffect(() => {
     const fetchEquipments = async () => {
@@ -104,6 +114,35 @@ const EquipmentsTab = ({ customerData }) => {
     return parts.join(', ');
   };
 
+  const handleSort = (field) => {
+    setSortDirection(sortField === field && sortDirection === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+  };
+
+  const getSortIcon = (direction) => {
+    return direction === 'asc' ? 
+      <CaretUpFill className="ms-1" /> : 
+      <CaretDownFill className="ms-1" />;
+  };
+
+  const sortEquipments = (equipments) => {
+    return [...equipments].sort((a, b) => {
+      let compareA = a[sortField];
+      let compareB = b[sortField];
+
+      if (sortField === 'ServiceLocationAddress') {
+        compareA = findServiceLocation(a.EquipmentLocation);
+        compareB = findServiceLocation(b.EquipmentLocation);
+      }
+
+      if (compareA < compareB) return sortDirection === 'asc' ? -1 : 1;
+      if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const sortedEquipments = sortEquipments(currentEquipments);
+
   if (loading) {
     return (
       <div className="p-4 text-center">
@@ -134,36 +173,54 @@ const EquipmentsTab = ({ customerData }) => {
       <h3 className="mb-4">Customer Equipment</h3>
       <Row className="mb-3">
         <Col md={6}>
-          <InputGroup>
+          <InputGroup className="mb-3">
             <InputGroup.Text>
               <Search />
             </InputGroup.Text>
             <Form.Control
+              type="text"
               placeholder="Search equipment..."
               value={searchTerm}
               onChange={handleSearch}
             />
+            {searchTerm && (
+              <Button variant="outline-secondary" onClick={() => setSearchTerm('')}>
+                <XCircle />
+              </Button>
+            )}
           </InputGroup>
         </Col>
       </Row>
       <Row>
         <Col>
           <div className="table-responsive">
-            <Table striped bordered hover>
-              <thead>
+            <Table striped bordered hover className="shadow-sm">
+              <thead className="bg-light">
                 <tr>
-                  <th>Item Code</th>
-                  <th>Item Name</th>
-                  <th>Model Series</th>
-                  <th>Serial No</th>
-                  <th>Location</th>
-                  <th>Service Location Address</th>
+                  <th onClick={() => handleSort('ItemCode')} style={headerStyle}>
+                    Item Code {sortField === 'ItemCode' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('ItemName')} style={headerStyle}>
+                    Item Name {sortField === 'ItemName' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('ModelSeries')} style={headerStyle}>
+                    Model Series {sortField === 'ModelSeries' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('SerialNo')} style={headerStyle}>
+                    Serial No {sortField === 'SerialNo' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('EquipmentLocation')} style={headerStyle}>
+                    Location {sortField === 'EquipmentLocation' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('ServiceLocationAddress')} style={headerStyle}>
+                    Service Location Address {sortField === 'ServiceLocationAddress' && getSortIcon(sortDirection)}
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {currentEquipments.map((item, index) => (
-                  <tr key={index}>
+                {sortedEquipments.map((item) => (
+                  <tr key={item.id} className="align-middle">
                     <td>{item.ItemCode || 'N/A'}</td>
                     <td>{item.ItemName || 'N/A'}</td>
                     <td>{item.ModelSeries || 'N/A'}</td>

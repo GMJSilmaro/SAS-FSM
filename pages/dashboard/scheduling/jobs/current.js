@@ -576,7 +576,7 @@ const Calendar = () => {
               height="650px"
               style={{ marginTop: "15px" }}
               width="100%"
-              selectedDate={new Date(2024, 9, 15)}
+              selectedDate={new Date()}
               eventSettings={{
                 dataSource: filteredEvents,
                 fields: {

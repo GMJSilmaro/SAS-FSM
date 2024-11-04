@@ -11,6 +11,8 @@ import { collection, getDocs } from "firebase/firestore";
 import { TaskSummaryChartOptions as baseChartOptions } from "data/charts/ChartData";
 
 const TaskSummaryChart = () => {
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState([]);
   const [chartData, setChartData] = useState([
     {
       name: "Closed",
@@ -44,7 +46,9 @@ const TaskSummaryChart = () => {
       colors: ['transparent']
     },
     xaxis: {
-      categories: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      categories: Array.from({ length: 12 }, (_, i) => {
+        return new Date(0, i).toLocaleString('default', { month: 'short' });
+      }),
     },
     yaxis: {
       title: {
@@ -64,66 +68,85 @@ const TaskSummaryChart = () => {
   });
 
   useEffect(() => {
-    // Fetch jobs data from Firebase
     const fetchJobsData = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "jobs"));
-        let closedJobsCount = [0, 0, 0, 0, 0, 0, 0]; // Array for Closed Jobs per day
-        let newJobsCount = [0, 0, 0, 0, 0, 0, 0]; // Array for New Jobs per day
-
+        let closedJobsCount = Array(12).fill(0);
+        let newJobsCount = Array(12).fill(0);
+        
+        // Get all available years from the data
+        const years = new Set();
+        
         querySnapshot.forEach((doc) => {
           const job = doc.data();
           const startDate = new Date(job.startDate);
-          const dayOfWeek = startDate.getUTCDay(); // Get the day of the week (0-6, where 0 is Sunday)
-
-          // Increment the corresponding day of the week index
-          if (job.jobStatus === "Job Complete") {
-            closedJobsCount[dayOfWeek]++;
-          } else {
-            newJobsCount[dayOfWeek]++;
+          const jobYear = startDate.getFullYear();
+          years.add(jobYear);
+          
+          // Only process jobs from selected year
+          if (jobYear === selectedYear) {
+            const month = startDate.getMonth();
+            if (job.jobStatus === "Job Complete") {
+              closedJobsCount[month]++;
+            } else {
+              newJobsCount[month]++;
+            }
           }
         });
 
-        // Update chart data with counts, ensuring no undefined or null values
+        // Sort years in descending order
+        setAvailableYears(Array.from(years).sort((a, b) => b - a));
+        
         setChartData([
           {
             name: "Closed",
-            data: closedJobsCount.map((count) => count || 0), // Fallback to 0 if count is falsy
+            data: closedJobsCount,
           },
           {
             name: "New",
-            data: newJobsCount.map((count) => count || 0), // Fallback to 0 if count is falsy
+            data: newJobsCount,
           },
         ]);
       } catch (error) {
         console.error("Error fetching jobs data:", error);
-        // Handle the error case by setting default data
         setChartData([
           {
             name: "Closed",
-            data: [0, 0, 0, 0, 0, 0, 0], // Default to empty data
+            data: Array(12).fill(0),
           },
           {
             name: "New",
-            data: [0, 0, 0, 0, 0, 0, 0], // Default to empty data
+            data: Array(12).fill(0),
           },
         ]);
       }
     };
 
     fetchJobsData();
-  }, []);
+  }, [selectedYear]); // Re-fetch when selected year changes
 
   return (
     <Card>
       <Card.Body>
-        <div className="d-flex justify-content-between">
+        <div className="d-flex justify-content-between align-items-center">
           <div>
             <h4 className="mb-0">Jobs Summary</h4>
           </div>
+          <div>
+            <select 
+              className="form-select" 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <p className="mt-4 mb-0">New vs. Closed</p>
-        {/* Render the chart if data is available, otherwise show loading message */}
         {chartData[0].data.length > 0 && chartData[1].data.length > 0 ? (
           <ApexCharts
             options={chartOptions}

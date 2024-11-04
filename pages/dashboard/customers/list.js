@@ -68,6 +68,12 @@ const debounce = (func, delay) => {
 const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTerm }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !loading) {
+      loadData(1, searchTerm);
+    }
+  };
+
   const handleClear = () => {
     onClear();
     // After clearing filters, automatically load default data
@@ -129,6 +135,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
                     placeholder="Search by customer name..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   />
                 </OverlayTrigger>
               </Form.Group>
@@ -181,6 +188,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     onChange={(e) => setFilters(prev => ({ ...prev, customerCode: e.target.value }))}
                     placeholder="Enter customer code..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   />
                 </OverlayTrigger>
               </Form.Group>
@@ -197,6 +205,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
                     placeholder="Search by customer name..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   />
                 </OverlayTrigger>
               </Form.Group>
@@ -213,6 +222,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="Search by email address..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   />
                 </OverlayTrigger>
               </Form.Group>
@@ -229,6 +239,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     onChange={(e) => setFilters(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="Search by phone number..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   />
                 </OverlayTrigger>
               </Form.Group>
@@ -248,6 +259,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     onChange={(e) => setFilters(prev => ({ ...prev, address: e.target.value }))}
                     placeholder="Search by address, postal code..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   />
                 </OverlayTrigger>
               </Form.Group>
@@ -262,6 +274,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                     value={filters.contractStatus}
                     onChange={(e) => setFilters(prev => ({ ...prev, contractStatus: e.target.value }))}
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                    onKeyPress={handleKeyPress}
                   >
                     <option value="">All Contract Status</option>
                     <option value="Y">With Contract</option>
@@ -282,6 +295,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                         value={filters.country}
                         onChange={(e) => setFilters(prev => ({ ...prev, country: e.target.value }))}
                         style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                        onKeyPress={handleKeyPress}
                       >
                         <option value="">All Countries</option>
                         <option value="SG">Singapore</option>
@@ -301,6 +315,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
                         value={filters.status}
                         onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
                         style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                        onKeyPress={handleKeyPress}
                       >
                         <option value="">All Status</option>
                         <option value="active">Active</option>
@@ -696,6 +711,12 @@ const ViewCustomers = () => {
   };
 
   const subHeaderComponentMemo = useMemo(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter' && !loading) {
+        loadData(1, searchTerm);
+      }
+    };
+
     return (
       <div className="w-100 mb-4 position-relative">
         <Search 
@@ -709,6 +730,7 @@ const ViewCustomers = () => {
           placeholder="Search customers... (e.g. C012345, Customer Name Only!)"
           value={searchTerm}
           onChange={handleSearch}
+          onKeyPress={handleKeyPress}
           style={{
             borderRadius: '8px',
             border: '1px solid #e2e8f0',
@@ -728,7 +750,7 @@ const ViewCustomers = () => {
         {loading && <small className="text-muted position-absolute" style={{ top: '12px', right: '40px' }}>Searching...</small>}
       </div>
     );
-  }, [searchTerm, loading]);
+  }, [searchTerm, loading, loadData]);
 
   return (
     <Fragment>

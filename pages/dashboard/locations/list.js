@@ -10,6 +10,14 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather';
 import { debounce } from 'lodash';
+import { GB as GBFlag, SG as SGFlag, US as USFlag } from 'country-flag-icons/react/3x2'
+
+const COUNTRY_CODE_MAP = {
+  'Singapore': 'SG',
+  'United Kingdom': 'GB',
+  'United States': 'US',
+
+};
 
 const fetchLocations = async (page = 1, limit = 10, filters = {}) => {
   try {
@@ -112,6 +120,12 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
     loadData();
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !loading) {
+      handleSearch();
+    }
+  };
+
   const handleClear = () => {
     onClear();
   };
@@ -160,6 +174,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                     type="text"
                     value={filters.address || ''}
                     onChange={(e) => handleInputChange('address', e.target.value)}
+                    onKeyPress={handleKeyPress}
                     placeholder="Search by address..."
                     style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
                   />
@@ -207,6 +222,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                   type="text"
                   value={filters.customerName || ''}
                   onChange={(e) => handleInputChange('customerName', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   placeholder="Search by customer name..."
                 />
               </Form.Group>
@@ -217,6 +233,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                   type="email"
                   value={filters.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   placeholder="Search by email..."
                 />
               </Form.Group>
@@ -227,6 +244,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                   type="text"
                   value={filters.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   placeholder="Search by phone number..."
                 />
               </Form.Group>
@@ -239,6 +257,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                   type="text"
                   value={filters.address}
                   onChange={(e) => handleInputChange('address', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   placeholder="Search by address..."
                 />
               </Form.Group>
@@ -249,6 +268,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                   type="text"
                   value={filters.postalCode}
                   onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   placeholder="Search by postal code..."
                 />
               </Form.Group>
@@ -258,6 +278,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, onInputC
                   size="sm"
                   value={filters.country}
                   onChange={(e) => handleInputChange('country', e.target.value)}
+                  onKeyPress={handleKeyPress}
                 >
                   <option value="">All Countries</option>
                   <option value="SG">Singapore</option>
@@ -496,8 +517,21 @@ const LocationsList = () => {
       name: 'Country',
       selector: row => row.Country,
       sortable: true,
-      minWidth: '120px',
-      grow: 0.5
+      minWidth: '150px',
+      grow: 0.5,
+      cell: row => {
+        const countryName = row.Country || '';
+        const countryCode = COUNTRY_CODE_MAP[countryName];
+        
+        return (
+          <div className="d-flex align-items-center">
+            {countryCode === 'SG' && <SGFlag className="me-2" style={{ width: '20px' }} />}
+            {countryCode === 'GB' && <GBFlag className="me-2" style={{ width: '20px' }} />}
+            {countryCode === 'US' && <USFlag className="me-2" style={{ width: '20px' }} />}
+            {countryName || '-'}
+          </div>
+        );
+      }
     }
   ], [currentPage, perPage]);
 

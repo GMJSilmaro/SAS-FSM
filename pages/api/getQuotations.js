@@ -70,7 +70,9 @@ export default async function handler(req, res) {
       DocDate: item.DocDate,
       Comments: item.Comments,
       DocNum: item.DocNum,
-      DocTotal: item.DocTotal
+      DocTotal: item.DocTotal,
+      DocStatus: item.DocStatus,
+      subject: item.subject
     }));
 
     res.status(200).json(quotations);

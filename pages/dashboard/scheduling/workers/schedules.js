@@ -455,11 +455,11 @@ const FieldServiceSchedules = () => {
       <Row>
         <Col lg={12}>
           <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-            <div className="mb-3">
-              <h1 className="mb-1 h2 fw-bold">Worker Schedules</h1>
+            <div className="mb-1">
+              <h1 className="mb-1 h2 fw-bold">Dispatch Schedules</h1>
               <Breadcrumb>
                 <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item href="/dashboard/scheduling/workers/schedules">Worker Calendar</Breadcrumb.Item>
+                <Breadcrumb.Item active href="/dashboard/scheduling/workers/schedules">Schedules</Breadcrumb.Item>
               </Breadcrumb>
             </div>
           </div>

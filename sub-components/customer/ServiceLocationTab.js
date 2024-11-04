@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
 import { Row, Col, Table, Button, Modal, Form, Alert, InputGroup } from 'react-bootstrap';
-import { Eye, MapPin, Search } from 'lucide-react';
+import { Eye, MapPin, Search, CaretUpFill, CaretDownFill } from 'react-bootstrap-icons';
 import { toast } from 'react-toastify';
+
+const headerStyle = {
+  cursor: 'pointer',
+  userSelect: 'none',
+  backgroundColor: '#f8f9fa',
+  position: 'relative',
+  padding: '12px 8px',
+};
 
 export const ServiceLocationTab = ({ customerData }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState('AddressName');
+  const [sortDirection, setSortDirection] = useState('desc');
 
   if (!customerData || !customerData.BPAddresses) {
     return <div className="p-4">Loading service locations...</div>;
@@ -63,12 +73,43 @@ export const ServiceLocationTab = ({ customerData }) => {
     setSearchTerm(event.target.value);
   };
 
+  const handleSort = (field) => {
+    setSortDirection(sortField === field && sortDirection === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+  };
+
+  const getSortIcon = (direction) => {
+    return direction === 'asc' ? 
+      <CaretUpFill className="ms-1" /> : 
+      <CaretDownFill className="ms-1" />;
+  };
+
+  const sortLocations = (locations) => {
+    return [...locations].sort((a, b) => {
+      let compareA = a[sortField];
+      let compareB = b[sortField];
+
+      if (sortField === 'AddressType') {
+        compareA = a.AddressType === 'bo_ShipTo' ? 'Shipping Address' : 
+                   a.AddressType === 'bo_BillTo' ? 'Billing Address' : 'Other';
+        compareB = b.AddressType === 'bo_ShipTo' ? 'Shipping Address' : 
+                   b.AddressType === 'bo_BillTo' ? 'Billing Address' : 'Other';
+      }
+
+      if (compareA < compareB) return sortDirection === 'asc' ? -1 : 1;
+      if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
   const filteredLocations = customerData.BPAddresses.filter((location) =>
     Object.values(location).some((value) =>
       value !== null && value !== undefined && 
       value.toString().toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
+
+  const sortedLocations = sortLocations(filteredLocations);
 
   return (
     <Row className="p-4">
@@ -85,18 +126,28 @@ export const ServiceLocationTab = ({ customerData }) => {
           />
         </InputGroup>
         <Table striped bordered hover responsive>
-          <thead>
+          <thead className="bg-light">
             <tr>
-              <th>Location Type</th>
-              <th>Address</th>
-              <th>Contact Person</th>
-              <th>Phone</th>
-              <th>Status</th>
+              <th onClick={() => handleSort('AddressType')} style={headerStyle}>
+                Location Type {sortField === 'AddressType' && getSortIcon(sortDirection)}
+              </th>
+              <th onClick={() => handleSort('AddressName')} style={headerStyle}>
+                Address {sortField === 'AddressName' && getSortIcon(sortDirection)}
+              </th>
+              <th onClick={() => handleSort('Name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                Contact Person {getSortIcon('Name')}
+              </th>
+              <th onClick={() => handleSort('Phone1')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                Phone {getSortIcon('Phone1')}
+              </th>
+              <th onClick={() => handleSort('U_Status')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                Status {getSortIcon('U_Status')}
+              </th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredLocations.map((location, index) => {
+            {sortedLocations.map((location, index) => {
               const contact = findContactForAddress(location.AddressName);
               return (
                 <tr key={index}>

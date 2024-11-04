@@ -598,207 +598,6 @@ const AddNewJobs = () => {
     setSelectedWorkers(selectedOptions);
   };
 
-  // const handleCustomerChange = async (selectedOption) => {
-  //   console.log("handleCustomerChange called with:", selectedOption);
-
-  //   setSelectedContact(null);
-  //   setSelectedLocation(null);
-  //   setSelectedCustomer(selectedOption);
-  //   setSelectedServiceCall(null);
-  //   setSelectedSalesOrder(null);
-
-  //   const selectedCustomer = customers.find(
-  //     (option) => option.value === selectedOption.value
-  //   );
-
-  //   console.log("Selected customer:", selectedCustomer);
-
-  //   setFormData((prevFormData) => ({
-  //     ...prevFormData,
-  //     customerName: selectedCustomer ? selectedCustomer.label : "",
-  //   }));
-
-  //   try {
-  //     console.log("Fetching related data for customer:", selectedOption.value);
-
-  //     // Fetch contacts
-  //     const contactsResponse = await fetch("/api/getContacts", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!contactsResponse.ok) {
-  //       throw new Error("Failed to fetch contacts");
-  //     }
-
-  //     const contactsData = await contactsResponse.json();
-  //     console.log("Fetched contacts:", contactsData);
-
-  //     const formattedContacts = contactsData.map((item) => ({
-  //       value: item.contactId,
-  //       label: item.contactId,
-  //       ...item,
-  //     }));
-  //     setContacts(formattedContacts);
-
-  //     if (formattedContacts.length === 0) {
-  //       toast.warning("No contacts found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedContacts.length} contacts.`);
-  //     }
-
-  //     // Fetch job contact types
-  //     try {
-  //       const jobContactTypeResponse = await fetch("/api/getJobContactType", {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({ 
-  //           cardCode: selectedOption.value,
-  //         }),
-  //       });
-
-  //       if (!jobContactTypeResponse.ok) {
-  //         const errorData = await jobContactTypeResponse.json();
-  //         throw new Error(`Failed to fetch job contact types: ${errorData.message || jobContactTypeResponse.statusText}`);
-  //       }
-
-  //       const jobContactTypeData = await jobContactTypeResponse.json();
-  //       console.log("Fetched job contact types:", jobContactTypeData);
-
-  //       const formattedJobContactTypes = jobContactTypeData.map((item) => ({
-  //         value: item.code,
-  //         label: item.name
-  //       }));
-        
-  //       setJobContactTypes(formattedJobContactTypes);
-        
-  //       setSelectedJobContactType(null);
-  //       setFormData(prevData => ({
-  //         ...prevData,
-  //         jobContactType: {
-  //           code: "",
-  //           name: ""
-  //         }
-  //       }));
-
-  //       if (formattedJobContactTypes.length === 0) {
-  //         toast.warning("No job contact types found for this customer.");
-  //       } else {
-  //         toast.success(`Successfully fetched ${formattedJobContactTypes.length} job contact types.`);
-  //       }
-
-  //     } catch (error) {
-  //       console.error("Error fetching job contact types:", error);
-  //       toast.error(`Failed to fetch job contact types: ${error.message}`);
-  //       setJobContactTypes([]);
-  //     }
-
-  //     // Fetch locations for the customer
-  //     const locationsResponse = await fetch("/api/getLocation", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!locationsResponse.ok) {
-  //       throw new Error("Failed to fetch locations");
-  //     }
-
-  //     const locationsData = await locationsResponse.json();
-  //     console.log("Fetched locations:", locationsData);
-
-  //     const formattedLocations = locationsData.map((item) => ({
-  //       value: item.siteId,
-  //       label: item.siteId,
-  //       ...item,
-  //     }));
-  //     setLocations(formattedLocations);
-
-  //     if (formattedLocations.length === 0) {
-  //       toast.warning("No locations found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedLocations.length} locations.`);
-  //     }
-
-  //     // Fetch equipments for the customer
-  //     const equipmentsResponse = await fetch("/api/getEquipments", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!equipmentsResponse.ok) {
-  //       throw new Error("Failed to fetch equipments");
-  //     }
-
-  //     const equipmentsData = await equipmentsResponse.json();
-  //     console.log("Fetched equipments:", equipmentsData);
-
-  //     const formattedEquipments = equipmentsData.map((item) => ({
-  //       value: item.ItemCode,
-  //       label: item.ItemCode,
-  //       ...item,
-  //     }));
-  //     setEquipments(formattedEquipments);
-
-  //     if (formattedEquipments.length === 0) {
-  //       toast.warning("No equipments found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`);
-  //     }
-
-  //     // Fetch service calls for the customer
-  //     const serviceCallResponse = await fetch("/api/getServiceCall", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ cardCode: selectedOption.value }),
-  //     });
-
-  //     if (!serviceCallResponse.ok) {
-  //       throw new Error("Failed to fetch service calls");
-  //     }
-
-  //     const serviceCallsData = await serviceCallResponse.json();
-  //     console.log("Fetched service calls:", serviceCallsData);
-
-  //     const formattedServiceCalls = serviceCallsData.map((item) => ({
-  //       value: item.serviceCallID,
-  //       label: item.serviceCallID + " - " + item.subject,
-  //     }));
-  //     setServiceCalls(formattedServiceCalls);
-
-  //     if (formattedServiceCalls.length === 0) {
-  //       toast.warning("No service calls found for this customer.");
-  //     } else {
-  //       toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`);
-  //     }
-
-  //     // Clear sales orders when customer changes
-  //     setSalesOrders([]);
-
-  //   } catch (error) {
-  //     console.error("Error in handleCustomerChange:", error);
-  //     toast.error(`Error: ${error.message}`);
-  //     setContacts([]);
-  //     setLocations([]);
-  //     setEquipments([]);
-  //     setServiceCalls([]);
-  //     setSalesOrders([]);
-  //     setJobContactTypes([]);
-  //   }
-  // };
-
   const handleCustomerChange = async (selectedOption) => {
     console.log("handleCustomerChange called with:", selectedOption);
   
@@ -1553,6 +1352,23 @@ const AddNewJobs = () => {
     setShowEquipments(!showEquipments);
   };
 
+  // Add useEffect to handle initial customer selection
+  useEffect(() => {
+    const initializeCustomer = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const customerCode = params.get('customerCode');
+      
+      if (customerCode && customers.length > 0) {
+        const customerOption = customers.find(customer => customer.value === customerCode);
+        if (customerOption) {
+          handleCustomerChange(customerOption);
+        }
+      }
+    };
+
+    initializeCustomer();
+  }, [customers]); // Dependency on customers ensures we wait for customer data to load
+
   return (
     <Tabs
       id="noanim-tab-example"
@@ -2024,25 +1840,7 @@ const AddNewJobs = () => {
             </Form.Group>
 
           </Row>
-          <Row className="mb-3">
-          <Form.Group as={Col} controlId="jobName" className="mb-3">
-              <Form.Label>Job Name</Form.Label>
-              <Form.Control
-                type="text"
-                name="jobName"
-                value={formData.jobName}
-                onChange={handleInputChange}
-                placeholder="Enter Job Name"
-              />
-            </Form.Group>
-            <Form.Group controlId="description" className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <ReactQuillEditor
-                initialValue={formData.jobDescription} // Pass the initial value
-                onDescriptionChange={handleDescriptionChange} // Handle changes
-              />
-            </Form.Group>
-          </Row>
+         
           <Row className="mb-3">
             <Form.Group as={Col} md="4" controlId="jobCategory">
               <Form.Label>
@@ -2231,6 +2029,25 @@ const AddNewJobs = () => {
             </Form.Group>
           </Row>
           <hr className="my-4" />
+          <Row className="mb-3">
+          <Form.Group as={Col} controlId="jobName" className="mb-3">
+              <Form.Label>Job Name</Form.Label>
+              <Form.Control
+                type="text"
+                name="jobName"
+                value={formData.jobName}
+                onChange={handleInputChange}
+                placeholder="Enter Job Name"
+              />
+            </Form.Group>
+            <Form.Group controlId="description" className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <ReactQuillEditor
+                initialValue={formData.jobDescription} // Pass the initial value
+                onDescriptionChange={handleDescriptionChange} // Handle changes
+              />
+            </Form.Group>
+          </Row>
           {/* <p className="text-muted">Notification:</p>
           <Row className="mt-3">
             <Form.Group controlId="adminWorkerNotify">

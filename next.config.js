@@ -2,7 +2,7 @@
 const path = require("path");
 
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   env: {
     SAP_SERVICE_LAYER_BASE_URL: process.env.SAP_SERVICE_LAYER_BASE_URL,
     SAP_B1_COMPANY_DB: process.env.SAP_B1_COMPANY_DB,

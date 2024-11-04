@@ -1,7 +1,7 @@
 // QuotationsTab.js
 import React, { useState, useEffect } from 'react';
 import { Table, Spinner, Alert, Pagination, Container, Row, Col, Form, InputGroup, Button } from 'react-bootstrap';
-import { Search, Calendar, XCircle } from 'react-bootstrap-icons';
+import { Search, Calendar, XCircle, CaretUpFill, CaretDownFill } from 'react-bootstrap-icons';
 import { format, parse, isValid } from 'date-fns';
 
 const QuotationsTab = ({ customerId }) => {
@@ -13,6 +13,8 @@ const QuotationsTab = ({ customerId }) => {
   const [retryCount, setRetryCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [sortField, setSortField] = useState('DocNum');
+  const [sortDirection, setSortDirection] = useState('desc');
 
   useEffect(() => {
     const fetchQuotations = async () => {
@@ -122,6 +124,42 @@ const QuotationsTab = ({ customerId }) => {
     setCurrentPage(1);
   };
 
+  const sortQuotations = (quotations) => {
+    return [...quotations].sort((a, b) => {
+      let compareA = a[sortField];
+      let compareB = b[sortField];
+
+      // Special handling for dates
+      if (sortField === 'DocDate') {
+        compareA = parseInt(compareA);
+        compareB = parseInt(compareB);
+      }
+
+      if (compareA < compareB) return sortDirection === 'asc' ? -1 : 1;
+      if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const handleSort = (field) => {
+    setSortDirection(sortField === field && sortDirection === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+  };
+
+  const getSortIcon = (direction) => {
+    return direction === 'asc' ? 
+      <CaretUpFill className="ms-1" /> : 
+      <CaretDownFill className="ms-1" />;
+  };
+
+  const headerStyle = {
+    cursor: 'pointer',
+    userSelect: 'none',
+    backgroundColor: '#f8f9fa',
+    position: 'relative',
+    padding: '12px 8px',
+  };
+
   if (loading) {
     return (
       <div className="text-center my-5">
@@ -195,23 +233,43 @@ const QuotationsTab = ({ customerId }) => {
       <Row>
         <Col>
           <div className="table-responsive">
-            <Table striped bordered hover>
-              <thead>
+            <Table striped bordered hover className="shadow-sm">
+              <thead className="bg-light">
                 <tr>
-                  <th>Quotation Number</th>
-                  <th>Date</th>
-                  <th>Total</th>
-                  <th>Subjects</th>
+                  <th onClick={() => handleSort('DocNum')} style={headerStyle}>
+                    Quotation Number {sortField === 'DocNum' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('DocDate')} style={headerStyle}>
+                    Date {sortField === 'DocDate' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('DocStatus')} style={headerStyle}>
+                    Status {sortField === 'DocStatus' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('DocTotal')} style={headerStyle}>
+                    Total {sortField === 'DocTotal' && getSortIcon(sortDirection)}
+                  </th>
+                  <th onClick={() => handleSort('subject')} style={headerStyle}>
+                    Subject {sortField === 'subject' && getSortIcon(sortDirection)}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotations.slice(indexOfFirstQuotation, indexOfLastQuotation).map((quote) => (
-                  <tr key={quote.DocNum}>
-                    <td>{quote.DocNum}</td>
-                    <td>{formatDate(quote.DocDate)}</td>
-                    <td>{formatCurrency(quote.DocTotal)}</td>
-                    <td>{quote.subject || 'N/A'}</td>
-                  </tr>
+                {sortQuotations(filteredQuotations)
+                  .slice(indexOfFirstQuotation, indexOfLastQuotation)
+                  .map((quote) => (
+                    <tr key={quote.DocNum} className="align-middle">
+                      <td className="fw-bold text-primary">{quote.DocNum}</td>
+                      <td>{formatDate(quote.DocDate)}</td>
+                      <td>
+                        <span className={`badge ${quote.DocStatus === 'C' ? 'bg-secondary' : 'bg-success'}`}>
+                          {quote.DocStatus === 'C' ? 'Closed' : 'Open'}
+                        </span>
+                      </td>
+                      <td className="text-end">{formatCurrency(quote.DocTotal)}</td>
+                      <td style={{ maxWidth: '300px' }} className="text-wrap">
+                        {quote.subject || 'N/A'}
+                      </td>
+                    </tr>
                 ))}
               </tbody>
             </Table>
