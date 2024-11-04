@@ -22,7 +22,8 @@ import { Search } from "react-feather";
 import { 
   BsBriefcase, 
   BsCalendar, 
-  BsClock 
+  BsClock, 
+  BsArrowRepeat 
 } from "react-icons/bs";
 import Link from 'next/link';
 
@@ -36,6 +37,7 @@ const ViewJobs = () => {
   const [lastFetchTime, setLastFetchTime] = useState(null);
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   const [editLoading, setEditLoading] = useState(false); // New state for edit loading
+  const [jobTypeFilter, setJobTypeFilter] = useState('all'); // 'all', 'recurring', 'one-time'
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -297,7 +299,7 @@ const ViewJobs = () => {
       name: "Assigned Workers",
       selector: (row) => row.assignedWorkers,
       sortable: true,
-      width: "180px",
+      width: "130px",
       cell: (row) => (
         <AssignedWorkerCell workers={row.assignedWorkers} />
       ),
@@ -306,7 +308,7 @@ const ViewJobs = () => {
       name: "Date & Time",
       selector: (row) => row.startDate,
       sortable: true,
-      width: "180px",
+      width: "150px",
       cell: (row) => (
         <div className="d-flex flex-column">
           <span>{formatDate(row.startDate)}</span>
@@ -314,20 +316,20 @@ const ViewJobs = () => {
         </div>
       ),
     },
-    {
-      name: "Est. Duration",
-      selector: (row) => row.estimatedDurationHours,
-      sortable: true,
-      width: "120px",
-      cell: (row) => (
-        <span>{`${row.estimatedDurationHours}h ${row.estimatedDurationMinutes}m`}</span>
-      ),
-    },
+    // {
+    //   name: "Est. Duration",
+    //   selector: (row) => row.estimatedDurationHours,
+    //   sortable: true,
+    //   width: "120px",
+    //   cell: (row) => (
+    //     <span>{`${row.estimatedDurationHours}h ${row.estimatedDurationMinutes}m`}</span>
+    //   ),
+    // },
     {
       name: "Equipment",
       selector: (row) => row.equipments,
       sortable: true,
-      width: "200px",
+      width: "100px",
       cell: (row) => (
         <OverlayTrigger
           placement="top"
@@ -341,6 +343,43 @@ const ViewJobs = () => {
             {row.equipments.length > 0 ? `${row.equipments.length} item(s)` : "No equipment"}
           </div>
         </OverlayTrigger>
+      ),
+    },
+    {
+      name: "Type",
+      selector: (row) => row.isRepeating ? "Recurring" : "One-time",
+      sortable: true,
+      width: "120px",
+      cell: (row) => (
+        <div>
+          {row.isRepeating ? (
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip>
+                  {row.repeatDetails ? (
+                    <>
+                      Recurring job ({row.repeatDetails.frequency || 'N/A'}) - 
+                      Occurrence {row.repeatDetails.occurrence || '0'} of {row.repeatDetails.totalOccurrences || '0'}
+                      {row.repeatDetails.originalJobNo && 
+                        <div>Original Job: #{row.repeatDetails.originalJobNo}</div>
+                      }
+                    </>
+                  ) : (
+                    'Recurring job'
+                  )}
+                </Tooltip>
+              }
+            >
+              <Badge bg="info" className="d-flex align-items-center gap-1">
+                <BsArrowRepeat />
+                Recurring
+              </Badge>
+            </OverlayTrigger>
+          ) : (
+            <Badge bg="secondary">One-time</Badge>
+          )}
+        </div>
       ),
     },
   ];
@@ -401,28 +440,37 @@ const ViewJobs = () => {
 
   useEffect(() => {
     const debounceTimeout = setTimeout(() => {
-      if (!search.trim()) {
-        setFilteredJobs(jobs);
-        return;
+      let filtered = jobs;
+
+      // Apply job type filter
+      if (jobTypeFilter !== 'all') {
+        filtered = filtered.filter(job => 
+          jobTypeFilter === 'recurring' ? job.isRepeating : !job.isRepeating
+        );
       }
 
-      const searchLower = search.toLowerCase().trim();
-      const searchableFields = ['jobNo', 'jobName', 'customerName', 'locationName', 
-                              'jobStatus', 'priority', 'workerFullName'];
+      // Apply search filter
+      if (search.trim()) {
+        const searchLower = search.toLowerCase().trim();
+        const searchableFields = [
+          'jobNo', 'jobName', 'customerName', 'locationName', 
+          'jobStatus', 'priority', 'workerFullName'
+        ];
 
-      const result = jobs.filter((job) => {
-        return searchableFields.some(field => {
-          const value = job[field];
-          if (!value) return false;
-          return value.toString().toLowerCase().includes(searchLower);
+        filtered = filtered.filter((job) => {
+          return searchableFields.some(field => {
+            const value = job[field];
+            if (!value) return false;
+            return value.toString().toLowerCase().includes(searchLower);
+          });
         });
-      });
+      }
 
-      setFilteredJobs(result);
-    }, 300); // 300ms debounce delay
+      setFilteredJobs(filtered);
+    }, 300);
 
     return () => clearTimeout(debounceTimeout);
-  }, [search, jobs]);
+  }, [search, jobs, jobTypeFilter]);
 
   useEffect(() => {
     fetchData();
@@ -595,28 +643,42 @@ const ViewJobs = () => {
 
   const subHeaderComponentMemo = useMemo(() => {
     return (
-      <div className="w-100 mb-4 position-relative">
-        <Search 
-          size={18} 
-          className="position-absolute text-muted" 
-          style={{ top: '12px', left: '12px' }} 
-        />
-        <input
-          type="text"
-          className="form-control ps-5"
-          placeholder="Search jobs by number, name, customer, status..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            padding: '0.75rem 1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-          }}
-        />
+      <div className="w-100 mb-4">
+        <div className="d-flex gap-3 mb-3">
+          <div className="flex-grow-1 position-relative">
+            <Search 
+              size={18} 
+              className="position-absolute text-muted" 
+              style={{ top: '12px', left: '12px' }} 
+            />
+            <input
+              type="text"
+              className="form-control ps-5"
+              placeholder="Search jobs by number, name, customer, status..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                padding: '0.75rem 1rem',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
+            />
+          </div>
+          <select
+            className="form-select"
+            style={{ width: 'auto' }}
+            value={jobTypeFilter}
+            onChange={(e) => setJobTypeFilter(e.target.value)}
+          >
+            <option value="all">All Jobs</option>
+            <option value="recurring">Recurring Jobs</option>
+            <option value="one-time">One-time Jobs</option>
+          </select>
+        </div>
       </div>
     );
-  }, [search]);
+  }, [search, jobTypeFilter]);
 
   return (
     <Fragment>

@@ -43,6 +43,8 @@ import {
   BsTools,
   BsX,
   BsThreeDotsVertical,
+  BsArrowRepeat,
+  BsArrowRight,
 } from "react-icons/bs"; // Import icons
 import styles from "./calendar.module.css";
 import { useRouter } from "next/router";
@@ -444,11 +446,11 @@ const Calendar = () => {
       </div>
       <div className={styles.actionButtons}>
         <button
-          className={`${styles.actionButton} ${styles.repeatButton}`}
+          className={styles.viewDetailsButton}
           onClick={() => handleRepeatJob(props)}
         >
-          <BsCalendarCheck className={styles.icon} />
-          Repeat Job
+          <span>Repeat Job</span>
+          <BsArrowRepeat className={styles.arrowIcon} />
         </button>
       </div>
     </div>
@@ -802,53 +804,79 @@ const Calendar = () => {
 
   const handleRepeatJob = async (jobData) => {
     try {
-      const { Id, Subject, StartTime, EndTime } = jobData;
+      const { Id, Subject } = jobData;
       
+      // First, get the latest job number from the jobs collection
+      const jobsSnapshot = await getDocs(collection(db, "jobs"));
+      let maxJobNo = 0;
+
+      jobsSnapshot.forEach((doc) => {
+        const jobNo = doc.data().jobNo;
+        if (jobNo) {
+          // Assuming job numbers are in format "JOB-001"
+          const numPart = parseInt(jobNo.split('-')[1]);
+          if (!isNaN(numPart) && numPart > maxJobNo) {
+            maxJobNo = numPart;
+          }
+        }
+      });
+
       const result = await Swal.fire({
         title: 'Repeat Job',
         html: `
-          <div class="mb-3">
-            <label class="form-label">Frequency</label>
-            <select id="frequency" class="form-select">
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Bi-weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Number of Services</label>
-            <input 
-              type="number" 
-              id="services" 
-              class="form-control" 
-              min="1" 
-              max="52" 
-              value="1"
-            >
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Months (Optional)</label>
-            <select id="months" class="form-select" multiple>
-              <option value="0">January</option>
-              <option value="1">February</option>
-              <option value="2">March</option>
-              <option value="3">April</option>
-              <option value="4">May</option>
-              <option value="5">June</option>
-              <option value="6">July</option>
-              <option value="7">August</option>
-              <option value="8">September</option>
-              <option value="9">October</option>
-              <option value="10">November</option>
-              <option value="11">December</option>
-            </select>
+          <div class="swal2-custom-container">
+            <div class="form-group mb-3">
+              <label class="form-label fw-bold">Frequency</label>
+              <select id="frequency" class="form-select">
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Bi-weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            <div class="form-group mb-3">
+              <label class="form-label fw-bold">Number of Occurrences</label>
+              <input 
+                type="number" 
+                id="services" 
+                class="form-control" 
+                min="1" 
+                max="52" 
+                value="1"
+              >
+              <small class="text-muted">Maximum 52 occurrences</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label fw-bold">Select Months (Optional)</label>
+              <select id="months" class="form-select" multiple size="6">
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+              </select>
+              <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+            </div>
           </div>
         `,
+        customClass: {
+          container: 'swal2-custom',
+          popup: 'swal2-custom-popup',
+          confirmButton: 'btn btn-primary px-4',
+          cancelButton: 'btn btn-outline-secondary'
+        },
         showCancelButton: true,
         confirmButtonText: 'Create',
         cancelButtonText: 'Cancel',
+        buttonsStyling: false,
         preConfirm: () => {
           const frequency = document.getElementById('frequency').value;
           const services = parseInt(document.getElementById('services').value);
@@ -856,7 +884,7 @@ const Calendar = () => {
           const selectedMonths = Array.from(monthsSelect.selectedOptions).map(option => parseInt(option.value));
           
           if (services < 1 || services > 52) {
-            Swal.showValidationMessage('Number of services must be between 1 and 52');
+            Swal.showValidationMessage('Number of occurrences must be between 1 and 52');
             return false;
           }
           
@@ -865,41 +893,126 @@ const Calendar = () => {
       });
 
       if (result.isConfirmed) {
-        const { frequency, services, selectedMonths } = result.value;
-        const jobRef = doc(db, "jobs", Id);
-        const originalJob = await getDoc(jobRef);
-        const jobDetails = originalJob.data();
-
-        // Calculate dates based on frequency
-        const newDates = calculateRepeatingDates(
-          new Date(StartTime),
-          new Date(EndTime),
-          frequency,
-          services,
-          selectedMonths
-        );
-
-        // Create new jobs
-        for (const [startDate, endDate] of newDates) {
-          const newJobId = `${Id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const newJobRef = doc(db, "jobs", newJobId);
-          
-          await setDoc(newJobRef, {
-            ...jobDetails,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            parentJobId: Id,
-            isRepeating: true
+        try {
+          Swal.fire({
+            title: 'Creating Jobs',
+            html: 'Please wait while we create the repeated jobs...',
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
           });
-        }
 
-        // Refresh events
-        await fetchJobs();
-        showToast(`Created ${newDates.length} repeated jobs successfully`, 'success');
+          const { frequency, services, selectedMonths } = result.value;
+          const jobRef = doc(db, "jobs", Id);
+          const originalJob = await getDoc(jobRef);
+          
+          if (!originalJob.exists()) {
+            throw new Error('Original job not found');
+          }
+
+          const jobDetails = originalJob.data();
+          const newDates = calculateRepeatingDates(
+            new Date(jobDetails.startDate),
+            new Date(jobDetails.endDate),
+            frequency,
+            services,
+            selectedMonths
+          );
+
+          // Create new jobs with sequential job numbers
+          const creationPromises = newDates.map(async ([startDate, endDate], index) => {
+            const newJobNo = `JOB-${String(maxJobNo + index + 1).padStart(3, '0')}`;
+            const newJobId = `${Id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Create new job data with modifications
+            const newJobData = {
+              ...jobDetails,
+              jobNo: newJobNo,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              parentJobId: Id,
+              isRepeating: true,
+              jobStatus: defaultStatus || 'created',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              repeatDetails: {
+                originalJobId: Id,
+                originalJobNo: jobDetails.jobNo,
+                frequency: frequency,
+                occurrence: index + 1,
+                totalOccurrences: services
+              }
+            };
+
+            // Remove any existing status-specific fields that shouldn't be copied
+            delete newJobData.completedAt;
+            delete newJobData.completedBy;
+            delete newJobData.startedAt;
+            delete newJobData.startedBy;
+            delete newJobData.cancelledAt;
+            delete newJobData.cancelledBy;
+            delete newJobData.validatedAt;
+            delete newJobData.validatedBy;
+
+            const newJobRef = doc(db, "jobs", newJobId);
+            await setDoc(newJobRef, newJobData);
+
+            return {
+              Id: newJobId,
+              Subject: jobDetails.jobName,
+              JobNo: newJobNo,
+              Customer: jobDetails.customerName,
+              ServiceLocation: jobDetails.location?.locationName || "",
+              AssignedWorkers: jobDetails.assignedWorkers?.map((worker) => ({
+                workerId: worker.workerId,
+                fullName: worker.contact?.contactFullname || worker.workerId,
+                profilePicture: worker.contact?.profilePicture || "/images/avatar/NoProfile.png",
+              })) || [],
+              StartTime: startDate,
+              EndTime: endDate,
+              JobStatus: newJobData.jobStatus,
+              Description: jobDetails.jobDescription,
+              Priority: jobDetails.priority || "",
+              Category: jobDetails.category || "N/A",
+              ServiceCall: jobDetails.serviceCallID || "N/A",
+              Equipment: jobDetails.equipments?.[0]?.itemName || "N/A",
+            };
+          });
+
+          const newJobsData = await Promise.all(creationPromises);
+
+          // Update the events state
+          const updatedEvents = [...events, ...newJobsData];
+          setEvents(updatedEvents);
+          setFilteredEvents(
+            searchTerm
+              ? updatedEvents.filter(event =>
+                  event.Subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  event.JobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  event.Customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  event.ServiceLocation.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+              : updatedEvents
+          );
+
+          Swal.close();
+          showToast(`Successfully created ${newDates.length} repeated jobs`, 'success');
+
+          if (scheduleObj.current) {
+            scheduleObj.current.refreshEvents();
+          }
+
+        } catch (error) {
+          console.error('Error in job creation:', error);
+          Swal.close();
+          showToast(`Failed to create repeated jobs: ${error.message}`, 'error');
+        }
       }
     } catch (error) {
-      console.error('Error creating repeated jobs:', error);
-      showToast('Failed to create repeated jobs', 'error');
+      console.error('Error in repeat job dialog:', error);
+      Swal.close();
+      showToast('Failed to open repeat job dialog', 'error');
     }
   };
 
