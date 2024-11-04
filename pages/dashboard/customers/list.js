@@ -8,8 +8,58 @@ import { Eye, EnvelopeFill, TelephoneFill, GeoAltFill, CurrencyExchange, HouseFi
 import { GeeksSEO, PageHeading } from 'widgets'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import moment from 'moment'; // Make sure to install and import moment.js for date calculations
-import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather'; // Update imports
+import moment from 'moment';
+import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather';
+
+// Define flag components for each country
+const SGFlag = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28.35 18.9" style={{ width: '16px', height: '11px' }}>
+    <rect width="28.35" height="9.45" fill="#EF3340"/>
+    <rect y="9.45" width="28.35" height="9.45" fill="#fff"/>
+    <circle cx="7.087" cy="9.45" r="5.67" fill="#fff"/>
+    <path d="M7.087,5.67l1.147,3.531h3.712L8.959,11.142l1.147,3.531L7.087,13.23L4.069,14.673l1.147-3.531L2.228,9.201h3.712Z" fill="#EF3340"/>
+  </svg>
+);
+
+const GBFlag = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" style={{ width: '16px', height: '11px' }}>
+    <clipPath id="t">
+      <path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/>
+    </clipPath>
+    <path d="M0,0 v30 h60 v-30 z" fill="#00247d"/>
+    <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6"/>
+    <path d="M0,0 L60,30 M60,0 L0,30" clipPath="url(#t)" stroke="#cf142b" strokeWidth="4"/>
+    <path d="M30,0 v30 M0,15 h60" stroke="#fff" strokeWidth="10"/>
+    <path d="M30,0 v30 M0,15 h60" stroke="#cf142b" strokeWidth="6"/>
+  </svg>
+);
+
+const USFlag = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 100" style={{ width: '16px', height: '11px' }}>
+    <rect width="190" height="100" fill="#bf0a30"/>
+    <rect y="7.69" width="190" height="7.69" fill="#fff"/>
+    <rect y="23.08" width="190" height="7.69" fill="#fff"/>
+    <rect y="38.46" width="190" height="7.69" fill="#fff"/>
+    <rect y="53.85" width="190" height="7.69" fill="#fff"/>
+    <rect y="69.23" width="190" height="7.69" fill="#fff"/>
+    <rect y="84.62" width="190" height="7.69" fill="#fff"/>
+    <rect width="76" height="53.85" fill="#002868"/>
+    <g fill="#fff">
+      {[...Array(9)].map((_, i) => 
+        [...Array(11)].map((_, j) => (
+          <circle key={`star-${i}-${j}`} cx={3.8 + j * 7.6} cy={3.8 + i * 5.38} r="2"/>
+        ))
+      )}
+    </g>
+  </svg>
+);
+
+const COUNTRY_CODE_MAP = {
+  'Singapore': 'SG',
+  'United Kingdom': 'GB',
+  'United States': 'US',
+};
+
 
 const fetchCustomers = async (page = 1, limit = 10, search = '', filters = {}, initialLoad = 'true') => {
   try {
@@ -530,18 +580,73 @@ const ViewCustomers = () => {
         </div>
       )
     },
-    { 
-      name: 'Main Address', 
-      selector: row => row.MailAddress, 
+    {
+      name: 'Main Address',
+      selector: row => row.MailAddress || row.Address,
       sortable: true,
-      minWidth: '200px',
+      minWidth: '300px',
       grow: 2,
-      cell: row => (
-        <div>
-          <HouseFill className="me-2" />
-          {row.MailAddress}
-        </div>
-      )
+      wrap: true,
+      cell: row => {
+        // Try MailAddress fields first, then fall back to regular Address fields
+        const addressParts = [];
+        
+        if (row.MailAddress) {
+          // If MailAddress exists, use mail address related fields
+          if (row.MailAddress) addressParts.push(row.MailAddress);
+          if (row.MailAddressLine2 && row.MailAddressLine2.trim()) addressParts.push(row.MailAddressLine2);
+          if (row.MailAddressLine3 && row.MailAddressLine3.trim()) addressParts.push(row.MailAddressLine3);
+          if (row.MailZipCode) addressParts.push(row.MailZipCode);
+          if (row.MailState) addressParts.push(row.MailState);
+          if (row.MailCountry) addressParts.push(row.MailCountry);
+        } else {
+          // Fall back to regular address fields if MailAddress doesn't exist
+          if (row.Address) addressParts.push(row.Address);
+          if (row.Address2 && row.Address2.trim()) addressParts.push(row.Address2);
+          if (row.Address3 && row.Address3.trim()) addressParts.push(row.Address3);
+          if (row.ZipCode) addressParts.push(row.ZipCode);
+          if (row.State) addressParts.push(row.State);
+          if (row.Country) addressParts.push(row.Country);
+        }
+        
+        const fullAddress = addressParts.filter(Boolean).join(', ');
+    
+        // Country flag logic - check both MailCountry and Country
+        let FlagComponent = null;
+        const countryCode = COUNTRY_CODE_MAP[row.MailCountry] || COUNTRY_CODE_MAP[row.Country];
+        if (countryCode) {
+          switch (countryCode) {
+            case 'SG':
+              FlagComponent = SGFlag;
+              break;
+            case 'GB':
+              FlagComponent = GBFlag;
+              break;
+            case 'US':
+              FlagComponent = USFlag;
+              break;
+          }
+        }
+    
+        return (
+          <div className="d-flex align-items-center">
+            <HouseFill className="me-2 flex-shrink-0" />
+            <OverlayTrigger
+              placement="top"
+              overlay={<Tooltip>{fullAddress || 'No address available'}</Tooltip>}
+            >
+              <div className="text-truncate" style={{ maxWidth: '250px' }}>
+                {fullAddress || '-'}
+              </div>
+            </OverlayTrigger>
+            {FlagComponent && (
+              <div className="ms-2 flex-shrink-0">
+                <FlagComponent />
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     { 
       name: 'Phone', 
@@ -662,11 +767,61 @@ const ViewCustomers = () => {
     },
   ];
 
+  // const customStyles = {
+  //   table: {
+  //     style: {
+  //       backgroundColor: '#ffffff',
+  //       borderRadius: '8px',
+  //     }
+  //   },
+  //   headRow: {
+  //     style: {
+  //       backgroundColor: '#f8fafc',
+  //       borderTopLeftRadius: '8px',
+  //       borderTopRightRadius: '8px',
+  //       borderBottom: '1px solid #e2e8f0',
+  //     }
+  //   },
+  //   headCells: {
+  //     style: {
+  //       fontSize: '13px',
+  //       fontWeight: '600',
+  //       color: '#475569',
+  //       paddingTop: '16px',
+  //       paddingBottom: '16px',
+  //     }
+  //   },
+  //   cells: {
+  //     style: {
+  //       fontSize: '14px',
+  //       color: '#64748b',
+  //       paddingTop: '12px',
+  //       paddingBottom: '12px',
+  //     }
+  //   },
+  //   rows: {
+  //     style: {
+  //       '&:hover': {
+  //         backgroundColor: '#f1f5f9',
+  //         cursor: 'pointer',
+  //         transition: 'all 0.2s',
+  //       },
+  //     }
+  //   },
+  //   pagination: {
+  //     style: {
+  //       borderTop: '1px solid #e2e8f0',
+  //     }
+  //   }
+  // };
+
   const customStyles = {
     table: {
       style: {
         backgroundColor: '#ffffff',
         borderRadius: '8px',
+        width: '100%',
+        tableLayout: 'fixed'
       }
     },
     headRow: {
@@ -675,6 +830,7 @@ const ViewCustomers = () => {
         borderTopLeftRadius: '8px',
         borderTopRightRadius: '8px',
         borderBottom: '1px solid #e2e8f0',
+        minHeight: '52px'
       }
     },
     headCells: {
@@ -682,30 +838,43 @@ const ViewCustomers = () => {
         fontSize: '13px',
         fontWeight: '600',
         color: '#475569',
-        paddingTop: '16px',
-        paddingBottom: '16px',
+        paddingLeft: '16px',
+        paddingRight: '16px'
       }
     },
     cells: {
       style: {
         fontSize: '14px',
         color: '#64748b',
+        paddingLeft: '16px',
+        paddingRight: '16px',
         paddingTop: '12px',
-        paddingBottom: '12px',
+        paddingBottom: '12px'
       }
     },
     rows: {
       style: {
+        minHeight: '60px',
         '&:hover': {
           backgroundColor: '#f1f5f9',
           cursor: 'pointer',
-          transition: 'all 0.2s',
-        },
+          transition: 'all 0.2s'
+        }
       }
+    },
+    expandableRowsStyle: {
+      backgroundColor: '#f8fafc'
     },
     pagination: {
       style: {
         borderTop: '1px solid #e2e8f0',
+        minHeight: '56px'
+      },
+      pageButtonsStyle: {
+        borderRadius: '4px',
+        height: '32px',
+        padding: '4px 8px',
+        margin: '0 4px'
       }
     }
   };
@@ -762,7 +931,7 @@ const ViewCustomers = () => {
               <h1 className="mb-1 h2 fw-bold">Customers</h1>
               <Breadcrumb>
                 <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item active href="/customers/list">Customers</Breadcrumb.Item>
+                <Breadcrumb.Item active href="/customers/list">List</Breadcrumb.Item>
               </Breadcrumb>
             </div>
           </div>
@@ -801,6 +970,12 @@ const ViewCustomers = () => {
                   </div>
                 }
                 customStyles={customStyles}
+                paginationComponentOptions={{
+                  noRowsPerPage: true // Hide rows per page selector
+                }}
+                responsive
+                fixedHeader
+                dense
                 persistTableHead
                 noDataComponent={
                   <div className="text-center py-5">

@@ -697,8 +697,7 @@ const ViewJobs = () => {
               <h1 className="mb-1 h2 fw-bold">Job Lists</h1>
               <Breadcrumb>
                 <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item href="/dashboard/jobs/list-job">Jobs</Breadcrumb.Item>
-                <Breadcrumb.Item active>View Jobs</Breadcrumb.Item>
+                <Breadcrumb.Item active>List</Breadcrumb.Item>
               </Breadcrumb>
             </div>
             <div>

@@ -102,7 +102,7 @@ const WorkersListItems = () => {
           <p class="text-muted mb-4">${row.workerId}</p>
           <div class="d-grid gap-2">
             <button class="btn btn-primary" id="viewBtn">
-              <i class="fas fa-eye me-2"></i>View Worker
+              <i class="fas fa-eye me-2"></i>View Details
             </button>
             <button class="btn btn-warning" id="editBtn">
               <i class="fas fa-edit me-2"></i>Edit Worker
@@ -126,10 +126,10 @@ const WorkersListItems = () => {
           router.push(`/dashboard/workers/${row.id}`);
         });
         document.getElementById('editBtn').addEventListener('click', async () => {
-          setIsEditing(true); // Ensure this is called
+          setIsEditing(true);
           Swal.close();
-          await router.push(`/dashboard/workers/${row.id}`);
-          setIsEditing(false); // Ensure this is called
+          await router.push(`/dashboard/workers/${row.id}/edit`);
+          setIsEditing(false);
         });
         document.getElementById('removeBtn').addEventListener('click', () => {
           Swal.close();

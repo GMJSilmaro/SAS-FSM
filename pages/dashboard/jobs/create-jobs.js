@@ -17,7 +17,7 @@ const CreateJobs = () => {
                 <h1 className="mb-1 h2 fw-bold">Create New Job</h1>
                 <Breadcrumb>
                   <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                  <Breadcrumb.Item href="/dashboard/jobs/list-job">Jobs</Breadcrumb.Item>
+                  <Breadcrumb.Item href="/dashboard/jobs/list-jobs">Jobs</Breadcrumb.Item>
                   <Breadcrumb.Item active>Add new Jobs</Breadcrumb.Item>
                 </Breadcrumb>
               </div>

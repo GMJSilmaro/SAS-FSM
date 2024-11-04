@@ -300,7 +300,7 @@ const SignIn = () => {
                     >
                       {loading ? (
                         <div className="d-flex align-items-center justify-content-center">
-                          <ClipLoader color="#ffffff" size={20} />
+                          {/* <ClipLoader color="#ffffff" size={20} /> */}
                           <span className="ms-2">Please Wait...</span>
                         </div>
                       ) : (
