@@ -7,6 +7,7 @@ import Cookies from 'js-cookie';
 import { toast, ToastContainer } from 'react-toastify';
 import { ClipLoader } from 'react-spinners';
 import { collection, query, getDocs, limit, onSnapshot, doc } from 'firebase/firestore';
+import Swal from 'sweetalert2';
 
 const SignIn = () => {
   const [email, setEmail] = useState(''); 
@@ -52,12 +53,21 @@ const SignIn = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+  
     try {
       if (!email || !password) {
         throw new Error('Please enter both email and password');
       }
-
+  
+      // Show loading alert
+      Swal.fire({
+        title: 'Logging in...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+  
       // Firebase Authentication
       try {
         await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -69,7 +79,7 @@ const SignIn = () => {
         }
         throw firebaseError;
       }
-
+  
       // Backend Authentication
       const response = await fetch('/api/login', {
         method: 'POST',
@@ -79,15 +89,22 @@ const SignIn = () => {
         body: JSON.stringify({ email: email.trim(), password }),
         credentials: 'include',
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Login failed');
       }
-
+  
       const data = await response.json();
       
-      toast.success('Login successful!');
+      // Show success alert
+      await Swal.fire({
+        icon: 'success',
+        title: 'Login Successful!',
+        text: 'Redirecting to dashboard...',
+        timer: 1500,
+        showConfirmButton: false
+      });
       
       // Ensure cookies are set before redirect
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -120,22 +137,117 @@ const SignIn = () => {
       }
       
       setError(errorMessage);
-      toast.error(errorMessage, {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+      
+      // Show error alert
+      Swal.fire({
+        icon: 'error',
+        title: 'Login Failed',
+        text: errorMessage,
+        confirmButtonText: 'Try Again'
       });
       
       setLoading(false);
     }
   };
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setLoading(true);
+  //   setError('');
+
+  //   try {
+  //     if (!email || !password) {
+  //       throw new Error('Please enter both email and password');
+  //     }
+
+  //     // Firebase Authentication
+  //     try {
+  //       await signInWithEmailAndPassword(auth, email.trim(), password);
+  //     } catch (firebaseError) {
+  //       if (firebaseError.code === 'auth/invalid-credential' ||
+  //           firebaseError.code === 'auth/user-not-found' ||
+  //           firebaseError.code === 'auth/wrong-password') {
+  //         throw new Error('Invalid email or password');
+  //       }
+  //       throw firebaseError;
+  //     }
+
+  //     // Backend Authentication
+  //     const response = await fetch('/api/login', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ email: email.trim(), password }),
+  //       credentials: 'include',
+  //     });
+
+  //     if (!response.ok) {
+  //       const errorData = await response.json();
+  //       throw new Error(errorData.message || 'Login failed');
+  //     }
+
+  //     const data = await response.json();
+      
+  //     toast.success('Login successful!');
+      
+  //     // Ensure cookies are set before redirect
+  //     await new Promise(resolve => setTimeout(resolve, 100));
+  //     window.location.href = '/dashboard/overview';
+      
+  //   } catch (error) {
+  //     console.error('Login error:', error);
+  //     setPassword(''); // Clear password field on error
+      
+  //     let errorMessage;
+  //     if (error.code) {
+  //       switch (error.code) {
+  //         case 'auth/invalid-email':
+  //           errorMessage = 'Please enter a valid email address';
+  //           break;
+  //         case 'auth/user-disabled':
+  //           errorMessage = 'This account has been disabled';
+  //           break;
+  //         case 'auth/too-many-requests':
+  //           errorMessage = 'Too many failed attempts. Please try again later';
+  //           break;
+  //         case 'auth/network-request-failed':
+  //           errorMessage = 'Network error. Please check your internet connection';
+  //           break;
+  //         default:
+  //           errorMessage = 'Invalid email or password';
+  //       }
+  //     } else {
+  //       errorMessage = error.message;
+  //     }
+      
+  //     setError(errorMessage);
+  //     toast.error(errorMessage, {
+  //       position: "top-right",
+  //       autoClose: 3000,
+  //       hideProgressBar: false,
+  //       closeOnClick: true,
+  //       pauseOnHover: true,
+  //       draggable: true,
+  //     });
+      
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <Fragment>
-      <ToastContainer />
+      <ToastContainer
+      position="top-right"
+      autoClose={3000}
+      hideProgressBar={false}
+      newestOnTop
+      closeOnClick
+      rtl={false}
+      pauseOnFocusLoss
+      draggable
+      pauseOnHover
+      theme="light"
+    />
       <Row className="align-items-center justify-content-center g-0 min-vh-100">
         <Col lg={5} md={5} className="py-8 py-xl-0">
           <Card>

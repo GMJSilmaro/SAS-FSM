@@ -30,6 +30,7 @@ import { format } from "date-fns";
 import { FaBell, FaBriefcase, FaCheckCircle, FaExclamationCircle, FaSearch } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Swal from 'sweetalert2';
 
 const SearchResults = React.memo(({ results, onClose }) => {
   const groupedResults = {
@@ -118,43 +119,99 @@ const QuickMenu = () => {
     fetchUserDetails();
   }, [router]);
 
-  // Sign out function
-  const handleSignOut = async () => {
-    try {
-      const response = await fetch("/api/logout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: 'include', // Important: include credentials
+  // // Sign out function
+  // const handleSignOut = async () => {
+  //   try {
+  //     const response = await fetch("/api/logout", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       credentials: 'include', // Important: include credentials
+  //     });
+
+  //     if (response.ok) {
+  //       // Clear client-side cookies using js-cookie
+  //       const cookiesToClear = [
+  //         'customToken',
+  //         'uid',
+  //         'isAdmin',
+  //         'email',
+  //         'workerId',
+  //         'LAST_ACTIVITY'
+  //       ];
+
+  //       cookiesToClear.forEach(cookie => {
+  //         Cookies.remove(cookie, { path: '/' });
+  //       });
+
+  //       // Force reload to clear any cached state
+  //       window.location.href = '/authentication/sign-in';
+  //     } else {
+  //       throw new Error("Logout failed");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error logging out:", error.message);
+  //     toast.error("Failed to logout. Please try again.");
+  //   }
+  // };
+
+// Sign out function
+const handleSignOut = async () => {
+  try {
+    // Show loading alert
+    Swal.fire({
+      title: 'Signing out...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    const response = await fetch("/api/logout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: 'include',
+    });
+
+    if (response.ok) {
+      const cookiesToClear = [
+        'customToken',
+        'uid',
+        'isAdmin',
+        'email',
+        'workerId',
+        'LAST_ACTIVITY'
+      ];
+
+      cookiesToClear.forEach(cookie => {
+        Cookies.remove(cookie, { path: '/' });
       });
 
-      if (response.ok) {
-        // Clear client-side cookies using js-cookie
-        const cookiesToClear = [
-          'customToken',
-          'uid',
-          'isAdmin',
-          'email',
-          'workerId',
-          'LAST_ACTIVITY'
-        ];
-
-        cookiesToClear.forEach(cookie => {
-          Cookies.remove(cookie, { path: '/' });
-        });
-
-        // Force reload to clear any cached state
+      // Show success alert
+      Swal.fire({
+        icon: 'success',
+        title: 'Successfully signed out!',
+        text: 'Redirecting to login page...',
+        timer: 1500,
+        showConfirmButton: false
+      }).then(() => {
         window.location.href = '/authentication/sign-in';
-      } else {
-        throw new Error("Logout failed");
-      }
-    } catch (error) {
-      console.error("Error logging out:", error.message);
-      toast.error("Failed to logout. Please try again.");
+      });
+    } else {
+      throw new Error("Logout failed");
     }
-  };
-
+  } catch (error) {
+    console.error("Error logging out:", error.message);
+    Swal.fire({
+      icon: 'error',
+      title: 'Oops...',
+      text: 'Failed to logout. Please try again.'
+    });
+  }
+};
   const Notifications = React.memo(({ setUnreadCount }) => {
     const [notifications, setNotifications] = useState([]);
     const workerID = Cookies.get("workerId");
