@@ -28,6 +28,8 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
 import { db } from "../../firebase";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Settings = () => {
   const router = useRouter();
@@ -303,41 +305,38 @@ const Settings = () => {
 
   const handleCompanyInfoSave = async () => {
     try {
-      let logoUrl = logoPreview;
-      const workerId = userDetails.workerId; // Fetching workerId from userDetails
-
-      // Log the fetched workerId
-      console.log("Fetched workerId:", workerId);
+      let logoUrl = companyInfo.logo;
+      const workerId = userDetails.workerId;
 
       if (file) {
-        // Create a storage reference using workerId
-        const storageRef = ref(
-          storage,
-          `company_logos/${workerId}-${file.name}`
-        );
-        console.log("Storage reference path:", storageRef.fullPath); // Log the storage reference path
-
-        const snapshot = await uploadBytes(storageRef, file); // Upload the file
-        logoUrl = await getDownloadURL(snapshot.ref); // Get the download URL
-
-        // Log the download URL
-        console.log("Logo uploaded. Download URL:", logoUrl);
+        const storageRef = ref(storage, `company_logos/${workerId}-${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        logoUrl = await getDownloadURL(snapshot.ref);
+        console.log("New logo uploaded. Download URL:", logoUrl);
       }
 
-      // Save the updated company information to Firestore
+      // Update companyDetails document
       await setDoc(doc(db, "companyDetails", "companyInfo"), {
+        ...companyInfo,
         logo: logoUrl,
-        name: companyInfo.name,
-        address: companyInfo.address,
-        email: companyInfo.email,
-        phone: companyInfo.phone,
-        website: companyInfo.website,
       });
 
-      console.log("Company Information updated successfully");
+      // Also update companyInfo collection for the navbar
+      await setDoc(doc(db, "companyInfo", "default"), {
+        name: companyInfo.name,
+        logo: logoUrl
+      });
+
+      setCompanyInfo(prev => ({
+        ...prev,
+        logo: logoUrl
+      }));
+
+      toast.success('Company Information updated successfully!');
       handleEditModalClose();
     } catch (error) {
       console.error("Error updating company information:", error);
+      toast.error('Failed to update company information');
     }
   };
 
@@ -384,10 +383,18 @@ const Settings = () => {
   };
 
   // Function to save changes (implement saving to the database as needed)
-  const handleSave = () => {
-    console.log("Business Hours:", businessHours);
-    console.log("ScheduleAssist Settings:", scheduleAssist);
-    handleHideCompSchedule();
+  const handleSave = async () => {
+    try {
+      // Add your save logic here
+      console.log("Business Hours:", businessHours);
+      console.log("ScheduleAssist Settings:", scheduleAssist);
+      
+      toast.success('Schedule settings saved successfully!');
+      handleHideCompSchedule();
+    } catch (error) {
+      console.error("Error saving schedule settings:", error);
+      toast.error('Failed to save schedule settings');
+    }
   };
 
   const renderContent = () => {
@@ -1214,6 +1221,19 @@ const Settings = () => {
           {renderContent()}
         </Col>
       </Row>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </Container>
   );
 };

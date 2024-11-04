@@ -87,6 +87,7 @@ const QuickMenu = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [logo, setLogo] = useState('/images/SAS-LOGO.png'); // Default logo
 
   // Fetch user details
   useEffect(() => {
@@ -496,13 +497,37 @@ const QuickMenu = () => {
       }
     };
 
+  // Add useEffect to fetch company logo
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      try {
+        const companyInfoRef = collection(db, 'companyInfo');
+        const q = query(companyInfoRef, limit(1));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const companyData = querySnapshot.docs[0].data();
+          if (companyData.logo) {
+            setLogo(companyData.logo);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company info:', error);
+      }
+    };
+
+    fetchCompanyInfo();
+  }, []);
+
   return (
     <Fragment>
       <ListGroup
         as="ul"
         bsPrefix="navbar-nav"
-        className="navbar-right-wrap ms-2 d-flex nav-top-wrap"
+        className="navbar-right-wrap ms-2 d-flex nav-top-wrap align-items-center"
       >
+   
+
         {/* Search Form */}
         <li className="me-2" style={{ minWidth: '250px' }}>
           <form onSubmit={handleSearch} className="search-container">

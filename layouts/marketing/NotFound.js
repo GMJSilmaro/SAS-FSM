@@ -12,15 +12,13 @@ const NotFound = (props) => {
 	});
 
 	return (
-		<main>
-			<section id="db-wrapper" className="bg-white">
-				<Container className="d-flex flex-column">
-					<NavbarBrandOnly />
-					{props.children}
-					<FooterWithSocialIcons />
-				</Container>
-			</section>
-		</main>
+		<section id="db-wrapper" className="bg-white">
+			<Container className="d-flex flex-column">
+				<NavbarBrandOnly />
+				{props.children}
+				
+			</Container>
+		</section>
 	);
 };
 

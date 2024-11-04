@@ -9,12 +9,46 @@ import { GeeksSEO } from 'widgets';
 // import blank layout, header and footer to override default layout 
 import NotFound from 'layouts/marketing/NotFound';
 
-const Error404 = () => {
-	return (
-		<Fragment>
-			{/* Geeks SEO settings  */}
-			<GeeksSEO title="404 Error | SAS - SAP B1 Portal" />
+// import necessary Firebase dependencies
+import { db } from '../firebase';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 
+const Error404 = () => {
+	const [isLoading, setIsLoading] = useState(true);
+	const [logo, setLogo] = useState(null);
+
+	useEffect(() => {
+		const fetchCompanyInfo = async () => {
+			try {
+				const companyInfoRef = collection(db, 'companyInfo');
+				const q = query(companyInfoRef, limit(1));
+				const querySnapshot = await getDocs(q);
+				
+				if (!querySnapshot.empty) {
+					const companyData = querySnapshot.docs[0].data();
+					setLogo(companyData.logo || '/images/SAS-LOGO.png');
+				} else {
+					setLogo('/images/SAS-LOGO.png');
+				}
+			} catch (error) {
+				console.error('Error fetching company info:', error);
+				setLogo('/images/SAS-LOGO.png');
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		fetchCompanyInfo();
+	}, []);
+
+	if (isLoading || !logo) {
+		return null;
+	}
+
+	return (
+		<>
+			<GeeksSEO title="404 Error | SAS - SAP B1 Portal" />
 			<Row>
 				<Col lg={12} md={12} sm={12}>
 					<Row className="align-items-center justify-content-center g-0 py-lg-22 py-10">
@@ -24,6 +58,7 @@ const Error404 = () => {
 							md={12}
 							className="text-center text-lg-start"
 						>
+						
 							<h1 className="display-1 mb-3">404</h1>
 							<p className="mb-5 lead">
 								Oops! Sorry, we couldn’t find the page you were looking for. If
@@ -47,7 +82,7 @@ const Error404 = () => {
 					</Row>
 				</Col>
 			</Row>
-		</Fragment>
+		</>
 	);
 };
 

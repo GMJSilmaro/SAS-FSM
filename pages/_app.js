@@ -17,6 +17,7 @@ import DefaultDashboardLayout from "layouts/dashboard/DashboardIndexTop";
 
 // Styles
 import "../styles/theme.scss";
+import FooterWithSocialIcons from "@/layouts/marketing/footers/FooterWithSocialIcons";
 
 registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
 
@@ -87,9 +88,10 @@ function MyApp({ Component, pageProps }) {
             <LoadingOverlay isLoading={isLoading} />
             {process.env.NODE_ENV !== 'production'}
           </Layout>
-    
+       
         </QueryClientProvider>
       </Provider>
+      <FooterWithSocialIcons/>
     </Fragment>
   );
 }

@@ -1,39 +1,155 @@
-// import node module libraries
-import Link from 'next/link';
-import { Col, Row } from 'react-bootstrap';
-
-// import MDI icons
-import Icon from '@mdi/react';
-import { mdiFacebook, mdiTwitter, mdiGithub } from '@mdi/js';
+import React, { useEffect, useState } from 'react';
+import { Col, Row, Container, Spinner, Alert, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { 
+  Facebook,
+  Twitter,
+  Github,
+  Linkedin,
+  MessageCircle,
+  Youtube,
+  Book,
+  Phone,
+  Video
+} from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../../firebase';
 
 const FooterWithSocialIcons = () => {
-	return (
-		<Row>
-			<Col xl={{ offset: 1, span: 10 }} lg={12} md={12}>
-				<Row className="align-items-center mt-6 mb-4">
-					<Col md={6} xl={8} lg={8} xs={8}>
-						<p className="mb-0">© Geeks. 2024 Codescandy.</p>
-					</Col>
-					<Col
-						md={6}
-						xl={4}
-						lg={4}
-						xs={4}
-						className="d-flex justify-content-end"
-					>
-						<Link href="/" target="_blank" className="text-muted text-primary-hover me-3  ">
-							<Icon path={mdiFacebook} size={1} />
-						</Link>
-						<Link href="/" className="text-muted text-primary-hover me-3  ">
-							<Icon path={mdiTwitter} size={1} />
-						</Link>
-						<Link href="/" className="text-muted text-primary-hover">
-							<Icon path={mdiGithub} size={1} />
-						</Link>
-					</Col>
-				</Row>
-			</Col>
-		</Row>
-	);
+  const [companyName, setCompanyName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const currentYear = new Date().getFullYear();
+
+  const socialLinks = [
+    {
+      name: 'LinkedIn',
+      icon: Linkedin,
+      href: 'https://www.linkedin.com/company/pixelcare-consulting-corporation'
+    },
+    {
+      name: 'Facebook',
+      icon: Facebook,
+      href: 'https://facebook.com/pixelcareconsulting'
+    },
+
+    {
+      name: 'WhatsApp',
+      icon: Phone,
+      href: 'https://web.whatsapp.com/send?phone=6594525848&text='
+    },
+    {
+      name: 'YouTube',
+      icon: Youtube,
+      href: 'https://www.youtube.com/channel/UCuy8i19SmgQG-me8espY0Ag/videos?view=0&sort=p'
+    },
+
+    {
+      name: 'Twitter',
+      icon: Twitter,
+      href: 'https://twitter.com/pixelcarecons'
+    },
+
+    {
+      name: 'Company Profile',
+      icon: Book,
+      href: 'https://heyzine.com/flip-book/3088ace65b.html#page/1'
+    }
+  ];
+
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      try {
+        setIsLoading(true);
+        setError('');
+        const docRef = doc(db, 'companyDetails', 'companyInfo');
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          setCompanyName(docSnap.data().name);
+        } else {
+          setCompanyName('Company Name');
+        }
+      } catch (err) {
+        setError('Failed to load company information');
+        setCompanyName('Company Name');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCompanyInfo();
+  }, []);
+
+  return (
+    <footer className="bg-white mt-auto">
+      <Container fluid>
+        <Row className="py-4 border-top">
+          <Col lg={{ span: 10, offset: 1 }}>
+            <Row className="align-items-center">
+              <Col lg={7} md={12} className="mb-3 mb-lg-0">
+                {isLoading ? (
+                  <div className="d-flex align-items-center">
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    <span>Loading...</span>
+                  </div>
+                ) : error ? (
+                  <Alert variant="danger" className="mb-0 py-2">
+                    {error}
+                  </Alert>
+                ) : (
+                  <p className="mb-0 text-secondary">
+                    FSM Portal © {companyName} {currentYear}{' '}
+                    All rights reserved | Powered by{' '}
+                    <a 
+                      href="https://pixelcareconsulting.com"
+                      className="text-decoration-none link-primary"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Pixelcare Consulting
+                    </a>
+                  </p>
+                )}
+              </Col>
+              
+              <Col lg={5} md={12}>
+                <div className="d-flex flex-wrap justify-content-lg-end justify-content-center gap-3">
+                  {socialLinks.map((social) => (
+                    <OverlayTrigger
+                      key={social.name}
+                      placement="top"
+                      overlay={<Tooltip id={`tooltip-${social.name}`}>{`Visit our ${social.name}`}</Tooltip>}
+                    >
+                      <a
+                        href={social.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-secondary p-2 d-inline-flex align-items-center justify-content-center rounded-circle hover-icon"
+                        aria-label={`Visit our ${social.name} page`}
+                      >
+                        <social.icon size={20} />
+                      </a>
+                    </OverlayTrigger>
+                  ))}
+                </div>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+      </Container>
+
+      <style jsx>{`
+        .hover-icon {
+          transition: all 0.3s ease;
+        }
+        .hover-icon:hover {
+          transform: translateY(-3px);
+          background: rgba(0, 0, 0, 0.05);
+          color: #0d6efd;
+        }
+      `}</style>
+    </footer>
+  );
 };
+
 export default FooterWithSocialIcons;

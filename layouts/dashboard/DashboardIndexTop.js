@@ -3,7 +3,7 @@
  */
 
 // import node module libraries
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
 	Container,
@@ -12,6 +12,8 @@ import {
 	Form,
 	Image
 } from 'react-bootstrap';
+import { collection, query, getDocs, limit, onSnapshot, doc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 // import sub components
 import NavDropdownMain from './navbars/NavDropdownMain';
@@ -25,6 +27,39 @@ import NavbarTopRoutes from 'routes/dashboard/NavbarTopRoutes';
 
 const DashboardIndexTop = (props) => {
 	const [expandedMenu, setExpandedMenu] = useState(false);
+	const [companyDetails, setCompanyDetails] = useState({
+		name: '',
+		logo: ''
+	});
+
+	useEffect(() => {
+		const fetchCompanyInfo = async () => {
+			try {
+				const companyInfoRef = collection(db, 'companyDetails');
+				const q = query(companyInfoRef, limit(1));
+				const querySnapshot = await getDocs(q);
+				
+				if (!querySnapshot.empty) {
+					const companyData = querySnapshot.docs[0].data();
+					setCompanyDetails(companyData);
+				}
+			} catch (error) {
+				console.error('Error fetching company info:', error);
+			}
+		};
+
+		// Set up a real-time listener for company info changes
+		const unsubscribe = onSnapshot(doc(db, 'companyDetails', 'companyInfo'), (doc) => {
+			if (doc.exists()) {
+				setCompanyDetails(doc.data());
+			}
+		});
+
+		fetchCompanyInfo();
+
+		// Cleanup subscription on unmount
+		return () => unsubscribe();
+	}, []);
 
 	return (
 		<div>
@@ -38,7 +73,11 @@ const DashboardIndexTop = (props) => {
 					<Navbar.Brand
 						as={Link}
 						href="/dashboard/overview/">
-						<Image src="/images/SAS-LOGO.png" alt="" style={{ height: '80px' }} />
+						<Image 
+							src={companyDetails.logo} 
+							alt={companyDetails.name || 'Company Logo'} 
+							style={{ height: '100px' }} 
+						/>
 					</Navbar.Brand>
 					{/* search box */}
 					<div className="ms-lg-3 d-none d-md-none d-lg-block">
@@ -76,7 +115,7 @@ const DashboardIndexTop = (props) => {
 									/>
 								);
 							})}
-							<DocumentMenu />
+							{/* <DocumentMenu /> */}
 						</Nav>
 					</Navbar.Collapse>
 				</Container>

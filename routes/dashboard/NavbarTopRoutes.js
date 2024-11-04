@@ -15,7 +15,6 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Manage Customer',
-		badge: 'NEW',
 		link: '#',
 		icon: 'PeopleFill',
 		children: [
@@ -27,12 +26,14 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				menuitem: 'Customers',
+				badge: 'SAPB1',
 				link: '/dashboard/customers/list',
 				icon: 'PersonFill'
 			},
 			{
 				id: uuid(),
 				menuitem: 'Service Locations',
+				badge: 'SAP B1',
 				link: '/dashboard/locations/list',
 				icon: 'GeoAltFill'
 			},
