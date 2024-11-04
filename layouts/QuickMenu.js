@@ -537,11 +537,12 @@ const QuickMenu = () => {
               </InputGroup.Text>
               <Form.Control
                 type="search"
-                placeholder="Search jobs, status..."
+                placeholder="Search jobs, status, etc..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="form-control"
-                style={{ fontSize: '0.875rem' }}
+                style={{ fontSize: '15px' }}
+                // style={{ fontSize: '0.875rem' }}
               />
               <Button 
                 type="submit" 
