@@ -14,6 +14,7 @@ import LoadingOverlay from '../components/LoadingOverlay';
 // Layouts
 import DefaultMarketingLayout from "layouts/marketing/DefaultLayout";
 import DefaultDashboardLayout from "layouts/dashboard/DashboardIndexTop";
+import MainLayout from "@/layouts/MainLayout";
 
 // Styles
 import "../styles/theme.scss";
@@ -32,6 +33,74 @@ const queryClient = new QueryClient({
   }
 });
 
+// function MyApp({ Component, pageProps }) {
+//   const router = useRouter();
+//   const [isLoading, setIsLoading] = useState(false);
+  
+//   const pageURL = process.env.baseURL + router.pathname;
+//   const title = "SAS&ME - SAP B1 | Portal";
+//   const description = "Discover SAS, your ultimate SAP B1 portal. Utilize the portal with ease!";
+//   const keywords = "SAP B1, Service Layer, Admin dashboard, Portal, web apps, Pixelcare Consulting";
+
+//   // Choose layout based on route
+//   const Layout = Component.Layout ||
+//     (router.pathname.includes("dashboard")
+//       ? DefaultDashboardLayout
+//       : DefaultMarketingLayout);
+
+//   // Loading state management
+//   useEffect(() => {
+//     const handleStart = () => setIsLoading(true);
+//     const handleComplete = () => setIsLoading(false);
+
+//     router.events.on('routeChangeStart', handleStart);
+//     router.events.on('routeChangeComplete', handleComplete);
+//     router.events.on('routeChangeError', handleComplete);
+
+//     return () => {
+//       router.events.off('routeChangeStart', handleStart);
+//       router.events.off('routeChangeComplete', handleComplete);
+//       router.events.off('routeChangeError', handleComplete);
+//     };
+//   }, []);
+
+//   // Check if current page is sign-in page
+//   const isSignInPage = router.pathname === '/sign-in' || router.pathname === '/authentication/sign-in';
+
+//   return (
+//     <Fragment>
+//       <Head>
+//         <meta name="viewport" content="width=device-width, initial-scale=1" />
+//         <meta name="keywords" content={keywords} />
+//         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+//       </Head>
+//       <NextSeo
+//         title={title}
+//         description={description}
+//         canonical={pageURL}
+//         openGraph={{
+//           url: pageURL,
+//           title: title,
+//           description: description,
+//           site_name: process.env.siteName,
+//         }}
+//       />
+//       <Provider store={store}>
+//         <QueryClientProvider client={queryClient}>
+//           <Layout>
+//             <Component {...pageProps} setIsLoading={setIsLoading} />
+//             {!router.pathname.startsWith('/authentication/') && <ActivityTracker />}
+//             <LoadingOverlay isLoading={isLoading} />
+//             {process.env.NODE_ENV !== 'production'}
+//           </Layout>
+//         </QueryClientProvider>
+//       </Provider>
+//       {!isSignInPage && <FooterWithSocialIcons/>}
+//     </Fragment>
+    
+//   );
+// }
+
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +115,9 @@ function MyApp({ Component, pageProps }) {
     (router.pathname.includes("dashboard")
       ? DefaultDashboardLayout
       : DefaultMarketingLayout);
+
+  // Check if current page is sign-in page
+  const isSignInPage = router.pathname === '/sign-in' || router.pathname === '/authentication/sign-in';
 
   // Loading state management
   useEffect(() => {
@@ -62,9 +134,6 @@ function MyApp({ Component, pageProps }) {
       router.events.off('routeChangeError', handleComplete);
     };
   }, []);
-
-  // Check if current page is sign-in page
-  const isSignInPage = router.pathname === '/sign-in' || router.pathname === '/authentication/sign-in';
 
   return (
     <Fragment>
@@ -86,15 +155,16 @@ function MyApp({ Component, pageProps }) {
       />
       <Provider store={store}>
         <QueryClientProvider client={queryClient}>
-          <Layout>
-            <Component {...pageProps} setIsLoading={setIsLoading} />
-            {!router.pathname.startsWith('/authentication/') && <ActivityTracker />}
-            <LoadingOverlay isLoading={isLoading} />
-            {process.env.NODE_ENV !== 'production'}
-          </Layout>
+          <MainLayout showFooter={!isSignInPage}>
+            <Layout>
+              <Component {...pageProps} setIsLoading={setIsLoading} />
+              {!router.pathname.startsWith('/authentication/') && <ActivityTracker />}
+              <LoadingOverlay isLoading={isLoading} />
+              {process.env.NODE_ENV !== 'production'}
+            </Layout>
+          </MainLayout>
         </QueryClientProvider>
       </Provider>
-      {!isSignInPage && <FooterWithSocialIcons/>}
     </Fragment>
   );
 }

@@ -75,7 +75,7 @@ const FooterWithSocialIcons = () => {
   }, []);
 
   return (
-    <footer className="bg-white mt-auto">
+    <footer className="bg-white">
       <Container fluid>
         <Row className="py-4 border-top">
           <Col lg={{ span: 10, offset: 1 }}>
