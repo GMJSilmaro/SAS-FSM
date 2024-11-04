@@ -53,6 +53,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Swal from "sweetalert2";
 import { format } from "date-fns";
+import Legend from "./legends";
 
 const DEFAULT_LEGEND_ITEMS = [
   { id: 'created', status: "Created", color: "#9e9e9e" },
@@ -1082,23 +1083,38 @@ const Calendar = () => {
         theme="light"
       />
       
-      <h1 className="mb-1 h2 fw-bold">Current Jobs Calendar</h1>
+      <h1 className="mb-1 h2 fw-bold">Jobs Calendar</h1>
 
       <Breadcrumb>
         <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-        <Breadcrumb.Item href="/dashboard/scheduling/jobs/current">
-          Jobs Calendar
+        <Breadcrumb.Item active href="/dashboard/scheduling/jobs/current">
+          Calendar
         </Breadcrumb.Item>
       </Breadcrumb>
-      <div style={{ display: "flex", marginTop: "10px" , width: "95%"}}>
+      <div style={{ 
+        display: "flex", 
+        marginTop: "10px", 
+        width: "100%",  // Changed from 95%
+        marginRight: "20px" 
+      }}>
         {/* Left side: Calendar */}
         <div style={{ flex: 8, marginRight: "20px" }}>
-          <TextBoxComponent
-            placeholder="Search via Job Name, Job Number, Customer, Location..."
-            value={searchTerm}
-            input={handleSearch}
-            cssClass={styles.searchInput}
-          />
+        <TextBoxComponent 
+      placeholder="Search via Job Name, Job Number, Customer, Location..."
+      cssClass="e-bigger" // Makes the component larger
+      floatLabelType="Auto"
+      value={searchTerm}
+      input={handleSearch}
+      htmlAttributes={{
+        style: {
+          width: '100%',
+          fontSize: '16px',
+          padding: '12px',
+          height: '48px'  // Increased height
+        }
+      }}
+    />
+
 
           {/* Display loading spinner when loading is true */}
           {loading ? (
@@ -1158,8 +1174,27 @@ const Calendar = () => {
           )}
         </div>
 
-        {/* Right side: Legend */}
-        <div style={{ flex: 1 }}>
+       
+      {/* Right side: Legend - update styles */}
+  <div style={{ 
+    flex: 1,
+    minWidth: "250px",
+    maxWidth: "300px", 
+    height: '650px',
+    display: 'flex',
+    flexDirection: 'column',
+    marginRight: "5px" // Add right margin to prevent sticking to edge
+  }}>
+    <Legend
+      legendItems={legendItems}
+      defaultStatus={defaultStatus}
+      onAddLegend={handleAddLegend}
+      onEditLegend={handleEditLegend}
+      onDeleteLegend={handleDeleteLegend}
+      onSetDefault={handleSetDefault}
+    />
+  </div>
+        {/* <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h4>Legend</h4>
             <button 
@@ -1260,7 +1295,9 @@ const Calendar = () => {
               </li>
             ))}
           </ul>
-        </div>
+        </div> */}
+
+        
       </div>
     </>
   );
