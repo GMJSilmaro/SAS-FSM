@@ -698,6 +698,12 @@ const QuickMenu = () => {
       <i className="fe fe-settings me-2"></i> Settings
     </Dropdown.Item>
     <Dropdown.Divider />
+    <Dropdown.Item
+      eventKey="4"
+      onClick={() => window.open("https://pixelcareconsulting.myfreshworks.com/login", "_blank")}
+    >
+      <i className="fe fe-help-circle me-2"></i> Help
+    </Dropdown.Item>
     <Dropdown.Item className="mb-3" onClick={handleSignOut}>
       <i className="fe fe-power me-2"></i> Sign Out
     </Dropdown.Item>
