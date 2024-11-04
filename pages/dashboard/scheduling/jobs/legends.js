@@ -87,7 +87,7 @@ const Legend = ({
       onClick={handleAddLegend}
     >
       <PlusCircle size={14} />
-      Add Status
+      Add Legends
     </Button>
   </div>
 </Card.Header>

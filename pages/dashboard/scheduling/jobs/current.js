@@ -523,10 +523,10 @@ const Calendar = () => {
 
   const handleAddLegend = () => {
     Swal.fire({
-      title: 'Add New Status',
+      title: 'Add new Legends',
       html: `
         <div class="mb-3">
-          <label class="form-label">Status Name</label>
+          <label class="form-label">Legend Name</label>
           <input 
             id="status" 
             class="form-control" 
@@ -543,13 +543,17 @@ const Calendar = () => {
           >
         </div>
       `,
-      showCancelButton: true,
-      confirmButtonText: 'Add',
-      cancelButtonText: 'Cancel',
       customClass: {
-        confirmButton: 'btn btn-primary',
+        container: 'swal2-custom',
+        popup: 'swal2-custom-popup',
+      
+        actions: 'swal2-actions-custom',
+        confirmButton: 'btn btn-primary px-4',
         cancelButton: 'btn btn-outline-secondary'
       },
+      showCancelButton: true,
+      confirmButtonText: 'Create',
+      cancelButtonText: 'Cancel',
       buttonsStyling: false,
       preConfirm: () => {
         const status = document.getElementById('status').value;
@@ -871,6 +875,8 @@ const Calendar = () => {
         customClass: {
           container: 'swal2-custom',
           popup: 'swal2-custom-popup',
+          // Add gap between buttons using actions container
+          actions: 'swal2-actions-custom',
           confirmButton: 'btn btn-primary px-4',
           cancelButton: 'btn btn-outline-secondary'
         },
@@ -1083,38 +1089,31 @@ const Calendar = () => {
         theme="light"
       />
       
-      <h1 className="mb-1 h2 fw-bold">Jobs Calendar</h1>
-
-      <Breadcrumb>
-        <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-        <Breadcrumb.Item active href="/dashboard/scheduling/jobs/current">
-          Calendar
-        </Breadcrumb.Item>
-      </Breadcrumb>
+   
+      <div className="border-bottom d-flex align-items-center justify-content-between">
+            <div className="mb-1">
+              <h1 className="mb-1 h2 fw-bold">Jobs Calendar</h1>
+              <Breadcrumb>
+                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
+                <Breadcrumb.Item active href="/dashboard/scheduling/workers/schedules">Schedules</Breadcrumb.Item>
+              </Breadcrumb>
+            </div>
+          </div>
+     
       <div style={{ 
         display: "flex", 
-        marginTop: "10px", 
         width: "100%",  // Changed from 95%
         marginRight: "20px" 
       }}>
         {/* Left side: Calendar */}
         <div style={{ flex: 8, marginRight: "20px" }}>
         <TextBoxComponent 
-      placeholder="Search via Job Name, Job Number, Customer, Location..."
-      cssClass="e-bigger" // Makes the component larger
+      placeholder="Search Job Name, Job No., Customer, Location etc........"
+      cssClass="e-bigger"
       floatLabelType="Auto"
       value={searchTerm}
       input={handleSearch}
-      htmlAttributes={{
-        style: {
-          width: '100%',
-          fontSize: '16px',
-          padding: '12px',
-          height: '48px'  // Increased height
-        }
-      }}
     />
-
 
           {/* Display loading spinner when loading is true */}
           {loading ? (
