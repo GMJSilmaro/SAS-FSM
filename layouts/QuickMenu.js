@@ -666,66 +666,108 @@ const handleSignOut = async () => {
             </Dropdown.Item>
           </Dropdown.Menu>
         </Dropdown>
-        {/* User Dropdown */}
-<Dropdown as="li" className="ms-2 pe-4">
-  <Dropdown.Toggle
-    as="a"
-    bsPrefix=" "
-    className="rounded-circle"
-    id="dropdownUser"
-    style={{ 
-      position: 'relative', 
-      display: 'inline-block',
-      paddingRight: '20px'  // Add padding to the right
-    }}
-  >
-    <div className="avatar avatar-md avatar-indicators avatar-online">
-      {userDetails && userDetails.profilePicture ? (
-        <Image
-          alt="avatar"
-          src={userDetails.profilePicture}
-          className="rounded-circle"
-          width={40}
-          height={40}
-          style={{
-            objectFit: 'cover',
-            border: '2px solid #e5e9f2',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
-        />
-      ) : (
-        <Image
-          alt="default avatar"
-          src="/images/avatar/default-avatar.png" // Make sure to add this default image to your public folder
-          className="rounded-circle"
-          width={40}
-          height={40}
-          style={{
-            objectFit: 'cover',
-            border: '2px solid #e5e9f2',
-            backgroundColor: '#f8f9fa',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
-        />
-      )}
-    </div>
-    {userDetails && (
-      <div 
-        style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          top: '100%',
-          marginTop: '4px',
-          whiteSpace: 'nowrap',
-          textAlign: 'center',
-          marginRight: '20px'  // Add margin to the right of the text
-        }}
-      >
-        <span className="text-dark small fw-bold">{userDetails.fullName}</span>
-      </div>
-    )}
-  </Dropdown.Toggle>
+     {/* User Dropdown with larger avatar */}
+     <Dropdown as="li" className="ms-2">
+          <Dropdown.Toggle
+            as="a"
+            bsPrefix=" "
+            className="rounded-circle"
+            id="dropdownUser"
+          >
+            <div className="position-relative" style={{ 
+              width: '75px', 
+              height: '75px',
+              display: 'inline-block'
+            }}>
+              {userDetails && userDetails.profilePicture ? (
+                <div style={{ 
+                  width: '75px', 
+                  height: '75px', 
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Image
+                    alt="avatar"
+                    src={userDetails.profilePicture}
+                    className="rounded-circle"
+                    width={65}
+                    height={65}
+                    style={{
+                      objectFit: 'cover',
+                      border: '3px solid #e5e9f2',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                  {/* Online indicator */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '5px',
+                      right: '10px',
+                      width: '15px',
+                      height: '15px',
+                      backgroundColor: '#00d27a',
+                      borderRadius: '50%',
+                      border: '2px solid #fff'
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ 
+                  width: '75px', 
+                  height: '75px', 
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Image
+                    alt="default avatar"
+                    src="/images/avatar/NoProfile.png"
+                    className="rounded-circle"
+                    width={65}
+                    height={65}
+                    style={{
+                      objectFit: 'cover',
+                      border: '3px solid #e5e9f2',
+                      backgroundColor: '#f8f9fa',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                  {/* Online indicator */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '5px',
+                      right: '5px',
+                      width: '12px',
+                      height: '12px',
+                      backgroundColor: '#00d27a',
+                      borderRadius: '50%',
+                      border: '2px solid #fff'
+                    }}
+                  />
+                </div>
+              )}
+              {userDetails && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bottom: '-25px',
+                    whiteSpace: 'nowrap',
+                    textAlign: 'center',
+                    width: 'auto'
+                  }}
+                >
+                  <span className="text-dark small fw-bold">{userDetails.fullName}</span>
+                </div>
+              )}
+            </div>
+          </Dropdown.Toggle>
   <Dropdown.Menu
     className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
     align="end"
