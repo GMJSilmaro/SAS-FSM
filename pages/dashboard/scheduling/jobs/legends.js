@@ -48,7 +48,7 @@ const Legend = ({
           theme="light"
         />
 
-        <Card className="shadow-sm d-flex flex-column" style={{ height: '720px' }}>
+        <Card className="shadow-sm d-flex flex-column" style={{ height: '720px', width: '100%' }}>
         <Card.Header 
   className="bg-white py-3 px-4"
   style={{ borderBottom: '1px solid #e9ecef' }}
