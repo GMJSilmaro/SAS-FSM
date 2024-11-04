@@ -688,7 +688,7 @@ const ViewJobs = () => {
           <span className="text-muted ms-2">Redirecting to edit page...</span>
         </div>
       )}
-      <GeeksSEO title="Job Lists | SAS - SAP B1 Portal" />
+      <GeeksSEO title="Job Lists | SAS&ME - SAP B1 | Portal" />
 
       <Row>
         <Col lg={12}>

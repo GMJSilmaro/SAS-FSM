@@ -450,7 +450,7 @@ const FieldServiceSchedules = () => {
 
   return (
     <div>
-      <GeeksSEO title="Worker Schedules | SAS - SAP B1 Portal" />
+      <GeeksSEO title="Worker Schedules | SAS&ME - SAP B1 | Portal" />
 
       <Row>
         <Col lg={12}>

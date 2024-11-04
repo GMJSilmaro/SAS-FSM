@@ -13,7 +13,7 @@ import WorkerStats from 'sub-components/dashboard/projects/single/task/WorkerSta
 const Worker = () => {
 	return (
 		<Fragment>
-			<GeeksSEO title="Worker Lists | SAS - SAP B1 Portal" />
+			<GeeksSEO title="Worker Lists | SAS&ME - SAP B1 | Portal" />
 			<Tab.Container defaultActiveKey="list">
 				<Row>
 					<Col lg={12} md={12} sm={12}>

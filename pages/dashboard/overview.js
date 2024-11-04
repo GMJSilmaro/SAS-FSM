@@ -418,7 +418,7 @@ const Overview = () => {
 
   return (
     <Fragment>
-      <GeeksSEO title="Overview | SAS - SAP B1 Portal" />
+      <GeeksSEO title="Overview | SAS&ME - SAP B1 | Portal" />
 
       <TaskStats />
 

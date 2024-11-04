@@ -74,7 +74,7 @@ const DataTableBootstrap = () => {
   return (
     <Card>
 
-       <GeeksSEO title="Recent Activities | SAS - SAP B1 Portal" />
+       <GeeksSEO title="Recent Activities | SAS&ME - SAP B1 | Portal" />
       <Card.Header className="d-flex justify-content-between align-items-center">
         <h4 className="mb-0">All Activities</h4>
         <Button variant="link" onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>

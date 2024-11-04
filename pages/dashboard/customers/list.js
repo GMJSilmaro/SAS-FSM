@@ -754,7 +754,7 @@ const ViewCustomers = () => {
 
   return (
     <Fragment>
-      <GeeksSEO title="View Customers | SAS - SAP B1 Portal" />
+      <GeeksSEO title="View Customers | SAS&ME - SAP B1 | Portal" />
       <Row>
         <Col lg={12}>
           <div className="border-bottom pb-2 mb-4 d-flex align-items-center justify-content-between">

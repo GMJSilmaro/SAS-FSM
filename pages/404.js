@@ -48,7 +48,7 @@ const Error404 = () => {
 
 	return (
 		<>
-			<GeeksSEO title="404 Error | SAS - SAP B1 Portal" />
+			<GeeksSEO title="404 Error | SAS&ME - SAP B1 | Portal" />
 			<Row>
 				<Col lg={12} md={12} sm={12}>
 					<Row className="align-items-center justify-content-center g-0 py-lg-22 py-10">

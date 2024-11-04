@@ -438,7 +438,7 @@ const ViewLocations = () => {
 
   return (
     <Fragment>
-      <GeeksSEO title="Locations | SAS - SAP B1 Portal" />
+      <GeeksSEO title="Locations | SAS&ME - SAP B1 | Portal" />
       <Row>
         <Col lg={12}>
           <div className="border-bottom pb-4 mb-4">

@@ -36,7 +36,7 @@ function MyApp({ Component, pageProps }) {
   const [isLoading, setIsLoading] = useState(false);
   
   const pageURL = process.env.baseURL + router.pathname;
-  const title = "SAS - SAP B1 Portal";
+  const title = "SAS&ME - SAP B1 | Portal";
   const description = "Discover SAS, your ultimate SAP B1 portal. Utilize the portal with ease!";
   const keywords = "SAP B1, Service Layer, Admin dashboard, Portal, web apps, Pixelcare Consulting";
 
@@ -132,7 +132,7 @@ export default MyApp;
 // function MyApp({ Component, pageProps }) {
 //   const router = useRouter();
 //   const pageURL = process.env.baseURL + router.pathname;
-//   const title = "SAS - SAP B1 Portal";
+//   const title = "SAS&ME - SAP B1 | Portal";
 //   const description =
 //     "Discover SAS, your ultimate SAP B1 portal. Utilize the portal with ease!";
 //   const keywords =

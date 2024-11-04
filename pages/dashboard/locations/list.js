@@ -585,7 +585,7 @@ const LocationsList = () => {
 
   return (
     <Fragment>
-      <GeeksSEO title="Service Locations | SAS - SAP B1 Portal" />
+      <GeeksSEO title="Service Locations | SAS&ME - SAP B1 | Portal" />
       <Row>
         <Col lg={12}>
           <div className="border-bottom pb-2 mb-4 d-flex align-items-center justify-content-between">
