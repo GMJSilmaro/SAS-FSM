@@ -811,6 +811,7 @@ const JobDetails = () => {
         return (
           <>
             <div className="d-flex justify-content-between align-items-center mb-3">
+            
               <h4 className="mb-0">Job Description</h4>
               <Button
                 variant="primary"
@@ -819,6 +820,19 @@ const JobDetails = () => {
                 Edit Job
               </Button>
             </div>
+            <div className="d-flex justify-content-between align-items-center">
+                <div className="d-flex align-items-center">
+                  {getStatusIcon(job.jobStatus)}
+                  <div className="ms-2">
+                    <h5 className="mb-0 text-body">Job Status</h5>
+                  </div>
+                </div>
+                <div>
+                  <span className="badge" style={getStatusColor(job.jobStatus)}>
+                    {getJobStatusName(job.jobStatus)}
+                  </span>
+                </div>
+              </div>
             <div
               dangerouslySetInnerHTML={{
                 __html: job.jobDescription || "No description available",
@@ -833,7 +847,7 @@ const JobDetails = () => {
                 ${job.location?.address?.postalCode || ""}`}
             </p>
 
-            {/* Remove the renderMap() call from here */}
+            
           </>
         );
       case "equipment":
@@ -884,6 +898,8 @@ const JobDetails = () => {
         return "Job Started";
       case "Job Complete":
         return "Job Complete";
+      case "InProgress":
+        return "In Progress";
       case "In Progress":
         return "In Progress";
       case "Validate":
@@ -903,8 +919,10 @@ const JobDetails = () => {
         return { backgroundColor: "#2196f3", color: "#fff" };
       case "Cancelled":
         return { backgroundColor: "#f44336", color: "#fff" };
-        case "In Progress":
-        return { backgroundColor: "#f44336", color: "#fff" };
+      case "InProgress":
+        return { backgroundColor: "#ff9800", color: "#fff" };
+      case "In Progress":
+        return { backgroundColor: "#ff9800", color: "#fff" };
       case "Job Started":
         return { backgroundColor: "#FFA500", color: "#fff" };
       case "Job Complete":
@@ -1138,122 +1156,101 @@ const JobDetails = () => {
 
           {/* Schedule */}
           <Card className="mb-4">
+            {/* Schedule Header */}
+            <Card.Header className="border-bottom">
+              <h5 className="mb-0">Schedule Details</h5>
+            </Card.Header>
+
+            {/* Start Date/Time Section */}
             <Card.Body className="py-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <Calendar4 size={16} className="text-primary" />
-                  <div className="ms-2">
-                    <h5 className="mb-0 text-body">Start Date</h5>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-dark mb-0 fw-semi-bold">
-                    {formatDate(job.startDate)}
-                  </p>
-                </div>
-              </div>
-              {job.startTime && (
-                <div className="d-flex justify-content-between align-items-center mt-2">
-                  <div className="d-flex align-items-center">
-                    <Clock size={16} className="text-primary" />
-                    <div className="ms-2">
-                      <h5 className="mb-0 text-body">Start Time</h5>
+              <Row>
+                <Col md={6}>
+                  <div className="d-flex align-items-center mb-2">
+                    <div className="schedule-icon-wrapper bg-soft-primary rounded-circle p-2 me-3">
+                      <Calendar4 size={18} className="text-primary" />
+                    </div>
+                    <div>
+                      <small className="text-muted d-block">Start Date</small>
+                      <h6 className="mb-0">{formatDate(job.startDate)}</h6>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-dark mb-0 fw-semi-bold">
-                      {formatTime(job.startTime)}
-                    </p>
-                  </div>
-                </div>
-              )}
+                </Col>
+                {job.startTime && (
+                  <Col md={6}>
+                    <div className="d-flex align-items-center mb-2">
+                      <div className="schedule-icon-wrapper bg-soft-primary rounded-circle p-2 me-3">
+                        <Clock size={18} className="text-primary" />
+                      </div>
+                      <div>
+                        <small className="text-muted d-block">Start Time</small>
+                        <h6 className="mb-0">{formatTime(job.startTime)}</h6>
+                      </div>
+                    </div>
+                  </Col>
+                )}
+              </Row>
             </Card.Body>
+
+            {/* End Date/Time Section */}
             <Card.Body className="border-top py-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <Calendar4 size={16} className="text-primary" />
-                  <div className="ms-2">
-                    <h5 className="mb-0 text-body">End Date</h5>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-dark mb-0 fw-semi-bold">
-                    {formatDate(job.endDate)}
-                  </p>
-                </div>
-              </div>
-              {job.endTime && (
-                <div className="d-flex justify-content-between align-items-center mt-2">
-                  <div className="d-flex align-items-center">
-                    <Clock size={16} className="text-primary" />
-                    <div className="ms-2">
-                      <h5 className="mb-0 text-body">End Time</h5>
+              <Row>
+                <Col md={6}>
+                  <div className="d-flex align-items-center mb-2">
+                    <div className="schedule-icon-wrapper bg-soft-danger rounded-circle p-2 me-3">
+                      <Calendar4 size={18} className="text-danger" />
+                    </div>
+                    <div>
+                      <small className="text-muted d-block">End Date</small>
+                      <h6 className="mb-0">{formatDate(job.endDate)}</h6>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-dark mb-0 fw-semi-bold">
-                      {formatTime(job.endTime)}
-                    </p>
-                  </div>
-                </div>
-              )}
+                </Col>
+                {job.endTime && (
+                  <Col md={6}>
+                    <div className="d-flex align-items-center mb-2">
+                      <div className="schedule-icon-wrapper bg-soft-danger rounded-circle p-2 me-3">
+                        <Clock size={18} className="text-danger" />
+                      </div>
+                      <div>
+                        <small className="text-muted d-block">End Time</small>
+                        <h6 className="mb-0">{formatTime(job.endTime)}</h6>
+                      </div>
+                    </div>
+                  </Col>
+                )}
+              </Row>
             </Card.Body>
-            {/* Multiple Days Indicator */}
+
+            {/* Duration Badge */}
             {job.startDate && job.endDate && (
-              <Card.Body className="border-top py-3 bg-light">
+              <Card.Body className="border-top py-3">
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center">
-                    <Calendar4 size={16} className="text-primary" />
-                    <div className="ms-2">
-                      <h5 className="mb-0 text-body">Duration</h5>
+                    <div className="schedule-icon-wrapper bg-soft-warning rounded-circle p-2 me-3">
+                      <Clock size={18} className="text-warning" />
+                    </div>
+                    <div>
+                      <h6 className="mb-0">Total Duration</h6>
                     </div>
                   </div>
-                  <div>
-                    <Badge bg={
-                      new Date(job.endDate).getDate() - new Date(job.startDate).getDate() > 0 
-                        ? "warning" 
-                        : "info"
-                    }>
+                  <div className="d-flex align-items-center">
+                    <Badge 
+                      bg={new Date(job.endDate).getDate() - new Date(job.startDate).getDate() > 0 ? "warning" : "info"}
+                      className="py-2 px-3"
+                    >
                       {new Date(job.endDate).getDate() - new Date(job.startDate).getDate() > 0
                         ? `${new Date(job.endDate).getDate() - new Date(job.startDate).getDate() + 1} Days`
                         : "Single Day"}
                     </Badge>
+                    {job.estimatedDurationHours > 0 || job.estimatedDurationMinutes > 0 ? (
+                      <Badge bg="secondary" className="ms-2 py-2 px-3">
+                        Est. {job.estimatedDurationHours || 0}h {job.estimatedDurationMinutes || 0}m
+                      </Badge>
+                    ) : null}
                   </div>
                 </div>
               </Card.Body>
             )}
-            <Card.Body className="border-top py-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <Clock size={16} className="text-primary" />
-                  <div className="ms-2">
-                    <h5 className="mb-0 text-body">Estimated Duration</h5>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-dark mb-0 fw-semi-bold">
-                    {`${job.estimatedDurationHours || 0} hrs ${
-                      job.estimatedDurationMinutes || 0
-                    } mins`}
-                  </p>
-                </div>
-              </div>
-            </Card.Body>
-            <Card.Body className="border-top py-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  {getStatusIcon(job.jobStatus)}
-                  <div className="ms-2">
-                    <h5 className="mb-0 text-body">Status</h5>
-                  </div>
-                </div>
-                <div>
-                  <span className="badge" style={getStatusColor(job.jobStatus)}>
-                    {getJobStatusName(job.jobStatus)}
-                  </span>
-                </div>
-              </div>
-            </Card.Body>
           </Card>
         </Col>
       </Row>

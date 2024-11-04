@@ -2,7 +2,7 @@
 import Link from "next/link";
 import React, { Fragment, useState, useEffect, useCallback } from "react";
 import { useMediaQuery } from "react-responsive";
-import { Row, Col, Image, Dropdown, ListGroup, Badge } from "react-bootstrap";
+import { Row, Col, Image, Dropdown, ListGroup, Badge, Form, InputGroup, Button } from "react-bootstrap";
 import SimpleBar from "simplebar-react";
 import "simplebar/dist/simplebar.min.css";
 import { GKTippy } from "widgets";
@@ -27,9 +27,55 @@ import {
 } from "firebase/firestore";
 import DotBadge from "components/bootstrap/DotBadge";
 import { format } from "date-fns";
-import { FaBell, FaBriefcase, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
+import { FaBell, FaBriefcase, FaCheckCircle, FaExclamationCircle, FaSearch } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
+const SearchResults = React.memo(({ results, onClose }) => {
+  const groupedResults = {
+    jobs: results.filter(r => r.type === 'job'),
+    followUps: results.filter(r => r.type === 'followUp'),
+    workers: results.filter(r => r.type === 'worker'),
+    // Add more categories as needed
+  };
+
+  return (
+    <SimpleBar style={{ maxHeight: "400px" }}>
+      <ListGroup variant="flush">
+        {Object.entries(groupedResults).map(([category, items]) => (
+          items.length > 0 && (
+            <div key={category}>
+              <div className="p-2 bg-light">
+                <strong className="text-capitalize">{category.replace(/([A-Z])/g, ' $1')}</strong>
+              </div>
+              {items.map((item) => (
+                <ListGroup.Item
+                  key={item.id}
+                  action
+                  onClick={() => {
+                    router.push(item.link);
+                    onClose();
+                  }}
+                  className="d-flex align-items-center py-2"
+                >
+                  <div className="ms-3">
+                    <h6 className="mb-0">{item.title}</h6>
+                    <small className="text-muted">{item.subtitle}</small>
+                  </div>
+                </ListGroup.Item>
+              ))}
+            </div>
+          )
+        ))}
+        {results.length === 0 && (
+          <ListGroup.Item className="text-center py-3">
+            <p className="text-muted mb-0">No results found</p>
+          </ListGroup.Item>
+        )}
+      </ListGroup>
+    </SimpleBar>
+  );
+});
 
 const QuickMenu = () => {
   const hasMounted = useMounted();
@@ -37,6 +83,10 @@ const QuickMenu = () => {
   const router = useRouter();
   const [userDetails, setUserDetails] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   // Fetch user details
   useEffect(() => {
@@ -332,6 +382,120 @@ const QuickMenu = () => {
     );
   });
 
+  const performGlobalSearch = useCallback(async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    console.log('Searching for:', searchTerm); // Debug log
+
+    try {
+      // Search in jobs collection
+      const jobsRef = collection(db, 'jobs');
+      // First, let's try a simpler query to match job titles
+      const jobsQuery = query(jobsRef, 
+        where('jobTitle', '>=', searchTerm.toLowerCase()),
+        where('jobTitle', '<=', searchTerm.toLowerCase() + '\uf8ff'),
+        limit(5)
+      );
+      
+      // Search in followUps collection
+      const followUpsRef = collection(db, 'followUps');
+      const followUpsQuery = query(followUpsRef,
+        where('title', '>=', searchTerm.toLowerCase()),
+        where('title', '<=', searchTerm.toLowerCase() + '\uf8ff'),
+        limit(5)
+      );
+
+      // Execute queries in parallel
+      const [jobsSnapshot, followUpsSnapshot] = await Promise.all([
+        getDocs(jobsQuery),
+        getDocs(followUpsQuery)
+      ]);
+
+      console.log('Jobs results:', jobsSnapshot.docs.length); // Debug log
+      console.log('FollowUps results:', followUpsSnapshot.docs.length); // Debug log
+
+      // Process job results
+      const jobResults = jobsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          type: 'job',
+          title: `Job: ${data.jobTitle || 'Untitled'}`,
+          subtitle: `Client: ${data.clientName || 'Unknown'}`,
+          link: `/dashboard/jobs/${doc.id}`,
+          timestamp: data.timestamp?.toDate() || new Date(),
+          ...data
+        };
+      });
+
+      // Process followUp results
+      const followUpResults = followUpsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          type: 'followUp',
+          title: `Follow-up: ${data.title || 'Untitled'}`,
+          subtitle: `Due: ${data.dueDate ? format(new Date(data.dueDate.toDate()), 'MMM d, yyyy') : 'No date'}`,
+          link: `/dashboard/follow-ups/${doc.id}`,
+          timestamp: data.timestamp?.toDate() || new Date(),
+          ...data
+        };
+      });
+
+      // Combine and sort results
+      const combinedResults = [...jobResults, ...followUpResults]
+        .sort((a, b) => {
+          const dateA = a.timestamp instanceof Date ? a.timestamp : new Date();
+          const dateB = b.timestamp instanceof Date ? b.timestamp : new Date();
+          return dateB - dateA;
+        });
+
+      console.log('Combined results:', combinedResults); // Debug log
+      setSearchResults(combinedResults);
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Search failed. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Add debounced search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      performGlobalSearch(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, performGlobalSearch]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.search-container')) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+    // In the QuickMenu component
+    const handleSearch = (e) => {
+      e.preventDefault();
+      if (searchQuery.trim()) {
+        router.push({
+          pathname: '/dashboard/search',
+          query: { q: searchQuery.trim() }
+        });
+        setSearchQuery('');
+      }
+    };
+
   return (
     <Fragment>
       <ListGroup
@@ -339,6 +503,33 @@ const QuickMenu = () => {
         bsPrefix="navbar-nav"
         className="navbar-right-wrap ms-2 d-flex nav-top-wrap"
       >
+        {/* Search Form */}
+        <li className="me-2" style={{ minWidth: '250px' }}>
+          <form onSubmit={handleSearch} className="search-container">
+            <InputGroup size="sm">
+              <InputGroup.Text>
+                <FaSearch size={16} className="text-secondary" />
+              </InputGroup.Text>
+              <Form.Control
+                type="search"
+                placeholder="Search jobs, status..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="form-control"
+                style={{ fontSize: '0.875rem' }}
+              />
+              <Button 
+                type="submit" 
+                variant="primary" 
+                size="sm"
+                disabled={!searchQuery.trim()}
+              >
+                Search
+              </Button>
+            </InputGroup>
+          </form>
+        </li>
+
         {/* Notification Dropdown */}
         <Dropdown as="li">
           <Dropdown.Toggle

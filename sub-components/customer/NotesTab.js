@@ -173,6 +173,13 @@ export const NotesTab = ({ customerId }) => {
     setToastMessage(`Tag "${tagToRemove}" removed successfully!`);
   };
 
+  // Add this function to handle view change
+  const handleViewChange = (showAll) => {
+    setShowAllNotes(showAll);
+    setSearchTerm(''); // Clear search term when changing views
+    setCurrentPage(1); // Reset to first page
+  };
+
   return (
     <>
       {!showAllNotes ? (
@@ -323,7 +330,7 @@ export const NotesTab = ({ customerId }) => {
 
                 <Button 
                   variant="primary" 
-                  onClick={() => setShowAllNotes(true)}
+                  onClick={() => handleViewChange(true)}
                   className="w-100 mt-3"
                 >
                   View All Notes
@@ -402,7 +409,7 @@ export const NotesTab = ({ customerId }) => {
       ) : (
         <AllNotesTable 
           notes={notes} 
-          onClose={() => setShowAllNotes(false)}
+          onClose={() => handleViewChange(false)}
           customerId={customerId}
         />
       )}

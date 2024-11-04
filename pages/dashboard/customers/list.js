@@ -353,7 +353,7 @@ const ViewCustomers = () => {
     contractStatus: '',
     country: '',
     status: '',
-    address: '' // Add this line
+    address: '' 
   });
 
   const loadData = useCallback(async (page, search = '', forceInitial = false) => {
@@ -816,15 +816,15 @@ const ViewCustomers = () => {
       <ToastContainer
         position="top-right"
         autoClose={3000}
-        hideProgressBar={true}
-        newestOnTop={false}
+        limit={3}
+        hideProgressBar={false}
+        newestOnTop
         closeOnClick
         rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover
         theme="light"
-        limit={3}
       />
     </Fragment>
   );

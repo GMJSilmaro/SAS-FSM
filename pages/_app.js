@@ -11,9 +11,6 @@ import ActivityTracker from '../components/ActivityTracker';
 import LoadingOverlay from '../components/LoadingOverlay';
 //import SessionDebug from '../components/SessionDebug';
 
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-
 // Layouts
 import DefaultMarketingLayout from "layouts/marketing/DefaultLayout";
 import DefaultDashboardLayout from "layouts/dashboard/DashboardIndexTop";
@@ -90,18 +87,7 @@ function MyApp({ Component, pageProps }) {
             <LoadingOverlay isLoading={isLoading} />
             {process.env.NODE_ENV !== 'production'}
           </Layout>
-          <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
+    
         </QueryClientProvider>
       </Provider>
     </Fragment>
