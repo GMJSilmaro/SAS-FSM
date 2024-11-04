@@ -18,6 +18,7 @@ import DefaultDashboardLayout from "layouts/dashboard/DashboardIndexTop";
 // Styles
 import "../styles/theme.scss";
 import FooterWithSocialIcons from "@/layouts/marketing/footers/FooterWithSocialIcons";
+import 'react-toastify/dist/ReactToastify.css';
 
 registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
 
