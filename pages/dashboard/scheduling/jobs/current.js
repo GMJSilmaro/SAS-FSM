@@ -5,6 +5,7 @@ import {
   updateDoc,
   doc,
   setDoc,
+  getDoc
 } from "firebase/firestore"; // Firebase Firestore imports
 import { db } from "../../../../firebase";
 import {
@@ -17,6 +18,7 @@ import {
   Breadcrumb,
   ListGroup,
   Spinner,
+  Dropdown,
 } from "react-bootstrap";
 import {
   ScheduleComponent,
@@ -40,6 +42,7 @@ import {
   BsBuilding,
   BsTools,
   BsX,
+  BsThreeDotsVertical,
 } from "react-icons/bs"; // Import icons
 import styles from "./calendar.module.css";
 import { useRouter } from "next/router";
@@ -49,6 +52,16 @@ import "react-toastify/dist/ReactToastify.css";
 import Swal from "sweetalert2";
 import { format } from "date-fns";
 
+const DEFAULT_LEGEND_ITEMS = [
+  { id: 'created', status: "Created", color: "#9e9e9e" },
+  { id: 'confirmed', status: "Confirmed", color: "#2196f3" },
+  { id: 'cancelled', status: "Cancelled", color: "#f44336" },
+  { id: 'started', status: "Job Started", color: "#FFA500" },
+  { id: 'complete', status: "Job Complete", color: "#32CD32" },
+  { id: 'validate', status: "Validate", color: "#00bcd4" },
+  { id: 'scheduled', status: "Scheduled", color: "#607d8b" }
+];
+
 const Calendar = () => {
   const router = useRouter();
   const scheduleObj = useRef(null);
@@ -56,6 +69,41 @@ const Calendar = () => {
   const [searchTerm, setSearchTerm] = useState(""); // Search term state
   const [filteredEvents, setFilteredEvents] = useState([]); // Filtered events
   const [loading, setLoading] = useState(true); // Loading state
+  const [legendItems, setLegendItems] = useState(DEFAULT_LEGEND_ITEMS);
+  const [editingLegendId, setEditingLegendId] = useState(null);
+  const [defaultStatus, setDefaultStatus] = useState(legendItems[0]?.id);
+
+  // Create a stable toast configuration
+  const toastConfig = {
+    position: "top-right",
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+    theme: "light"
+  };
+
+  // Create a stable showToast function with useCallback
+  const showToast = useCallback((message, type = 'success') => {
+    if (!message) return;
+
+    try {
+      switch (type) {
+        case 'success':
+          toast.success(message, toastConfig);
+          break;
+        case 'error':
+          toast.error(message, toastConfig);
+          break;
+        default:
+          toast.info(message, toastConfig);
+      }
+    } catch (error) {
+      console.error('Toast error:', error);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -202,13 +250,13 @@ const Calendar = () => {
       );
 
       scheduleObj.current.refreshEvents();
-      toast.success(`Job ${Id} ${Subject} updated successfully.`);
+      showToast(`Job ${Id} ${Subject} updated successfully.`, 'success');
 
       // Create notification for job update
       await createJobUpdateNotification(Id, Subject, "Drag");
     } catch (error) {
       console.error("Error updating job:", error);
-      toast.error("Failed to update job. Please try again.");
+      showToast("Failed to update job. Please try again.", 'error');
       scheduleObj.current.refreshEvents();
     }
   };
@@ -278,10 +326,10 @@ const Calendar = () => {
 
       // Add notification for resize action
       await createJobUpdateNotification(Id, Subject, "Resize");
-      toast.success(`Job ${Id} resized successfully.`);
+      showToast(`Job ${Id} resized successfully.`, 'success');
     } catch (error) {
       console.error("Error updating job:", error);
-      toast.error("Failed to update job. Please try again.");
+      showToast("Failed to update job. Please try again.", 'error');
       scheduleObj.current.refreshEvents(); // Revert the resize if there's an error
     }
   };
@@ -289,24 +337,12 @@ const Calendar = () => {
   const intl = new Internationalization();
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case "Created":
-        return { backgroundColor: "#9e9e9e", color: "#fff" }; // Created (Gray)
-      case "Confirmed":
-        return { backgroundColor: "#2196f3", color: "#fff" }; // Confirmed (Blue)
-      case "Cancelled":
-        return { backgroundColor: "#f44336", color: "#fff" }; // Cancelled (Red)
-      case "Job Started":
-        return { backgroundColor: "#FFA500", color: "#fff" }; // Job Started (Orange)
-      case "Job Complete":
-        return { backgroundColor: "#32CD32", color: "#fff" }; // Job Complete (Green)
-      case "Validate":
-        return { backgroundColor: "#00bcd4", color: "#fff" }; // Validate (Cyan)
-      case "Scheduled":
-        return { backgroundColor: "#607d8b", color: "#fff" }; // Scheduled (Blue Gray)
-      default:
-        return { backgroundColor: "#9e9e9e", color: "#fff" }; // Default (Gray)
-    }
+    const legendItem = legendItems.find(item => 
+      item.status.toLowerCase() === status.toLowerCase()
+    );
+    return legendItem 
+      ? { backgroundColor: legendItem.color, color: '#fff' }
+      : { backgroundColor: '#9e9e9e', color: '#fff' };
   };
 
   const headerTemplate = (props) => (
@@ -406,6 +442,15 @@ const Calendar = () => {
         <span style={{ fontWeight: 600 }}>Service Call: </span>
         {props.ServiceCall}
       </div>
+      <div className={styles.actionButtons}>
+        <button
+          className={`${styles.actionButton} ${styles.repeatButton}`}
+          onClick={() => handleRepeatJob(props)}
+        >
+          <BsCalendarCheck className={styles.icon} />
+          Repeat Job
+        </button>
+      </div>
     </div>
   );
 
@@ -449,11 +494,6 @@ const Calendar = () => {
     }
   };
 
-  const onCellDoubleClick = (args) => {
-    args.cancel = true; // This cancels the default editor popup
-    window.location.href = "/dashboard/jobs/create-jobs"; // Custom redirect action
-  };
-
   const onEventDoubleClick = (args) => {
     args.cancel = true; // Prevent the default event editor from opening
 
@@ -478,21 +518,224 @@ const Calendar = () => {
     }
   };
 
-  const legendItems = [
-    { status: "Created", color: getStatusColor("Created").backgroundColor },
-    { status: "Confirmed", color: getStatusColor("Confirmed").backgroundColor },
-    { status: "Cancelled", color: getStatusColor("Cancelled").backgroundColor },
-    {
-      status: "Job Started",
-      color: getStatusColor("Job Started").backgroundColor,
-    },
-    {
-      status: "Job Complete",
-      color: getStatusColor("Job Complete").backgroundColor,
-    },
-    { status: "Validate", color: getStatusColor("Validate").backgroundColor },
-    { status: "Scheduled", color: getStatusColor("Scheduled").backgroundColor },
-  ];
+  const handleAddLegend = () => {
+    Swal.fire({
+      title: 'Add New Status',
+      html: `
+        <div class="mb-3">
+          <label class="form-label">Status Name</label>
+          <input 
+            id="status" 
+            class="form-control" 
+            placeholder="Enter status name"
+          >
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Color</label>
+          <input 
+            id="color" 
+            class="form-control" 
+            type="color" 
+            value="#000000"
+          >
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Add',
+      cancelButtonText: 'Cancel',
+      customClass: {
+        confirmButton: 'btn btn-primary',
+        cancelButton: 'btn btn-outline-secondary'
+      },
+      buttonsStyling: false,
+      preConfirm: () => {
+        const status = document.getElementById('status').value;
+        const color = document.getElementById('color').value;
+        if (!status) {
+          Swal.showValidationMessage('Please enter a status name');
+          return false;
+        }
+        if (!validateNewStatus(status)) {
+          Swal.showValidationMessage('Status name already exists');
+          return false;
+        }
+        return { status, color };
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const newId = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const newLegendItems = [...legendItems, {
+            id: newId,
+            status: result.value.status,
+            color: result.value.color
+          }];
+          
+          await saveLegendToFirebase(newLegendItems);
+          setLegendItems(newLegendItems);
+          toast.success('New status added successfully', {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        } catch (error) {
+          console.error('Error adding new status:', error);
+          toast.error('Failed to add new status', {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        }
+      }
+    });
+  };
+
+  const handleEditLegend = (item) => {
+    Swal.fire({
+      title: 'Edit Status',
+      html: `
+        <div class="mb-3">
+          <label class="form-label">Status Name</label>
+          <input 
+            id="status" 
+            class="form-control" 
+            value="${item.status}"
+            placeholder="Enter status name"
+          >
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Color</label>
+          <input 
+            id="color" 
+            class="form-control" 
+            type="color" 
+            value="${item.color}"
+          >
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Save',
+      cancelButtonText: 'Cancel',
+      customClass: {
+        confirmButton: 'btn btn-primary me-2',
+        cancelButton: 'btn btn-outline-secondary ms-2',
+        actions: 'my-2'
+      },
+      buttonsStyling: false,
+      preConfirm: () => {
+        const status = document.getElementById('status').value;
+        const color = document.getElementById('color').value;
+        if (!status) {
+          Swal.showValidationMessage('Please enter a status name');
+          return false;
+        }
+        if (!validateNewStatus(status, item.id)) {
+          Swal.showValidationMessage('Status name already exists');
+          return false;
+        }
+        return { status, color };
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const newLegendItems = legendItems.map(legend => 
+            legend.id === item.id 
+              ? { ...legend, status: result.value.status, color: result.value.color }
+              : legend
+          );
+          
+          await saveLegendToFirebase(newLegendItems);
+          setLegendItems(newLegendItems);
+          toast.success('Status updated successfully', {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        } catch (error) {
+          console.error('Error updating status:', error);
+          toast.error('Failed to update status', {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        }
+      }
+    });
+  };
+
+  const handleDeleteLegend = (itemId) => {
+    Swal.fire({
+      title: 'Delete Status?',
+      text: 'Are you sure you want to delete this status?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Delete'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const newLegendItems = legendItems.filter(item => item.id !== itemId);
+          await saveLegendToFirebase(newLegendItems);
+          setLegendItems(newLegendItems);
+          showToast('Status deleted successfully', 'success');
+        } catch (error) {
+          console.error('Error deleting status:', error);
+          showToast('Failed to delete status', 'error');
+        }
+      }
+    });
+  };
+
+  const calculateDuration = (start, end) => {
+    const diffInMilliseconds = new Date(end) - new Date(start);
+    const hours = Math.floor(diffInMilliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor(
+      (diffInMilliseconds % (1000 * 60 * 60)) / (1000 * 60)
+    );
+
+    if (hours === 0) {
+      return `${minutes}min`;
+    } else if (minutes === 0) {
+      return `${hours}hr`;
+    } else {
+      return `${hours}hr ${minutes}min`;
+    }
+  };
+
+  // Add this function to save legend changes to Firebase
+  const saveLegendToFirebase = async (newLegendItems) => {
+    try {
+      const legendRef = doc(db, 'settings', 'jobStatuses');
+      await setDoc(legendRef, { items: newLegendItems }, { merge: true });
+      // showToast('Status settings saved successfully', 'success');
+    } catch (error) {
+      console.error('Error saving legend items:', error);
+      showToast('Failed to save status settings', 'error');
+    }
+  };
+
+  const validateNewStatus = (status, currentId = null) => {
+    return !legendItems.some(item => 
+      item.id !== currentId && 
+      item.status.toLowerCase() === status.toLowerCase()
+    );
+  };
+
+  const handleSetDefault = (itemId) => {
+    setDefaultStatus(itemId);
+    // You could also save this to Firebase
+  };
 
   const handleCellDoubleClick = useCallback(
     (args) => {
@@ -526,24 +769,206 @@ const Calendar = () => {
     [router]
   );
 
-  const calculateDuration = (start, end) => {
-    const diffInMilliseconds = new Date(end) - new Date(start);
-    const hours = Math.floor(diffInMilliseconds / (1000 * 60 * 60));
-    const minutes = Math.floor(
-      (diffInMilliseconds % (1000 * 60 * 60)) / (1000 * 60)
-    );
+  useEffect(() => {
+    const fetchLegendItems = async () => {
+      try {
+        const legendRef = doc(db, 'settings', 'jobStatuses');
+        const legendDoc = await getDoc(legendRef);
+        
+        if (legendDoc.exists()) {
+          const data = legendDoc.data();
+          setLegendItems(data.items || DEFAULT_LEGEND_ITEMS);
+        } else {
+          // If no document exists, create it with default items
+          await setDoc(legendRef, { items: DEFAULT_LEGEND_ITEMS });
+          setLegendItems(DEFAULT_LEGEND_ITEMS);
+        }
+      } catch (error) {
+        console.error('Error loading legend items:', error);
+        toast.error('Failed to load status settings', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        setLegendItems(DEFAULT_LEGEND_ITEMS);
+      }
+    };
 
-    if (hours === 0) {
-      return `${minutes}min`;
-    } else if (minutes === 0) {
-      return `${hours}hr`;
-    } else {
-      return `${hours}hr ${minutes}min`;
+    fetchLegendItems();
+  }, []);
+
+  const handleRepeatJob = async (jobData) => {
+    try {
+      const { Id, Subject, StartTime, EndTime } = jobData;
+      
+      const result = await Swal.fire({
+        title: 'Repeat Job',
+        html: `
+          <div class="mb-3">
+            <label class="form-label">Frequency</label>
+            <select id="frequency" class="form-select">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Number of Services</label>
+            <input 
+              type="number" 
+              id="services" 
+              class="form-control" 
+              min="1" 
+              max="52" 
+              value="1"
+            >
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Months (Optional)</label>
+            <select id="months" class="form-select" multiple>
+              <option value="0">January</option>
+              <option value="1">February</option>
+              <option value="2">March</option>
+              <option value="3">April</option>
+              <option value="4">May</option>
+              <option value="5">June</option>
+              <option value="6">July</option>
+              <option value="7">August</option>
+              <option value="8">September</option>
+              <option value="9">October</option>
+              <option value="10">November</option>
+              <option value="11">December</option>
+            </select>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Create',
+        cancelButtonText: 'Cancel',
+        preConfirm: () => {
+          const frequency = document.getElementById('frequency').value;
+          const services = parseInt(document.getElementById('services').value);
+          const monthsSelect = document.getElementById('months');
+          const selectedMonths = Array.from(monthsSelect.selectedOptions).map(option => parseInt(option.value));
+          
+          if (services < 1 || services > 52) {
+            Swal.showValidationMessage('Number of services must be between 1 and 52');
+            return false;
+          }
+          
+          return { frequency, services, selectedMonths };
+        }
+      });
+
+      if (result.isConfirmed) {
+        const { frequency, services, selectedMonths } = result.value;
+        const jobRef = doc(db, "jobs", Id);
+        const originalJob = await getDoc(jobRef);
+        const jobDetails = originalJob.data();
+
+        // Calculate dates based on frequency
+        const newDates = calculateRepeatingDates(
+          new Date(StartTime),
+          new Date(EndTime),
+          frequency,
+          services,
+          selectedMonths
+        );
+
+        // Create new jobs
+        for (const [startDate, endDate] of newDates) {
+          const newJobId = `${Id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const newJobRef = doc(db, "jobs", newJobId);
+          
+          await setDoc(newJobRef, {
+            ...jobDetails,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            parentJobId: Id,
+            isRepeating: true
+          });
+        }
+
+        // Refresh events
+        await fetchJobs();
+        showToast(`Created ${newDates.length} repeated jobs successfully`, 'success');
+      }
+    } catch (error) {
+      console.error('Error creating repeated jobs:', error);
+      showToast('Failed to create repeated jobs', 'error');
     }
   };
 
+  const calculateRepeatingDates = (startDate, endDate, frequency, services, selectedMonths) => {
+    const dates = [];
+    const duration = endDate - startDate;
+    let currentDate = new Date(startDate);
+
+    const getNextDate = (current) => {
+      const next = new Date(current);
+      switch (frequency) {
+        case 'weekly':
+          next.setDate(next.getDate() + 7);
+          break;
+        case 'biweekly':
+          next.setDate(next.getDate() + 14);
+          break;
+        case 'monthly':
+          next.setMonth(next.getMonth() + 1);
+          break;
+        case 'quarterly':
+          next.setMonth(next.getMonth() + 3);
+          break;
+        case 'yearly':
+          next.setFullYear(next.getFullYear() + 1);
+          break;
+      }
+      return next;
+    };
+
+    for (let i = 0; i < services; i++) {
+      if (selectedMonths.length > 0) {
+        // If specific months are selected, find the next valid month
+        while (!selectedMonths.includes(currentDate.getMonth())) {
+          currentDate = getNextDate(currentDate);
+        }
+      }
+
+      const newEndDate = new Date(currentDate.getTime() + duration);
+      dates.push([new Date(currentDate), newEndDate]);
+      currentDate = getNextDate(currentDate);
+    }
+
+    return dates;
+  };
+
+  useEffect(() => {
+    // Component mount
+    return () => {
+      // Component cleanup
+      toast.dismiss(); // Dismiss all toasts when component unmounts
+    };
+  }, []);
+
   return (
     <>
+      <ToastContainer
+        enableMultiContainer={false}
+        containerId="main-toaster"
+        limit={3}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss={false}
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+      
       <h1 className="mb-1 h2 fw-bold">Current Jobs Calendar</h1>
 
       <Breadcrumb>
@@ -552,8 +977,7 @@ const Calendar = () => {
           Jobs Calendar
         </Breadcrumb.Item>
       </Breadcrumb>
-      <ToastContainer />
-      <div style={{ display: "flex", marginTop: "10px" }}>
+      <div style={{ display: "flex", marginTop: "10px" , width: "95%"}}>
         {/* Left side: Calendar */}
         <div style={{ flex: 8, marginRight: "20px" }}>
           <TextBoxComponent
@@ -623,20 +1047,103 @@ const Calendar = () => {
 
         {/* Right side: Legend */}
         <div style={{ flex: 1 }}>
-          <h4>Legend</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h4>Legend</h4>
+            <button 
+              className="btn btn-sm btn-primary"
+              onClick={handleAddLegend}
+            >
+              Add Status
+            </button>
+          </div>
           <ul style={{ listStyle: "none", paddingLeft: 0 }}>
             {legendItems.map((item) => (
-              <li key={item.status} style={{ marginBottom: "10px" }}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "20px",
-                    height: "20px",
-                    backgroundColor: item.color,
-                    marginRight: "10px",
-                  }}
-                ></span>
-                {item.status}
+              <li 
+                key={item.id} 
+                style={{ 
+                  marginBottom: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s",
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5'
+                  }
+                }}
+              >
+                <OverlayTrigger
+                  placement="left"
+                  overlay={
+                    <Tooltip>
+                      Click for options
+                    </Tooltip>
+                  }
+                >
+                  <div 
+                    style={{ 
+                      display: "flex", 
+                      alignItems: "center",
+                      flex: 1 
+                    }}
+                    onClick={() => handleEditLegend(item)}
+                  >
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: "20px",
+                        height: "20px",
+                        backgroundColor: item.color,
+                        marginRight: "10px",
+                        borderRadius: "4px"
+                      }}
+                    ></span>
+                    <span style={{ flex: 1 }}>{item.status}</span>
+                  </div>
+                </OverlayTrigger>
+                
+                <Dropdown align="end">
+                  <Dropdown.Toggle 
+                    variant="link" 
+                    size="sm"
+                    style={{ 
+                      border: 'none', 
+                      padding: '4px',
+                      background: 'transparent',
+                      color: '#6c757d'
+                    }}
+                  >
+                    <BsThreeDotsVertical />
+                  </Dropdown.Toggle>
+
+                  <Dropdown.Menu>
+                    <Dropdown.Item onClick={() => handleEditLegend(item)}>
+                      Edit
+                    </Dropdown.Item>
+                    <Dropdown.Item 
+                      onClick={() => handleSetDefault(item.id)}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      Set as Default
+                      {defaultStatus === item.id && (
+                        <span style={{ color: '#28a745' }}>✓</span>
+                      )}
+                    </Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Item 
+                      onClick={() => handleDeleteLegend(item.id)}
+                      className="text-danger"
+                    >
+                      Delete
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
               </li>
             ))}
           </ul>

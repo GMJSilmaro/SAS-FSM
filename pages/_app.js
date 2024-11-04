@@ -6,18 +6,19 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import { Provider } from "react-redux";
 import { store } from "store/store";
 import { Fragment } from "react";
-import { ToastContainer } from "react-toastify";
 import { registerLicense } from "@syncfusion/ej2-base";
 import ActivityTracker from '../components/ActivityTracker';
 import LoadingOverlay from '../components/LoadingOverlay';
 //import SessionDebug from '../components/SessionDebug';
+
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Layouts
 import DefaultMarketingLayout from "layouts/marketing/DefaultLayout";
 import DefaultDashboardLayout from "layouts/dashboard/DashboardIndexTop";
 
 // Styles
-import "react-toastify/dist/ReactToastify.css";
 import "../styles/theme.scss";
 
 registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
@@ -90,19 +91,17 @@ function MyApp({ Component, pageProps }) {
             {process.env.NODE_ENV !== 'production'}
           </Layout>
           <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={true}
-            closeOnClick={true}
-            rtl={false}
-            pauseOnFocusLoss={true}
-            draggable={true}
-            pauseOnHover={true}
-            theme="light"
-            limit={3}
-            style={{ zIndex: 9999 }}
-          />
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
         </QueryClientProvider>
       </Provider>
     </Fragment>
@@ -110,7 +109,6 @@ function MyApp({ Component, pageProps }) {
 }
 
 export default MyApp;
-
 
 // // import node module libraries
 // import Head from "next/head";
@@ -215,3 +213,4 @@ export default MyApp;
 // }
 
 // export default MyApp;
+
