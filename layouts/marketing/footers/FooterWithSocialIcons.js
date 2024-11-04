@@ -44,12 +44,6 @@ const FooterWithSocialIcons = () => {
     },
 
     {
-      name: 'Twitter',
-      icon: Twitter,
-      href: 'https://twitter.com/pixelcarecons'
-    },
-
-    {
       name: 'Company Profile',
       icon: Book,
       href: 'https://heyzine.com/flip-book/3088ace65b.html#page/1'
