@@ -8,6 +8,7 @@ import DotBadge from "components/bootstrap/DotBadge";
 import { db } from "../../firebase";
 import { collection, query, where, getDocs, updateDoc, doc, orderBy, limit, startAfter } from "firebase/firestore";
 import Cookies from "js-cookie";
+import { getNotifications, updateNotificationCache, invalidateNotificationCache } from '../../utils/notificationCache';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -27,69 +28,62 @@ const Notifications = () => {
     console.log("Fetching notifications for workerId:", workerId);
 
     if (workerId) {
-      const notificationsRef = collection(db, "notifications");
-      let q = query(
-        notificationsRef,
-        where("workerId", "in", [workerId, "all"]),
-        orderBy("timestamp", "desc"),
-        limit(ITEMS_PER_PAGE)
-      );
-
-      if (lastVisible && currentPage > 1) {
-        q = query(q, startAfter(lastVisible));
-      }
-
       try {
-        const querySnapshot = await getDocs(q);
-        const notificationsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
+        const notificationsData = await getNotifications(db, workerId, ITEMS_PER_PAGE);
         setNotifications(notificationsData);
-        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
-
-        // Get total count for pagination
+        
+        // Get total count (this still needs a separate query)
+        const notificationsRef = collection(db, "notifications");
         const countQuery = query(notificationsRef, where("workerId", "in", [workerId, "all"]));
         const countSnapshot = await getDocs(countQuery);
         setTotalPages(Math.ceil(countSnapshot.size / ITEMS_PER_PAGE));
 
-        console.log("Fetched notifications:", notificationsData);
       } catch (error) {
         console.error("Error fetching notifications:", error);
       }
-    } else {
-      console.log("No workerId found in cookies");
     }
   };
 
   const markAsRead = async (notificationId) => {
-    console.log("Marking as read:", notificationId);
-    const notificationRef = doc(db, "notifications", notificationId);
-    await updateDoc(notificationRef, { read: true });
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification =>
+    try {
+      const notificationRef = doc(db, "notifications", notificationId);
+      await updateDoc(notificationRef, { read: true });
+      
+      // Update local state
+      const updatedNotifications = notifications.map(notification =>
         notification.id === notificationId ? { ...notification, read: true } : notification
-      )
-    );
-    console.log("Marked as read successfully");
+      );
+      setNotifications(updatedNotifications);
+      
+      // Update cache
+      updateNotificationCache(updatedNotifications);
+      
+    } catch (error) {
+      console.error("Error marking as read:", error);
+    }
   };
 
   const markAllAsRead = async () => {
-    console.log("Marking all as read");
-    const updatePromises = notifications.map(notification => {
-      if (!notification.read) {
-        const notificationRef = doc(db, "notifications", notification.id);
-        return updateDoc(notificationRef, { read: true });
-      }
-      return Promise.resolve();
-    });
+    try {
+      const updatePromises = notifications.map(notification => {
+        if (!notification.read) {
+          const notificationRef = doc(db, "notifications", notification.id);
+          return updateDoc(notificationRef, { read: true });
+        }
+        return Promise.resolve();
+      });
 
-    await Promise.all(updatePromises);
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification => ({ ...notification, read: true }))
-    );
-    console.log("All notifications marked as read");
+      await Promise.all(updatePromises);
+      
+      const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
+      setNotifications(updatedNotifications);
+      
+      // Update cache
+      updateNotificationCache(updatedNotifications);
+      
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+    }
   };
 
   const handleSearch = (e) => {
@@ -114,6 +108,32 @@ const Notifications = () => {
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
     setLastVisible(null);  // Reset lastVisible when changing pages
+  };
+
+  const formatNotificationDate = (timestamp) => {
+    try {
+      if (!timestamp) return '';
+      
+      let date;
+      if (timestamp.toDate) {
+        // Firestore Timestamp
+        date = timestamp.toDate();
+      } else if (typeof timestamp === 'number') {
+        // Unix timestamp in milliseconds
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        // Already a Date object
+        date = timestamp;
+      } else {
+        console.warn('Invalid timestamp format:', timestamp);
+        return '';
+      }
+
+      return format(date, "MMM d, yyyy h:mm a");
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
   };
 
   return (
@@ -149,7 +169,7 @@ const Notifications = () => {
                       <h6 className="mb-1">{notification.title}</h6>
                       <p className="mb-1 text-muted">{notification.message}</p>
                       <small className="text-muted">
-                        {format(new Date(notification.timestamp.toDate()), "MMM d, yyyy h:mm a")}
+                        {formatNotificationDate(notification.timestamp)}
                       </small>
                       <small className="text-muted ms-2">
                         Worker ID: {notification.workerId}

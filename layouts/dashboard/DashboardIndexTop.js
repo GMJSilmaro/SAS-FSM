@@ -12,7 +12,7 @@ import {
 	Form,
 	Image
 } from 'react-bootstrap';
-import { collection, query, getDocs, limit, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, getDocs, limit, onSnapshot, doc , getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 // import sub components
@@ -25,40 +25,22 @@ import QuickMenu from 'layouts/QuickMenu';
 // import routes file
 import NavbarTopRoutes from 'routes/dashboard/NavbarTopRoutes';
 
+// import utility function
+import { getCompanyDetails } from '../../utils/companyCache';
+
 const DashboardIndexTop = (props) => {
 	const [expandedMenu, setExpandedMenu] = useState(false);
-	const [companyDetails, setCompanyDetails] = useState({
-		name: '',
-		logo: ''
-	});
+	const [companyDetails, setCompanyDetails] = useState(null);
 
 	useEffect(() => {
-		const fetchCompanyInfo = async () => {
-			try {
-				const companyInfoRef = collection(db, 'companyDetails');
-				const q = query(companyInfoRef, limit(1));
-				const querySnapshot = await getDocs(q);
-				
-				if (!querySnapshot.empty) {
-					const companyData = querySnapshot.docs[0].data();
-					setCompanyDetails(companyData);
-				}
-			} catch (error) {
-				console.error('Error fetching company info:', error);
+		const loadCompanyDetails = async () => {
+			const data = await getCompanyDetails();
+			if (data) {
+				setCompanyDetails(data);
 			}
 		};
 
-		// Set up a real-time listener for company info changes
-		const unsubscribe = onSnapshot(doc(db, 'companyDetails', 'companyInfo'), (doc) => {
-			if (doc.exists()) {
-				setCompanyDetails(doc.data());
-			}
-		});
-
-		fetchCompanyInfo();
-
-		// Cleanup subscription on unmount
-		return () => unsubscribe();
+		loadCompanyDetails();
 	}, []);
 
 	return (
@@ -74,8 +56,8 @@ const DashboardIndexTop = (props) => {
 						as={Link}
 						href="/dashboard/overview/">
 						<Image 
-							src={companyDetails.logo} 
-							alt={companyDetails.name || 'Company Logo'} 
+							src={companyDetails?.logo} 
+							alt={companyDetails?.name || 'Company Logo'} 
 							style={{ height: '100px' }} 
 						/>
 					</Navbar.Brand>

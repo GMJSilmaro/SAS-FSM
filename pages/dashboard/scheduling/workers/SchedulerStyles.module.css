@@ -7,83 +7,243 @@
 }
 
 .quickInfoContent {
-  padding: 10px 16px;
+  padding: 16px;
+  background: white;
+  animation: slideIn 0.3s ease-out;
 }
 
-.eventTime {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 12px;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.statusSelector {
+.headerContainer {
+  width: 100%;
+}
+
+.headerBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.statusSelector label {
-  font-size: 14px;
-  font-weight: 500;
+  justify-content: center;
   color: #333;
 }
 
-.selectWrapper {
-  position: relative;
-  flex-grow: 1;
+.closeButton:hover {
+  color: #000;
 }
 
-.statusDropdown {
-  width: 100%;
-  padding: 8px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.priorityBadge {
+  display: inline-block;
+  padding: 4px 12px;
   border-radius: 4px;
-  appearance: none;
-  background-color: white;
-  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 16px;
+  animation: scaleIn 0.3s ease-out;
 }
 
-.dropdownIcon {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.high {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.infoRow {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 8px;
+  animation: slideInLeft 0.3s ease-out;
+  animation-fill-mode: both;
+}
+
+.infoRow:nth-child(2) { animation-delay: 0.1s; }
+.infoRow:nth-child(3) { animation-delay: 0.2s; }
+.infoRow:nth-child(4) { animation-delay: 0.3s; }
+.infoRow:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
   color: #666;
+  margin-top: 3px;
+}
+
+.infoRow span {
+  color: #666;
+  font-size: 14px;
+}
+
+.infoValue {
+  margin-left: 4px;
+  font-size: 14px;
+  color: #000;
+}
+
+.footerContainer {
+  padding: 16px;
+  border-top: 1px solid #eee;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .quickInfoFooter {
-  padding: 10px 16px;
+  padding: 16px;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  animation: slideUp 0.3s ease-out;
+}
+
+.viewDetailsButton {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid #eee;
-}
-
-.eBtn {
-  padding: 6px 12px;
-  font-size: 14px;
-  border-radius: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  background: #3b82f6;
+  color: #fff;
   border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+  gap: 8px;
 }
 
-.eFlat {
-  background-color: #f0f0f0;
-  color: #333;
+.viewDetailsButton:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+              0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.eFlat:hover {
-  background-color: #e0e0e0;
+.actionButtons {
+  display: flex;
+  gap: 8px;
 }
 
-.ePrimary {
-  background-color: #007bff;
+.editButton, .deleteButton {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editButton {
+  background: #3b82f6;
   color: white;
 }
 
-.ePrimary:hover {
-  background-color: #0056b3;
+.editButton:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+              0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
+
+.deleteButton {
+  background: #6b7280;
+  color: white;
+}
+
+.deleteButton:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+              0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

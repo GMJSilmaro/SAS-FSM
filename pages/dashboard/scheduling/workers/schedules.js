@@ -50,7 +50,7 @@ import { faLessThanEqual } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from 'next/router';
 import Swal from 'sweetalert2';
 import quickInfoStyles from '../jobs/calendar.module.css';  // Adjust the path based on your file structure
-import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX } from "react-icons/bs"; 
+import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX, BsArrowRight } from "react-icons/bs"; 
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -66,6 +66,8 @@ const LoadingOverlay = () => (
   </div>
 );
 
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 const FieldServiceSchedules = () => {
   const [fieldWorkers, setFieldWorkers] = useState([]);
   const [scheduleData, setScheduleData] = useState([]);
@@ -77,6 +79,9 @@ const FieldServiceSchedules = () => {
   const [filteredWorkers, setFilteredWorkers] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const unsubscribeRef = useRef(null);
+  const [cachedJobs, setCachedJobs] = useState(null);
+  const lastFetchTime = useRef(null);
+  const scheduleRef = useRef(null);
 
   const statusColors = {
     Available: "#28a745",
@@ -249,64 +254,54 @@ const FieldServiceSchedules = () => {
 
   const setupWorkerJobsListener = useCallback((worker) => {
     console.log(`Setting up jobs listener for worker: ${worker.text}`);
+    
     const jobsQuery = query(
       collection(db, "jobs"),
       where("assignedWorkers", "array-contains", { workerId: worker.id })
     );
 
-    return onSnapshot(
-      jobsQuery,
-      (snapshot) => {
-        const workerJobs = [];
-        snapshot.forEach((jobDoc) => {
-          const jobData = jobDoc.data();
+    return onSnapshot(jobsQuery, (snapshot) => {
+      const workerJobs = [];
+      snapshot.forEach((jobDoc) => {
+        const jobData = jobDoc.data();
+        
+        const startDate = jobData.startDate instanceof Timestamp 
+          ? jobData.startDate.toDate() 
+          : new Date(jobData.startDate);
+        
+        const endDate = jobData.endDate instanceof Timestamp 
+          ? jobData.endDate.toDate() 
+          : new Date(jobData.endDate);
 
-          const startDate =
-            jobData.startDate instanceof Timestamp
-              ? jobData.startDate.toDate()
-              : new Date(jobData.startDate);
+        const jobEntry = {
+          Id: jobDoc.id,
+          WorkerId: worker.id,
+          Subject: jobData.jobName || "Untitled Job",
+          StartTime: startDate,
+          EndTime: endDate,
+          Description: jobData.jobDescription || "",
+          JobStatus: jobData.jobStatus || "Pending",
+          Customer: jobData.customerName || "No Customer",
+          ServiceLocation: jobData.location?.locationName || "No Location",
+          Equipment: jobData.equipments?.[0]?.itemName || "No Equipment",
+          ServiceCall: jobData.serviceCallID || "N/A",
+          Priority: jobData.priority || "Normal",
+          Category: jobData.category || "General",
+          IsAllDay: false,
+          Status: jobData.jobStatus || "Pending"
+        };
 
-          const endDate =
-            jobData.endDate instanceof Timestamp
-              ? jobData.endDate.toDate()
-              : new Date(jobData.endDate);
+        console.log(`Processing job for ${worker.text}:`, jobEntry);
+        workerJobs.push(jobEntry);
+      });
 
-          // Align fields with calendar.js
-          workerJobs.push({
-            Id: jobDoc.id,
-            WorkerId: worker.id,
-            Subject: jobData.jobName,
-            JobNo: jobData.jobNo,
-            Customer: jobData.customerName,
-            ServiceLocation: jobData.location?.locationName || "",
-            StartTime: startDate,
-            EndTime: endDate,
-            WorkerName: worker.text,
-            JobStatus: jobData.jobStatus,
-            Description: jobData.jobDescription,
-            Equipments: jobData.equipments?.map(eq => eq.itemName).join(", "),
-            Priority: jobData.priority || "",
-            Category: jobData.category || "N/A",
-            ServiceCall: jobData.serviceCallID || "N/A",
-            Equipment: jobData.equipments?.[0]?.itemName || "N/A",
-            Location: jobData.location?.locationName || "Not specified",
-            ClientName: jobData.customerName || "Not specified"
-          });
-        });
-
-        console.log(`Updated jobs for ${worker.text}:`, workerJobs);
-
-        setScheduleData((prevData) => {
-          const filteredData = prevData.filter(
-            (job) => job.WorkerId !== worker.id
-          );
-          return [...filteredData, ...workerJobs];
-        });
-      },
-      (error) => {
-        console.error(`Error fetching jobs for worker ${worker.text}:`, error);
-      }
-    );
+      setScheduleData(prevData => {
+        const filteredData = prevData.filter(job => job.WorkerId !== worker.id);
+        const newData = [...filteredData, ...workerJobs];
+        console.log(`Updated schedule data for ${worker.text}:`, newData);
+        return newData;
+      });
+    });
   }, []);
 
   const createNotification = useCallback(
@@ -351,86 +346,138 @@ const FieldServiceSchedules = () => {
     setFilteredWorkers(filtered);
   }, [searchFilter, fieldWorkers]);
 
-  const filteredScheduleData = scheduleData.filter(event => 
-    filteredWorkers.some(worker => worker.id === event.WorkerId)
-  );
+  // Update the filtered schedule data calculation
+  const filteredScheduleData = React.useMemo(() => {
+    return scheduleData.filter(event => 
+      filteredWorkers.some(worker => worker.id === event.WorkerId)
+    );
+  }, [scheduleData, filteredWorkers]);
 
-  const quickInfoTemplates = {
-    header: (props) => (
-      <div className={quickInfoStyles.quickInfoHeader}>
-        <span className={quickInfoStyles.timeRange}>
-          {new Date(props.StartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-          {new Date(props.EndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
-        <button className={quickInfoStyles.closeButton}>
-          <BsX className={quickInfoStyles.closeIcon} />
-        </button>
-      </div>
-    ),
-    content: (props) => (
-      <div className={quickInfoStyles.quickInfoContent}>
-        <h3 className={quickInfoStyles.eventTitle}>
-          <BsTools className={quickInfoStyles.icon} />
+  const headerTemplate = (props) => {
+    return (
+      <div className={styles.headerContainer}>
+        <div className={styles.headerBar} style={{ backgroundColor: '#90EE90' }}>
           {props.Subject}
-        </h3>
-        
-        {/* Time Information */}
-        <div className={quickInfoStyles.infoItem}>
-          <BsClock className={quickInfoStyles.icon} />
-          <span style={{ fontWeight: 600 }}>Duration:</span>
-          <span>
-            {Math.round((new Date(props.EndTime) - new Date(props.StartTime)) / (1000 * 60 * 60))} hours
-            ({new Date(props.StartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-            {new Date(props.EndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
-          </span>
-        </div>
-
-        {/* Worker Information */}
-        <div className={quickInfoStyles.infoItem}>
-          <BsFillPersonFill className={quickInfoStyles.icon} />
-          <span style={{ fontWeight: 600 }}>Assigned To:</span>
-          <span className={quickInfoStyles.workerName}>{props.WorkerName}</span>
-        </div>
-
-        {/* Location Information */}
-        <div className={quickInfoStyles.infoItem}>
-          <BsGeoAlt className={quickInfoStyles.icon} />
-          <span style={{ fontWeight: 600 }}>Job Site:</span>
-          <span>{props.Location || 'Not specified'}</span>
-        </div>
-
-        {/* Client/Company Information */}
-        <div className={quickInfoStyles.infoItem}>
-          <BsBuilding className={quickInfoStyles.icon} />
-          <span style={{ fontWeight: 600 }}>Client:</span>
-          <span>{props.ClientName || 'Not specified'}</span>
-        </div>
-
-        {/* Job Status */}
-        <div className={quickInfoStyles.infoItem}>
-          <BsCalendarCheck className={quickInfoStyles.icon} />
-          <span style={{ fontWeight: 600 }}>Status:</span>
-          <span className={`${quickInfoStyles.status} ${quickInfoStyles[props.Status?.toLowerCase() || 'pending']}`}>
-            {props.Status || 'N/A'}
-          </span>
+          <button 
+            className={styles.closeButton}
+            onClick={() => {
+              if (scheduleRef.current) {
+                scheduleRef.current.closeQuickInfoPopup();
+              }
+            }}
+          >
+            <BsX size={20} />
+          </button>
         </div>
       </div>
-    ),
-    footer: (props) => (
-      <div className={quickInfoStyles.quickInfoFooter}>
+    );
+  };
+
+  const contentTemplate = (props) => {
+    return (
+      <div className={styles.quickInfoContent}>
+        <h2 className={styles.title}>{props.Subject}</h2>
+        
+        <div className={`${styles.priorityBadge} ${styles.high}`}>
+          High
+        </div>
+
+        <div className={styles.infoRow}>
+          <BsClock className={styles.icon} />
+          <span>0 hours</span>
+        </div>
+
+        <div className={styles.infoRow}>
+          <BsGeoAlt className={styles.icon} />
+          <span>Location</span>
+          <div className={styles.infoValue}>
+            {props.ServiceLocation}
+          </div>
+        </div>
+
+        <div className={styles.infoRow}>
+          <BsBuilding className={styles.icon} />
+          <span>Customer</span>
+          <div className={styles.infoValue}>
+            {props.Customer}
+          </div>
+        </div>
+
+        <div className={styles.infoRow}>
+          <BsTools className={styles.icon} />
+          <span>Equipment</span>
+          <div className={styles.infoValue}>
+            {props.Equipment}
+          </div>
+        </div>
+
+        <div className={styles.infoRow}>
+          <BsCalendarCheck className={styles.icon} />
+          <span>Service Call</span>
+          <div className={styles.infoValue}>
+            {props.ServiceCall || 'N/A'}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const footerTemplate = (props) => {
+    return (
+      <div className={styles.quickInfoFooter}>
         <button 
-          className={quickInfoStyles.viewDetailsButton}
+          className={styles.viewDetailsButton}
           onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
         >
-          <span>View Details</span>
-          <svg width="34" height="34" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="37" cy="37" r="35.5" stroke="white" strokeWidth="3"></circle>
-            <path d="M25 35.5C24.1716 35.5 23.5 36.1716 23.5 37C23.5 37.8284 24.1716 38.5 25 38.5V35.5ZM49.0607 38.0607C49.6464 37.4749 49.6464 36.5251 49.0607 35.9393L39.5147 26.3934C38.9289 25.8076 37.9792 25.8076 37.3934 26.3934C36.8076 26.9792 36.8076 27.9289 37.3934 28.5147L45.8787 37L37.3934 45.4853C36.8076 46.0711 36.8076 47.0208 37.3934 47.6066C37.9792 48.1924 38.9289 48.1924 39.5147 47.6066L49.0607 38.0607ZM25 38.5L48 38.5V35.5L25 35.5V38.5Z" fill="white"></path>
-          </svg>
+          View Details
+          <BsArrowRight size={16} />
         </button>
+        <div className={styles.actionButtons}>
+          <button className={styles.editButton}>
+            Edit
+          </button>
+          <button className={styles.deleteButton}>
+            Delete
+          </button>
+        </div>
       </div>
-    )
+    );
   };
+
+  // Update the ScheduleComponent props
+  <ScheduleComponent
+    ref={scheduleRef}
+    // ... other props ...
+    quickInfoTemplates={{
+      header: headerTemplate,
+      content: contentTemplate,
+      footer: footerTemplate,
+    }}
+  >
+  </ScheduleComponent>
+
+  // Add cache invalidation function
+  const invalidateCache = useCallback(() => {
+    fieldWorkers.forEach(worker => {
+      localStorage.removeItem(`workerJobs_${worker.id}`);
+    });
+    lastFetchTime.current = null;
+    setCachedJobs(null);
+  }, [fieldWorkers]);
+
+  // Add the calculateDuration helper function
+  const calculateDuration = (startTime, endTime) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const hours = Math.abs(end - start) / 36e5; // Convert to hours
+    return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  };
+
+  useEffect(() => {
+    console.log('Current schedule data:', scheduleData);
+    console.log('Filtered workers:', filteredWorkers);
+    console.log('Filtered schedule data:', filteredScheduleData);
+  }, [scheduleData, filteredWorkers, filteredScheduleData]);
 
   if (isLoading) {
     return <LoadingOverlay />;
@@ -483,6 +530,7 @@ const FieldServiceSchedules = () => {
               </Col>
             </Row>
             <ScheduleComponent
+              ref={scheduleRef}
               cssClass="timeline-resource-grouping"
               width="100%"
               height="650px"
@@ -495,27 +543,24 @@ const FieldServiceSchedules = () => {
                 dataSource: filteredScheduleData,
                 fields: {
                   id: 'Id',
-                  subject: { name: "Subject" },
-                  startTime: { name: "StartTime" },
-                  endTime: { name: "EndTime" },
-                  description: { name: "Description" },
-                  priority: { name: "Priority" },
-                  category: { name: "Category" },
-                  location: { name: "ServiceLocation" },
-                  customer: { name: "Customer" },
-                  equipment: { name: "Equipment" },
-                  serviceCall: { name: "ServiceCall" },
-                  status: { name: "JobStatus" }
+                  subject: { name: 'Subject', title: 'Job Name' },
+                  startTime: { name: 'StartTime' },
+                  endTime: { name: 'EndTime' },
+                  description: { name: 'Description' },
+                  workerId: { name: 'WorkerId' },
+                  status: { name: 'Status' }
                 },
-                allowEditing: false,
-                allowAdding: false,
-                allowDeleting: false,
+                enableTooltip: true
               }}
               group={{ resources: ["Workers"] }}
               eventRendered={(args) => {
                 args.element.style.backgroundColor = getEventColor(args.data);
               }}
-              quickInfoTemplates={quickInfoTemplates}
+              quickInfoTemplates={{
+                header: headerTemplate,
+                content: contentTemplate,
+                footer: footerTemplate,
+              }}
               cellDoubleClick={handleCellDoubleClick}
             >
               <ResourcesDirective>

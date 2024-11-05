@@ -3,7 +3,7 @@ import {
   getDocs,
   collection,
   updateDoc,
-  doc,
+  doc as firestoreDoc,
   setDoc,
   getDoc
 } from "firebase/firestore"; // Firebase Firestore imports
@@ -75,6 +75,10 @@ const Calendar = () => {
   const [legendItems, setLegendItems] = useState(DEFAULT_LEGEND_ITEMS);
   const [editingLegendId, setEditingLegendId] = useState(null);
   const [defaultStatus, setDefaultStatus] = useState(legendItems[0]?.id);
+  const [cachedJobs, setCachedJobs] = useState(null);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const lastFetchTime = useRef(null);
+  const userCache = useRef(new Map());
 
   // Create a stable toast configuration
   const toastConfig = {
@@ -112,44 +116,75 @@ const Calendar = () => {
     const fetchJobs = async () => {
       setLoading(true);
       try {
+        // Check if we have cached data and it's still valid
+        const now = Date.now();
+        if (
+          cachedJobs && 
+          lastFetchTime.current && 
+          now - lastFetchTime.current < CACHE_DURATION
+        ) {
+          setEvents(cachedJobs);
+          setFilteredEvents(cachedJobs);
+          setLoading(false);
+          return;
+        }
+
         const jobsSnapshot = await getDocs(collection(db, "jobs"));
-        const jobsData = jobsSnapshot.docs.map((doc) => {
+        const jobsData = await Promise.all(jobsSnapshot.docs.map(async (doc) => {
           const job = doc.data();
+          
+          // Fetch worker details for each assigned worker
+          const workersData = await Promise.all(
+            job.assignedWorkers.map(async (worker) => {
+              const userDoc = await getDoc(firestoreDoc(db, "users", worker.workerId));
+              const userData = userDoc.data();
+              return {
+                workerId: worker.workerId,
+                fullName: userData?.fullName || userData?.firstName + ' ' + userData?.lastName || worker.workerId,
+                profilePicture: userData?.profilePicture || "/images/avatar/NoProfile.png",
+              };
+            })
+          );
+
           return {
             Id: doc.id,
             Subject: job.jobName,
             JobNo: job.jobNo,
             Customer: job.customerName,
             ServiceLocation: job.location?.locationName || "",
-            AssignedWorkers: job.assignedWorkers.map((worker) => ({
-              workerId: worker.workerId,
-              fullName: worker.contact?.contactFullname || worker.workerId,
-              profilePicture:
-                worker.contact?.profilePicture ||
-                "/images/avatar/NoProfile.png",
-            })),
+            AssignedWorkers: workersData, // Use the fetched worker details
             StartTime: new Date(job.startDate),
             EndTime: new Date(job.endDate),
             JobStatus: job.jobStatus,
             Description: job.jobDescription,
-            Equipments: job.equipments.map((eq) => eq.itemName).join(", "),
             Priority: job.priority || "",
             Category: job.category || "N/A",
             ServiceCall: job.serviceCallID || "N/A",
             Equipment: job.equipments?.[0]?.itemName || "N/A",
           };
-        });
+        }));
+
+        // Update cache and timestamp
+        setCachedJobs(jobsData);
+        lastFetchTime.current = now;
+
         setEvents(jobsData);
-        console.log(jobsData);
         setFilteredEvents(jobsData);
       } catch (error) {
         console.error("Error fetching jobs from Firebase:", error);
+        showToast("Failed to fetch jobs", 'error');
       } finally {
         setLoading(false);
       }
     };
 
     fetchJobs();
+  }, []); // Empty dependency array since we're managing cache internally
+
+  // Add a function to invalidate cache when needed
+  const invalidateCache = useCallback(() => {
+    setCachedJobs(null);
+    lastFetchTime.current = null;
   }, []);
 
   const createJobUpdateNotification = async (jobId, subject, updateType) => {
@@ -185,7 +220,7 @@ const Calendar = () => {
     };
 
     // Save the notification to Firestore
-    const notificationRef = doc(db, "notifications", newNotificationId);
+    const notificationRef = firestoreDoc(db, "notifications", newNotificationId);
     await setDoc(notificationRef, notificationEntry);
     console.log(`Job update notification added with ID: ${newNotificationId}`);
   };
@@ -195,7 +230,7 @@ const Calendar = () => {
     const currentView = scheduleObj.current.currentView;
 
     try {
-      const jobRef = doc(db, "jobs", Id);
+      const jobRef = firestoreDoc(db, "jobs", Id);
       let updatedStartTime, updatedEndTime;
 
       if (currentView === "Month") {
@@ -257,6 +292,9 @@ const Calendar = () => {
 
       // Create notification for job update
       await createJobUpdateNotification(Id, Subject, "Drag");
+
+      // Invalidate cache after successful update
+      invalidateCache();
     } catch (error) {
       console.error("Error updating job:", error);
       showToast("Failed to update job. Please try again.", 'error');
@@ -269,7 +307,7 @@ const Calendar = () => {
     const currentView = scheduleObj.current.currentView;
 
     try {
-      const jobRef = doc(db, "jobs", Id);
+      const jobRef = firestoreDoc(db, "jobs", Id);
       let updatedStartTime, updatedEndTime;
 
       if (currentView === "Month") {
@@ -330,6 +368,9 @@ const Calendar = () => {
       // Add notification for resize action
       await createJobUpdateNotification(Id, Subject, "Resize");
       showToast(`Job ${Id} resized successfully.`, 'success');
+
+      // Invalidate cache after successful update
+      invalidateCache();
     } catch (error) {
       console.error("Error updating job:", error);
       showToast("Failed to update job. Please try again.", 'error');
@@ -348,23 +389,6 @@ const Calendar = () => {
       : { backgroundColor: '#9e9e9e', color: '#fff' };
   };
 
-  const headerTemplate = (props) => (
-    <div
-      className={styles.quickInfoHeader}
-      style={getStatusColor(props.JobStatus)}
-    >
-      <span className={styles.timeRange}>
-        {intl.formatDate(props.StartTime, { skeleton: "hm" })} -{" "}
-        {intl.formatDate(props.EndTime, { skeleton: "hm" })}
-      </span>
-      <button
-        onClick={() => scheduleObj.current.closeQuickInfoPopup()}
-        className={styles.closeButton}
-      >
-        <BsX className={styles.closeIcon} />
-      </button>
-    </div>
-  );
 
   const stripHtmlTags = (htmlContent) => {
     const tempElement = document.createElement("div");
@@ -372,120 +396,257 @@ const Calendar = () => {
     return tempElement.textContent || tempElement.innerText || ""; // Get plain text content
   };
 
-  const contentTemplate = (props) => (
-    <div className={styles.quickInfoContent}>
-      <div
-        className={styles.titleContainer}
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <h3 className={styles.eventTitle} style={{ fontWeight: 600 }}>
-          {props.Subject}
-        </h3>
-        <div
-          className={styles.statusBadge}
-          style={getStatusColor(props.JobStatus)}
-        >
-          {props.JobStatus}
-        </div>
-      </div>
-      <div className={styles.eventDetails}>
-        <span
-          className={`${styles.priorityTag} ${
-            styles[props.Priority?.toLowerCase()]
-          }`}
-        >
-          {props.Priority}
-        </span>
-        {/* <span className={styles.category}>{props.Category}</span> */}
-        <span className={styles.duration}>
-          <BsClock className={styles.icon} />
-          {calculateDuration(props.StartTime, props.EndTime)}
-          <div className={styles.avatarGroup}>
-            {props.AssignedWorkers.map((worker, index) => (
-              <OverlayTrigger
-                key={worker.workerId}
-                placement="top"
-                overlay={<Tooltip>{worker.fullName}</Tooltip>}
-              >
-                <img
-                  src={worker.profilePicture || "/images/avatar/NoProfile.png"}
-                  alt={worker.fullName}
-                  className={styles.avatar}
-                  style={{
-                    marginLeft: index > 0 ? "-10px" : "0",
-                    zIndex: props.AssignedWorkers.length - index,
-                  }}
-                />
-              </OverlayTrigger>
-            ))}
-          </div>
-        </span>
-      </div>
-      <div className={styles.infoItem}>
-        <BsGeoAlt className={styles.icon} />
-        <span style={{ fontWeight: 600 }}>Location: </span>
-        {props.ServiceLocation}
-      </div>
-      <div className={styles.infoItem}>
-        <BsBuilding className={styles.icon} />
-        <span style={{ fontWeight: 600 }}>Customer: </span>
-        {props.Customer}
-      </div>
-      <div className={styles.infoItem}>
-        <BsTools className={styles.icon} />
-        <span style={{ fontWeight: 600 }}>Equipment: </span>
-        {props.Equipment}
-      </div>
-      <div className={styles.infoItem}>
-        <BsClock className={styles.icon} />
-        <span style={{ fontWeight: 600 }}>Service Call: </span>
-        {props.ServiceCall}
-      </div>
-      <div className={styles.actionButtons}>
-        <button
-          className={styles.viewDetailsButton}
-          onClick={() => handleRepeatJob(props)}
-        >
-          <span>Repeat Job</span>
-          <BsArrowRepeat className={styles.arrowIcon} />
-        </button>
-      </div>
-    </div>
-  );
+  
+  // const headerTemplate = (props) => (
+  //   <div
+  //     className={styles.quickInfoHeader}
+  //     style={getStatusColor(props.JobStatus)}
+  //   >
+  //     <span className={styles.timeRange}>
+  //       {intl.formatDate(props.StartTime, { skeleton: "hm" })} -{" "}
+  //       {intl.formatDate(props.EndTime, { skeleton: "hm" })}
+  //     </span>
+  //     <button
+  //       onClick={() => scheduleObj.current.closeQuickInfoPopup()}
+  //       className={styles.closeButton}
+  //     >
+  //       <BsX className={styles.closeIcon} />
+  //     </button>
+  //   </div>
+  // );
 
-  const footerTemplate = (props) => (
-    <div className={styles.quickInfoFooter}>
+  // const contentTemplate = (props) => (
+  //   <div className={styles.quickInfoContent}>
+  //     {/* Title and Priority Section */}
+  //     <div className={styles.headerSection}>
+  //       <h3 className={styles.eventTitle}>{props.Subject}</h3>
+  //       <div className={styles.eventMeta}>
+  //         <span className={`${styles.priorityTag} ${styles[props.Priority?.toLowerCase()]}`}>
+  //           {props.Priority}
+  //         </span>
+  //         <span className={styles.duration}>
+  //           <BsClock className={styles.icon} />
+  //           {calculateDuration(props.StartTime, props.EndTime)}
+  //         </span>
+  //       </div>
+  //     </div>
+
+  //     {/* Assigned Workers Section */}
+  //     <div className={styles.workersSection}>
+  //       <div className={styles.sectionTitle}>
+  //         <BsFillPersonFill className={styles.icon} />
+  //         Assigned Workers
+  //       </div>
+  //       <div className={styles.avatarGroup}>
+  //         {props.AssignedWorkers.map((worker, index) => (
+  //           <OverlayTrigger
+  //             key={worker.workerId}
+  //             placement="top"
+  //             overlay={<Tooltip>{worker.fullName}</Tooltip>}
+  //           >
+  //             <img
+  //               src={worker.profilePicture || "/images/avatar/NoProfile.png"}
+  //               alt={worker.fullName}
+  //               className={styles.avatar}
+  //               style={{
+  //                 marginLeft: index > 0 ? "-10px" : "0",
+  //                 zIndex: props.AssignedWorkers.length - index,
+  //               }}
+  //             />
+  //           </OverlayTrigger>
+  //         ))}
+  //       </div>
+  //     </div>
+
+  //     {/* Details Grid */}
+  //     <div className={styles.detailsGrid}>
+  //       <div className={styles.infoItem}>
+  //         <span className={styles.infoLabel}>Location:</span>
+  //         <span className={styles.infoValue}>{props.ServiceLocation}</span>
+  //       </div>
+  //       <div className={styles.infoItem}>
+  //         <span className={styles.infoLabel}>Customer:</span>
+  //         <span className={styles.infoValue}>{props.Customer}</span>
+  //       </div>
+  //       <div className={styles.infoItem}>
+  //         <span className={styles.infoLabel}>Equipment:</span>
+  //         <span className={styles.infoValue}>{props.Equipment}</span>
+  //       </div>
+  //       <div className={styles.infoItem}>
+  //         <span className={styles.infoLabel}>Service Call:</span>
+  //         <span className={styles.infoValue}>{props.ServiceCall}</span>
+  //       </div>
+  //     </div>
+
+  //     {/* View Details Button */}
+  //     <button className={styles.viewDetailsButton}>
+  //       View Details
+  //       <BsArrowRight className={styles.arrowIcon} />
+  //     </button>
+  //   </div>
+  // );
+
+  // const footerTemplate = (props) => (
+  //   <div className={styles.quickInfoFooter}>
+  //     <button
+  //       className={styles.viewDetailsButton}
+  //       onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
+  //     >
+  //       <span>View Details</span>
+  //       <svg
+  //         width="34"
+  //         height="34"
+  //         viewBox="0 0 74 74"
+  //         fill="none"
+  //         xmlns="http://www.w3.org/2000/svg"
+  //       >
+  //         <circle
+  //           cx="37"
+  //           cy="37"
+  //           r="35.5"
+  //           stroke="white"
+  //           strokeWidth="3"
+  //         ></circle>
+  //         <path
+  //           d="M25 35.5C24.1716 35.5 23.5 36.1716 23.5 37C23.5 37.8284 24.1716 38.5 25 38.5V35.5ZM49.0607 38.0607C49.6464 37.4749 49.6464 36.5251 49.0607 35.9393L39.5147 26.3934C38.9289 25.8076 37.9792 25.8076 37.3934 26.3934C36.8076 26.9792 36.8076 27.9289 37.3934 28.5147L45.8787 37L37.3934 45.4853C36.8076 46.0711 36.8076 47.0208 37.3934 47.6066C37.9792 48.1924 38.9289 48.1924 39.5147 47.6066L49.0607 38.0607ZM25 38.5L48 38.5V35.5L25 35.5V38.5Z"
+  //           fill="white"
+  //         ></path>
+  //       </svg>
+  //     </button>
+  //   </div>
+  // );
+
+  const headerTemplate = (props) => (
+    <div
+      className={styles.quickInfoHeader}
+      style={getStatusColor(props.JobStatus)}
+    >
+      <div className={styles.timeRange}>
+        <BsClock size={14} className="me-2" />
+        {intl.formatDate(props.StartTime, { skeleton: "hm" })} -{" "}
+        {intl.formatDate(props.EndTime, { skeleton: "hm" })}
+      </div>
       <button
-        className={styles.viewDetailsButton}
-        onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
+        onClick={() => scheduleObj.current.closeQuickInfoPopup()}
+        className={styles.closeButton}
       >
-        <span>View Details</span>
-        <svg
-          width="34"
-          height="34"
-          viewBox="0 0 74 74"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle
-            cx="37"
-            cy="37"
-            r="35.5"
-            stroke="white"
-            strokeWidth="3"
-          ></circle>
-          <path
-            d="M25 35.5C24.1716 35.5 23.5 36.1716 23.5 37C23.5 37.8284 24.1716 38.5 25 38.5V35.5ZM49.0607 38.0607C49.6464 37.4749 49.6464 36.5251 49.0607 35.9393L39.5147 26.3934C38.9289 25.8076 37.9792 25.8076 37.3934 26.3934C36.8076 26.9792 36.8076 27.9289 37.3934 28.5147L45.8787 37L37.3934 45.4853C36.8076 46.0711 36.8076 47.0208 37.3934 47.6066C37.9792 48.1924 38.9289 48.1924 39.5147 47.6066L49.0607 38.0607ZM25 38.5L48 38.5V35.5L25 35.5V38.5Z"
-            fill="white"
-          ></path>
-        </svg>
+        <BsX size={20} />
       </button>
     </div>
   );
+  
+  const contentTemplate = (props) => {
+    console.log('AssignedWorkers:', props.AssignedWorkers);
+    return (
+      <div className={styles.quickInfoContent}>
+        {/* Title and Priority Badge */}
+        <div className={styles.headerSection}>
+          <div className={styles.titleContainer}>
+          
+            <h3 className={styles.eventTitle}>{props.Subject}</h3>
+            <span className={`${styles.priorityTag} ${styles[props.Priority?.toLowerCase() || 'n/a']}`}>
+              {props.Priority || 'N/A'}
+            </span>
+          </div>
+          <div className={styles.durationBadge}>
+            <BsClock size={14} />
+            <span>{calculateDuration(props.StartTime, props.EndTime)}</span>
+          </div>
+        </div>
+    
+        {/* Main Content Section */}
+        <div className={styles.contentSection}>
+          {/* Location & Customer Section */}
+          <div className={styles.infoCard}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoItem}>
+                <div className={styles.infoLabel}>
+                  <BsGeoAlt size={14} className={styles.infoIcon} />
+                  Location
+                </div>
+                <div className={styles.infoValue}>{props.ServiceLocation}</div>
+              </div>
+              <div className={styles.infoItem}>
+                <div className={styles.infoLabel}>
+                  <BsBuilding size={14} className={styles.infoIcon} />
+                  Customer
+                </div>
+                <div className={styles.infoValue}>{props.Customer}</div>
+              </div>
+            </div>
+            
+            <div className={styles.infoRow}>
+              <div className={styles.infoItem}>
+                <div className={styles.infoLabel}>
+                  <BsTools size={14} className={styles.infoIcon} />
+                  Equipment
+                </div>
+                <div className={styles.infoValue}>{props.Equipment}</div>
+              </div>
+              <div className={styles.infoItem}>
+                <div className={styles.infoLabel}>
+                  <BsCalendarCheck size={14} className={styles.infoIcon} />
+                  Service Call
+                </div>
+                <div className={styles.infoValue}>{props.ServiceCall}</div>
+              </div>
+            </div>
+          </div>
+  
+          {/* Assigned Workers Section */}
+          <div className={styles.workersSection}>
+            <div className={styles.workersSectionHeader}>
+              <BsFillPersonFill size={14} />
+              <span>Assigned Workers</span>
+            </div>
+            <div className={styles.avatarGroup}>
+              {props.AssignedWorkers?.map((worker, index) => (
+                <OverlayTrigger
+                  key={worker.workerId}
+                  placement="top"
+                  overlay={<Tooltip>{worker.fullName}</Tooltip>}
+                >
+                  <img
+                    src={worker.profilePicture || "/images/avatar/NoProfile.png"}
+                    alt={worker.fullName}
+                    className={styles.avatar}
+                    style={{
+                      marginLeft: index > 0 ? "-10px" : "0",
+                      zIndex: props.AssignedWorkers.length - index,
+                    }}
+                  />
+                </OverlayTrigger>
+              ))}
+            </div>
+          </div>
+        </div>
+  
+        {/* Action Button */}
+        <button 
+          className={styles.viewDetailsButton}
+          onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
+        >
+          <span>View Details</span>
+          <BsArrowRight size={16} />
+        </button>
+        <button
+          className={styles.repeatJobButton}
+          onClick={() => handleRepeatJob(props)}
+        >
+          <BsArrowRepeat size={16} />
+          <span>Repeat Job</span>
+        </button>
+      </div>
+    );
+  };
+  
+  const footerTemplate = (props) => (
+    <div className={styles.quickInfoFooter}>
+    
+    </div>
+  );
+
+  
 
   const onPopupOpen = (args) => {
     // Disable the quick info for cell clicks
@@ -723,9 +884,8 @@ const Calendar = () => {
   // Add this function to save legend changes to Firebase
   const saveLegendToFirebase = async (newLegendItems) => {
     try {
-      const legendRef = doc(db, 'settings', 'jobStatuses');
+      const legendRef = firestoreDoc(db, 'settings', 'jobStatuses');
       await setDoc(legendRef, { items: newLegendItems }, { merge: true });
-      // showToast('Status settings saved successfully', 'success');
     } catch (error) {
       console.error('Error saving legend items:', error);
       showToast('Failed to save status settings', 'error');
@@ -779,7 +939,7 @@ const Calendar = () => {
   useEffect(() => {
     const fetchLegendItems = async () => {
       try {
-        const legendRef = doc(db, 'settings', 'jobStatuses');
+        const legendRef = firestoreDoc(db, 'settings', 'jobStatuses');
         const legendDoc = await getDoc(legendRef);
         
         if (legendDoc.exists()) {
@@ -973,7 +1133,7 @@ const Calendar = () => {
               ServiceLocation: jobDetails.location?.locationName || "",
               AssignedWorkers: jobDetails.assignedWorkers?.map((worker) => ({
                 workerId: worker.workerId,
-                fullName: worker.contact?.contactFullname || worker.workerId,
+                fullName: worker.fullName || worker.workerId,
                 profilePicture: worker.contact?.profilePicture || "/images/avatar/NoProfile.png",
               })) || [],
               StartTime: startDate,
@@ -1009,6 +1169,9 @@ const Calendar = () => {
           if (scheduleObj.current) {
             scheduleObj.current.refreshEvents();
           }
+
+          // Invalidate cache after creating new jobs
+          invalidateCache();
 
         } catch (error) {
           console.error('Error in job creation:', error);

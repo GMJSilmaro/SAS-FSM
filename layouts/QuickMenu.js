@@ -31,6 +31,59 @@ import { FaBell, FaBriefcase, FaCheckCircle, FaExclamationCircle, FaSearch } fro
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Swal from 'sweetalert2';
+import { getNotifications, updateNotificationCache, invalidateNotificationCache, getUnreadCount } from '../utils/notificationCache';
+import { getCompanyDetails } from '../utils/companyCache';
+
+const formatNotificationTime = (timestamp) => {
+  try {
+    // Debug logging
+    //('Raw timestamp:', timestamp);
+    //console.log('Timestamp type:', typeof timestamp);
+    
+    // Safety check for null/undefined
+    if (!timestamp) {
+      //console.log('Timestamp is null or undefined');
+      return 'Date unavailable';
+    }
+
+    let dateToFormat;
+
+    // Handle different timestamp formats
+    if (timestamp?.toDate && typeof timestamp.toDate === 'function') {
+      try {
+        dateToFormat = timestamp.toDate();
+        //console.log('Firestore timestamp converted to:', dateToFormat);
+      } catch (e) {
+        console.error('Error converting Firestore timestamp:', e);
+        dateToFormat = new Date();
+      }
+    } else if (typeof timestamp === 'number') {
+      dateToFormat = new Date(timestamp);
+      //console.log('Number timestamp converted to:', dateToFormat);
+    } else if (timestamp instanceof Date) {
+      dateToFormat = timestamp;
+     // console.log('Date object:', dateToFormat);
+    } else if (timestamp.seconds) {
+      dateToFormat = new Date(timestamp.seconds * 1000);
+      //console.log('Seconds timestamp converted to:', dateToFormat);
+    } else {
+      //console.log('Using fallback current date');
+      dateToFormat = new Date();
+    }
+
+    // Validate the date before formatting
+    if (isNaN(dateToFormat.getTime())) {
+      console.error('Invalid date object:', dateToFormat);
+      return 'Invalid date';
+    }
+
+    return format(dateToFormat, "MMM d, yyyy h:mm a");
+  } catch (error) {
+    console.error('Error in formatNotificationTime:', error);
+    console.error('Problematic timestamp:', timestamp);
+    return 'Date error';
+  }
+};
 
 const SearchResults = React.memo(({ results, onClose }) => {
   const groupedResults = {
@@ -219,35 +272,34 @@ const handleSignOut = async () => {
     useEffect(() => {
       if (!workerID) return;
 
+      const loadNotifications = async () => {
+        const notificationsData = await getNotifications(db, workerID, 20);
+        setNotifications(notificationsData);
+        
+        const unreadCount = notificationsData.filter(item => !item.read).length;
+        setUnreadCount(unreadCount);
+      };
+
+      loadNotifications();
+
+      // Real-time updates for new notifications only
       const notificationsRef = collection(db, "notifications");
       const q = query(
         notificationsRef,
         where("workerId", "in", [workerID, "all"]),
         orderBy("timestamp", "desc"),
-        limit(20) // Limit to 20 most recent notifications
+        limit(1) // Only listen for the most recent notification
       );
 
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const notificationData = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          setNotifications(notificationData);
-
-          const unreadNotifications = notificationData.filter(
-            (item) => !item.read
-          ).length;
-          setUnreadCount(unreadNotifications);
-        },
-        (error) => {
-          console.error("Error fetching notifications: ", error.message);
-          toast.error(`Error fetching notifications: ${error.message}`, {
-            position: "top-right",
-          });
-        }
-      );
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            // Invalidate cache when new notification arrives
+            invalidateNotificationCache();
+            loadNotifications(); // Reload all notifications
+          }
+        });
+      });
 
       return () => unsubscribe();
     }, [workerID, setUnreadCount]);
@@ -364,65 +416,56 @@ const handleSignOut = async () => {
                 <p className="text-muted">No notifications</p>
               </ListGroup.Item>
             ) : (
-              notifications.map((item) => (
-                <ListGroup.Item
-                  className="d-flex align-items-center py-3"
-                  style={{
-                    backgroundColor:
-                      item.workerId === "all"
-                        ? item.readBy && item.readBy[workerID]
-                          ? "#fff"
-                          : "#f8f9fa"
-                        : item.read
-                        ? "#fff"
-                        : "#f8f9fa",
-                    cursor: "pointer",
-                    transition: "background-color 0.3s ease",
-                  }}
-                  key={item.id}
-                >
-                  <div className="me-3">
-                    {item.notificationType === "info" ? (
-                      <FaBell size={24} color="#007bff" />
-                    ) : item.notificationType === "warning" ? (
-                      <FaExclamationCircle size={24} color="#ffc107" />
-                    ) : (
-                      <FaCheckCircle size={24} color="#28a745" />
-                    )}
-                  </div>
-                  <div className="flex-grow-1">
-                    <h6 className="mb-1">{item.notificationType}  {!item.read && (
-                        <Badge bg="primary" pill className="ms-2">
-                          New
-                        </Badge>
-                      )}</h6>
-                    <p className="mb-1 text-muted">{item.message}</p>
-                    <div className="d-flex align-items-center text-muted">
-                      <FaBriefcase size={12} className="me-1" />
-                      <small>{item.jobID}</small>
-                     
+              notifications.map((item) => {
+                console.log('Notification item:', item); // Debug log
+                return (
+                  <ListGroup.Item
+                    key={item.id}
+                    className={`border-bottom px-0 align-items-center ${!item.read ? 'bg-light' : ''}`}
+                  >
+                    <div className="d-flex">
+                      <div className="me-3">
+                        {item.notificationType === "info" ? (
+                          <FaBell size={24} color="#007bff" />
+                        ) : item.notificationType === "warning" ? (
+                          <FaExclamationCircle size={24} color="#ffc107" />
+                        ) : (
+                          <FaCheckCircle size={24} color="#28a745" />
+                        )}
+                      </div>
+                      <div className="flex-grow-1">
+                        <h6 className="mb-1">{item.notificationType}  {!item.read && (
+                            <Badge bg="primary" pill className="ms-2">
+                              New
+                            </Badge>
+                          )}</h6>
+                        <p className="mb-1 text-muted">{item.message}</p>
+                        <div className="d-flex align-items-center text-muted">
+                          <FaBriefcase size={12} className="me-1" />
+                          <small>{item.jobID}</small>
+                        </div>
+                      </div>
+                      <div className="ms-auto">
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            hideNotification(item.id);
+                          }}
+                        >
+                          <i className="fe fe-eye-off"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="small text-muted">
                       <span className="mx-2">•</span>
                       <small>
-                        {format(
-                          new Date(item.timestamp.toDate()),
-                          "MMM d, yyyy h:mm a"
-                        )}
+                        {formatNotificationTime(item.timestamp)}
                       </small>
                     </div>
-                  </div>
-                  <div className="ms-auto">
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        hideNotification(item.id);
-                      }}
-                    >
-                      <i className="fe fe-eye-off"></i>
-                    </button>
-                  </div>
-                </ListGroup.Item>
-              ))
+                  </ListGroup.Item>
+                );
+              })
             )}
           </ListGroup>
         </SimpleBar>
@@ -512,7 +555,7 @@ const handleSignOut = async () => {
           return dateB - dateA;
         });
 
-      console.log('Combined results:', combinedResults); // Debug log
+      //console.log('Combined results:', combinedResults); // Debug log
       setSearchResults(combinedResults);
     } catch (error) {
       console.error('Search error:', error);
@@ -556,24 +599,14 @@ const handleSignOut = async () => {
 
   // Add useEffect to fetch company logo
   useEffect(() => {
-    const fetchCompanyInfo = async () => {
-      try {
-        const companyInfoRef = collection(db, 'companyInfo');
-        const q = query(companyInfoRef, limit(1));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const companyData = querySnapshot.docs[0].data();
-          if (companyData.logo) {
-            setLogo(companyData.logo);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching company info:', error);
+    const loadCompanyDetails = async () => {
+      const companyData = await getCompanyDetails();
+      if (companyData?.logo) {
+        setLogo(companyData.logo);
       }
     };
 
-    fetchCompanyInfo();
+    loadCompanyDetails();
   }, []);
 
   return (
@@ -675,14 +708,14 @@ const handleSignOut = async () => {
             id="dropdownUser"
           >
             <div className="position-relative" style={{ 
-              width: '75px', 
-              height: '75px',
+              width: '45px', 
+              height: '45px',
               display: 'inline-block'
             }}>
               {userDetails && userDetails.profilePicture ? (
                 <div style={{ 
-                  width: '75px', 
-                  height: '75px', 
+                  width: '45px', 
+                  height: '45px', 
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
@@ -692,8 +725,8 @@ const handleSignOut = async () => {
                     alt="avatar"
                     src={userDetails.profilePicture}
                     className="rounded-circle"
-                    width={65}
-                    height={65}
+                    width={45}
+                    height={45}
                     style={{
                       objectFit: 'cover',
                       border: '3px solid #e5e9f2',
@@ -704,8 +737,8 @@ const handleSignOut = async () => {
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: '5px',
-                      right: '10px',
+                      bottom: '1px',
+                      right: '1px',
                       width: '15px',
                       height: '15px',
                       backgroundColor: '#00d27a',

@@ -9,6 +9,7 @@ import {
   OverlayTrigger,
   Tooltip,
   Spinner,
+  Form,
 } from "react-bootstrap";
 import { FaUser } from "react-icons/fa";
 import { useRouter } from "next/router";
@@ -18,7 +19,7 @@ import DataTable from "react-data-table-component";
 import Swal from "sweetalert2";
 import { GeeksSEO } from "widgets";
 import JobStats from "sub-components/dashboard/projects/single/task/JobStats";
-import { Search } from "react-feather";
+import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather';
 import { 
   BsBriefcase, 
   BsCalendar, 
@@ -26,6 +27,199 @@ import {
   BsArrowRepeat 
 } from "react-icons/bs";
 import Link from 'next/link';
+
+const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !loading) {
+      loadData();
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-sm mb-4">
+      <Card.Body className="p-3">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <div className="d-flex align-items-center flex-grow-1">
+            <OverlayTrigger
+              placement="right"
+              overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} filters</Tooltip>}
+            >
+              <div 
+                className="d-flex align-items-center" 
+                style={{ cursor: 'pointer' }}
+                onClick={() => setIsExpanded(!isExpanded)}
+              >
+                <Filter size={16} className="me-2 text-primary" />
+                <h6 className="mb-0 me-2" style={{ fontSize: '1rem' }}>
+                  Filter
+                  {Object.values(filters).filter(value => value !== '').length > 0 && (
+                    <Badge 
+                      bg="primary" 
+                      className="ms-2" 
+                      style={{ 
+                        fontSize: '0.75rem', 
+                        verticalAlign: 'middle',
+                        borderRadius: '12px',
+                        padding: '0.25em 0.6em'
+                      }}
+                    >
+                      {Object.values(filters).filter(value => value !== '').length}
+                    </Badge>
+                  )}
+                </h6>
+                {isExpanded ? (
+                  <ChevronUp size={16} className="text-muted" />
+                ) : (
+                  <ChevronDown size={16} className="text-muted" />
+                )}
+              </div>
+            </OverlayTrigger>
+
+            {!isExpanded && (
+              <div className="ms-4 flex-grow-1" style={{ maxWidth: '300px' }}>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  placeholder="Quick search..."
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  onKeyPress={handleKeyPress}
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Button 
+              variant="outline-danger" 
+              size="sm"
+              onClick={onClear}
+              className="me-2"
+              disabled={loading}
+              style={{ fontSize: '0.9rem' }}
+            >
+              <X size={14} className="me-1" />
+              Clear
+            </Button>
+            
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => loadData()}
+              disabled={loading}
+            >
+              <Search size={14} className="me-1" />
+              Search
+            </Button>
+          </div>
+        </div>
+
+        <div style={{ 
+          maxHeight: isExpanded ? '1000px' : '0',
+          overflow: 'hidden',
+          transition: 'all 0.3s ease-in-out',
+          opacity: isExpanded ? 1 : 0
+        }}>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Job Number:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.jobNo}
+                  onChange={(e) => setFilters(prev => ({ ...prev, jobNo: e.target.value }))}
+                  placeholder="Enter job number..."
+                  onKeyPress={handleKeyPress}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Job Name:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.jobName}
+                  onChange={(e) => setFilters(prev => ({ ...prev, jobName: e.target.value }))}
+                  placeholder="Search by job name..."
+                  onKeyPress={handleKeyPress}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Customer:</Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  value={filters.customerName}
+                  onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
+                  placeholder="Search by customer name..."
+                  onKeyPress={handleKeyPress}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                />
+              </Form.Group>
+            </Col>
+
+            <Col md={6}>
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Status:</Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={filters.jobStatus}
+                  onChange={(e) => setFilters(prev => ({ ...prev, jobStatus: e.target.value }))}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                >
+                  <option value="">All Status</option>
+                  <option value="Created">Created</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Cancelled">Cancelled</option>
+                  <option value="Job Started">Job Started</option>
+                  <option value="Job Complete">Job Complete</option>
+                  <option value="Validate">Validate</option>
+                  <option value="Scheduled">Scheduled</option>
+                </Form.Select>
+              </Form.Group>
+
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Priority:</Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={filters.priority}
+                  onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                >
+                  <option value="">All Priority</option>
+                  <option value="Low">Low</option>
+                  <option value="Mid">Mid</option>
+                  <option value="High">High</option>
+                </Form.Select>
+              </Form.Group>
+
+              <Form.Group className="mb-2">
+                <Form.Label className="small mb-1">Job Type:</Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={filters.jobType}
+                  onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
+                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                >
+                  <option value="">All Types</option>
+                  <option value="recurring">Recurring</option>
+                  <option value="one-time">One-time</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
 
 const ViewJobs = () => {
   const router = useRouter();
@@ -38,6 +232,15 @@ const ViewJobs = () => {
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   const [editLoading, setEditLoading] = useState(false); // New state for edit loading
   const [jobTypeFilter, setJobTypeFilter] = useState('all'); // 'all', 'recurring', 'one-time'
+  const [filters, setFilters] = useState({
+    search: '',
+    jobNo: '',
+    jobName: '',
+    customerName: '',
+    jobStatus: '',
+    priority: '',
+    jobType: ''
+  });
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -111,6 +314,8 @@ const ViewJobs = () => {
       style: {
         backgroundColor: '#ffffff',
         borderRadius: '8px',
+        width: '100%',
+        tableLayout: 'fixed'
       }
     },
     headRow: {
@@ -119,6 +324,7 @@ const ViewJobs = () => {
         borderTopLeftRadius: '8px',
         borderTopRightRadius: '8px',
         borderBottom: '1px solid #e2e8f0',
+        minHeight: '52px'
       }
     },
     headCells: {
@@ -126,30 +332,43 @@ const ViewJobs = () => {
         fontSize: '13px',
         fontWeight: '600',
         color: '#475569',
-        paddingTop: '16px',
-        paddingBottom: '16px',
+        paddingLeft: '16px',
+        paddingRight: '16px'
       }
     },
     cells: {
       style: {
         fontSize: '14px',
         color: '#64748b',
+        paddingLeft: '16px',
+        paddingRight: '16px',
         paddingTop: '12px',
-        paddingBottom: '12px',
+        paddingBottom: '12px'
       }
     },
     rows: {
       style: {
+        minHeight: '60px',
         '&:hover': {
           backgroundColor: '#f1f5f9',
           cursor: 'pointer',
-          transition: 'all 0.2s',
-        },
+          transition: 'all 0.2s'
+        }
       }
+    },
+    expandableRowsStyle: {
+      backgroundColor: '#f8fafc'
     },
     pagination: {
       style: {
         borderTop: '1px solid #e2e8f0',
+        minHeight: '56px'
+      },
+      pageButtonsStyle: {
+        borderRadius: '4px',
+        height: '32px',
+        padding: '4px 8px',
+        margin: '0 4px'
       }
     }
   };
@@ -196,10 +415,7 @@ const ViewJobs = () => {
       sortable: true,
       width: "100px",
       cell: row => (
-        <OverlayTrigger
-          placement="top"
-          overlay={<Tooltip>Click to view job details for #{row.jobNo}</Tooltip>}
-        >
+       
           <Link href={`/dashboard/jobs/${row.id}`} passHref>
             <span 
               className="badge bg-light text-primary cursor-pointer"
@@ -208,7 +424,7 @@ const ViewJobs = () => {
               {row.jobNo}
             </span>
           </Link>
-        </OverlayTrigger>
+     
       )
     },
     {
@@ -442,27 +658,50 @@ const ViewJobs = () => {
     const debounceTimeout = setTimeout(() => {
       let filtered = jobs;
 
-      // Apply job type filter
-      if (jobTypeFilter !== 'all') {
+      // Apply filters
+      if (filters.jobNo) {
         filtered = filtered.filter(job => 
-          jobTypeFilter === 'recurring' ? job.isRepeating : !job.isRepeating
+          job.jobNo.toLowerCase().includes(filters.jobNo.toLowerCase())
         );
       }
 
-      // Apply search filter
-      if (search.trim()) {
-        const searchLower = search.toLowerCase().trim();
-        const searchableFields = [
-          'jobNo', 'jobName', 'customerName', 'locationName', 
-          'jobStatus', 'priority', 'workerFullName'
-        ];
+      if (filters.jobName) {
+        filtered = filtered.filter(job => 
+          job.jobName.toLowerCase().includes(filters.jobName.toLowerCase())
+        );
+      }
 
-        filtered = filtered.filter((job) => {
-          return searchableFields.some(field => {
-            const value = job[field];
-            if (!value) return false;
-            return value.toString().toLowerCase().includes(searchLower);
-          });
+      if (filters.customerName) {
+        filtered = filtered.filter(job => 
+          job.customerName.toLowerCase().includes(filters.customerName.toLowerCase())
+        );
+      }
+
+      if (filters.jobStatus) {
+        filtered = filtered.filter(job => job.jobStatus === filters.jobStatus);
+      }
+
+      if (filters.priority) {
+        filtered = filtered.filter(job => job.priority === filters.priority);
+      }
+
+      if (filters.jobType) {
+        filtered = filtered.filter(job => 
+          filters.jobType === 'recurring' ? job.isRepeating : !job.isRepeating
+        );
+      }
+
+      // Quick search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        filtered = filtered.filter(job => {
+          return (
+            job.jobNo.toLowerCase().includes(searchLower) ||
+            job.jobName.toLowerCase().includes(searchLower) ||
+            job.customerName.toLowerCase().includes(searchLower) ||
+            job.jobStatus.toLowerCase().includes(searchLower) ||
+            job.priority.toLowerCase().includes(searchLower)
+          );
         });
       }
 
@@ -470,7 +709,7 @@ const ViewJobs = () => {
     }, 300);
 
     return () => clearTimeout(debounceTimeout);
-  }, [search, jobs, jobTypeFilter]);
+  }, [filters, jobs]);
 
   useEffect(() => {
     fetchData();
@@ -641,44 +880,20 @@ const ViewJobs = () => {
     }
   };
 
-  const subHeaderComponentMemo = useMemo(() => {
-    return (
-      <div className="w-100 mb-4">
-        <div className="d-flex gap-3 mb-3">
-          <div className="flex-grow-1 position-relative">
-            <Search 
-              size={18} 
-              className="position-absolute text-muted" 
-              style={{ top: '12px', left: '12px' }} 
-            />
-            <input
-              type="text"
-              className="form-control ps-5"
-              placeholder="Search jobs by number, name, customer, status..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                padding: '0.75rem 1rem',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-            />
-          </div>
-          <select
-            className="form-select"
-            style={{ width: 'auto' }}
-            value={jobTypeFilter}
-            onChange={(e) => setJobTypeFilter(e.target.value)}
-          >
-            <option value="all">All Jobs</option>
-            <option value="recurring">Recurring Jobs</option>
-            <option value="one-time">One-time Jobs</option>
-          </select>
-        </div>
-      </div>
-    );
-  }, [search, jobTypeFilter]);
+  const handleClearFilters = () => {
+    setFilters({
+      search: '',
+      jobNo: '',
+      jobName: '',
+      customerName: '',
+      jobStatus: '',
+      priority: '',
+      jobType: ''
+    });
+    // Reset to default view
+    setFilteredJobs(jobs);
+  };
+  
 
   return (
     <Fragment>
@@ -713,6 +928,13 @@ const ViewJobs = () => {
         <Col md={12} xs={12} className="mb-5">
           <Card className="border-0 shadow-sm">
             <Card.Body className="p-4">
+              <FilterPanel 
+                filters={filters}
+                setFilters={setFilters}
+                onClear={handleClearFilters}
+                loading={loading}
+                loadData={fetchData}
+              />
               {loading ? (
                 <div className="text-center py-5">
                   <Spinner animation="border" variant="primary" className="me-2" />
@@ -727,9 +949,14 @@ const ViewJobs = () => {
                  // pointerOnHover
                   onRowClicked={(row) => handleRowClick(row)}
                   customStyles={customStyles}
-                  subHeader
-                  subHeaderComponent={subHeaderComponentMemo}
-                  persistTableHead
+                  fixedHeader
+                        fixedHeaderScrollHeight="calc(100vh - 300px)"
+                        dense
+                        persistTableHead
+                        paginationComponentOptions={{
+                          noRowsPerPage: true // Hide rows per page selector
+                        }}
+                        progressPending={loading}
                   noDataComponent={
                     <div className="text-center py-5">
                       <div className="text-muted mb-2">No jobs found</div>
