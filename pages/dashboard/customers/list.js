@@ -552,10 +552,10 @@ const ViewCustomers = () => {
       minWidth: '50px'
     },
     { 
-      name: 'Card Code', 
+      name: 'Code', 
       selector: row => row.CardCode, 
       sortable: true,
-      minWidth: '120px',
+      minWidth: '100px',
       grow: 0.5,
       cell: row => (
         <OverlayTrigger
@@ -569,10 +569,10 @@ const ViewCustomers = () => {
       )
     },
     { 
-      name: 'Customer Name', 
+      name: 'Customer', 
       selector: row => row.CardName, 
       sortable: true,
-      minWidth: '200px',
+      minWidth: 'auto',
       grow: 2,
       cell: row => (
         <div className="d-flex align-items-center">
@@ -581,10 +581,10 @@ const ViewCustomers = () => {
       )
     },
     {
-      name: 'Main Address',
+      name: 'Billing Address',
       selector: row => row.MailAddress || row.Address,
       sortable: true,
-      minWidth: '300px',
+      minWidth: 'auto',
       grow: 2,
       wrap: true,
       cell: row => {
@@ -652,7 +652,7 @@ const ViewCustomers = () => {
       name: 'Phone', 
       selector: row => row.Phone1, 
       sortable: true,
-      minWidth: '130px',
+      minWidth: 'auto',
       grow: 0.8,
       cell: row => (
         <OverlayTrigger

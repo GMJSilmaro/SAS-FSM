@@ -672,7 +672,7 @@ const loadData = useCallback(async (page, currentFilters = {}) => {
       wrap: true
     },
     {
-      name: 'Main Address',
+      name: 'Billing Address',
       selector: row => row.Address1,
       sortable: true,
       minWidth: '300px',
@@ -690,7 +690,14 @@ const loadData = useCallback(async (page, currentFilters = {}) => {
         return (
           <div className="d-flex align-items-center">
             <HouseFill className="me-2 flex-shrink-0" />
-            <span>{fullAddress || '-'}</span>
+            <OverlayTrigger
+              placement="top"
+              overlay={<Tooltip>{fullAddress || 'No address available'}</Tooltip>}
+            >
+              <div className="text-truncate" style={{ maxWidth: '250px' }}>
+                {fullAddress || '-'}
+              </div>
+            </OverlayTrigger>
             {row.Country && (
               <div className="ms-2 flex-shrink-0">
                 {COUNTRY_CODE_MAP[row.Country] === 'SG' && <SGFlag style={{ width: '16px' }} />}
