@@ -309,24 +309,48 @@ const Settings = () => {
       const workerId = userDetails.workerId;
 
       if (file) {
+        // Upload new logo file
         const storageRef = ref(storage, `company_logos/${workerId}-${file.name}`);
         const snapshot = await uploadBytes(storageRef, file);
         logoUrl = await getDownloadURL(snapshot.ref);
         console.log("New logo uploaded. Download URL:", logoUrl);
       }
 
-      // Update companyDetails document
-      await setDoc(doc(db, "companyDetails", "companyInfo"), {
-        ...companyInfo,
-        logo: logoUrl,
-      });
+      // Check if companyDetails/companyInfo document exists
+      const companyDetailsRef = doc(db, "companyDetails", "companyInfo");
+      const companyDetailsDoc = await getDoc(companyDetailsRef);
 
-      // Also update companyInfo collection for the navbar
-      await setDoc(doc(db, "companyInfo", "default"), {
-        name: companyInfo.name,
-        logo: logoUrl
-      });
+      // Check if companyInfo/default document exists
+      const companyInfoRef = doc(db, "companyInfo", "default");
+      const companyInfoDoc = await getDoc(companyInfoRef);
 
+      // Update or create companyDetails document
+      if (companyDetailsDoc.exists()) {
+        await updateDoc(companyDetailsRef, {
+          ...companyInfo,
+          logo: logoUrl,
+        });
+      } else {
+        await setDoc(companyDetailsRef, {
+          ...companyInfo,
+          logo: logoUrl,
+        });
+      }
+
+      // Update or create companyInfo document
+      if (companyInfoDoc.exists()) {
+        await updateDoc(companyInfoRef, {
+          name: companyInfo.name,
+          logo: logoUrl
+        });
+      } else {
+        await setDoc(companyInfoRef, {
+          name: companyInfo.name,
+          logo: logoUrl
+        });
+      }
+
+      // Update local state
       setCompanyInfo(prev => ({
         ...prev,
         logo: logoUrl
