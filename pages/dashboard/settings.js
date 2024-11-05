@@ -25,6 +25,8 @@ import {
   getDocs,
   deleteDoc,
   updateDoc,
+  writeBatch,
+  serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
 import { db } from "../../firebase";
@@ -248,13 +250,27 @@ const Settings = () => {
   const handleCloseScheduleModal = () => setShowScheduleModal(false);
   const handleImageChange = (event) => {
     const selectedFile = event.target.files[0];
+    
+    // Validate file type
+    if (!selectedFile.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (e.g., 5MB limit)
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+    if (selectedFile.size > MAX_SIZE) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
     if (selectedFile) {
       const reader = new FileReader();
       reader.onload = () => {
-        setLogoPreview(reader.result); // Set the preview of the logo
+        setLogoPreview(reader.result);
       };
       reader.readAsDataURL(selectedFile);
-      setFile(selectedFile); // Store the selected file for uploading
+      setFile(selectedFile);
     }
   };
 
@@ -303,52 +319,52 @@ const Settings = () => {
     fetchCompanyInfo();
   }, []);
 
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleCompanyInfoSave = async () => {
     try {
       let logoUrl = companyInfo.logo;
-      const workerId = userDetails.workerId;
+      const workerId = userDetails?.workerId;
 
       if (file) {
-        // Upload new logo file
-        const storageRef = ref(storage, `company_logos/${workerId}-${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        logoUrl = await getDownloadURL(snapshot.ref);
-        console.log("New logo uploaded. Download URL:", logoUrl);
+        try {
+          // Generate a unique filename using timestamp
+          const timestamp = Date.now();
+          const fileName = `${workerId}-${timestamp}-${file.name}`;
+          
+          // Upload new logo file
+          const storageRef = ref(storage, `company_logos/${fileName}`);
+          const snapshot = await uploadBytes(storageRef, file);
+          logoUrl = await getDownloadURL(snapshot.ref);
+          console.log("New logo uploaded. Download URL:", logoUrl);
+        } catch (storageError) {
+          console.error("Error uploading logo:", storageError);
+          toast.error('Failed to upload company logo');
+          return; // Exit early if logo upload fails
+        }
       }
 
-      // Check if companyDetails/companyInfo document exists
+      // Batch write to both documents
+      const batch = writeBatch(db);
+      
+      // Update companyDetails/companyInfo
       const companyDetailsRef = doc(db, "companyDetails", "companyInfo");
-      const companyDetailsDoc = await getDoc(companyDetailsRef);
+      batch.set(companyDetailsRef, {
+        ...companyInfo,
+        logo: logoUrl,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
 
-      // Check if companyInfo/default document exists
+      // Update companyInfo/default
       const companyInfoRef = doc(db, "companyInfo", "default");
-      const companyInfoDoc = await getDoc(companyInfoRef);
+      batch.set(companyInfoRef, {
+        name: companyInfo.name,
+        logo: logoUrl,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
 
-      // Update or create companyDetails document
-      if (companyDetailsDoc.exists()) {
-        await updateDoc(companyDetailsRef, {
-          ...companyInfo,
-          logo: logoUrl,
-        });
-      } else {
-        await setDoc(companyDetailsRef, {
-          ...companyInfo,
-          logo: logoUrl,
-        });
-      }
-
-      // Update or create companyInfo document
-      if (companyInfoDoc.exists()) {
-        await updateDoc(companyInfoRef, {
-          name: companyInfo.name,
-          logo: logoUrl
-        });
-      } else {
-        await setDoc(companyInfoRef, {
-          name: companyInfo.name,
-          logo: logoUrl
-        });
-      }
+      // Commit the batch
+      await batch.commit();
 
       // Update local state
       setCompanyInfo(prev => ({
@@ -361,6 +377,8 @@ const Settings = () => {
     } catch (error) {
       console.error("Error updating company information:", error);
       toast.error('Failed to update company information');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -769,8 +787,12 @@ const Settings = () => {
             <Button variant="secondary" onClick={handleEditModalClose}>
               Close
             </Button>
-            <Button variant="primary" onClick={handleCompanyInfoSave}>
-              Save Changes
+            <Button 
+              variant="primary" 
+              onClick={handleCompanyInfoSave}
+              disabled={isUploading}
+            >
+              {isUploading ? 'Saving...' : 'Save Changes'}
             </Button>
           </Modal.Footer>
         </Modal>

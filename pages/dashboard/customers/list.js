@@ -297,7 +297,7 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData, searchTe
             </Col>
             <Col md={6}>
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Address:</Form.Label>
+                <Form.Label className="small mb-1" style={{ fontSize: '0.9rem' }}>Billing Address:</Form.Label>
                 <OverlayTrigger
                   placement="top"
                   overlay={<Tooltip>Enter street name, building name, postal code etc.</Tooltip>}
