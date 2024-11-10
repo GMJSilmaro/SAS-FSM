@@ -1409,22 +1409,29 @@
   color: #2c5282;
 }
 
-.followUpList {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
 .followUpItem {
   padding: 0.5rem;
   border-bottom: 1px solid #eee;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.followUpItem:hover {
+  background-color: #f8f9fa;
 }
 
 .followUpItem:last-child {
   border-bottom: none;
 }
+
+.followUpItem .badge {
+  transition: opacity 0.2s;
+}
+
+.followUpItem .badge:hover {
+  opacity: 0.8;
+}
+
+
 
 @media (max-width: 768px) {
   .statusHeader {

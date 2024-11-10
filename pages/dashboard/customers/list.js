@@ -1439,9 +1439,8 @@ const ViewCustomers = () => {
   };
 
   const handleViewDetails = (customer) => {
-    // Store the customer name in localStorage
+    console.log('Viewing customer:', customer); // Debug log
     localStorage.setItem('viewCustomerToast', customer.CardName);
-    // Navigate to the customer details page
     router.push(`/dashboard/customers/${customer.CardCode}`);
   };
 

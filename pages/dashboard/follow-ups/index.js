@@ -270,7 +270,7 @@ const FollowUpsPage = () => {
                       </a>
                     </td>
                     <td>
-                      <a href={`/customers/${followUp.customerID}`}>
+                      <a href={`/customers/view/${followUp.customerID}`}>
                         {followUp.customerName}
                       </a>
                     </td>

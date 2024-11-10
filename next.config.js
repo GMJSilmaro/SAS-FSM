@@ -87,10 +87,10 @@ const nextConfig = {
         destination: "/dashboard/customers/list",
       },
       {
-        source: "/customers/:id",
-        destination: "/dashboard/customers/[id]",
+        source: "/customers/view/:id",
+        destination: "/dashboard/customers/:id",
       },
-
+ 
       // WORKERS
       {
         source: "/workers/create",
@@ -102,11 +102,11 @@ const nextConfig = {
       },
       {
         source: "/workers/view/:workerId",
-        destination: "/dashboard/workers/[workerId]",
+        destination: "/dashboard/workers/:workerId",
       },
       {
         source: "/workers/edit-worker/:workerId",
-        destination: "/dashboard/workers/[workerId]",
+        destination: "/dashboard/workers/:workerId",
       },
 
       // SCHEDULING

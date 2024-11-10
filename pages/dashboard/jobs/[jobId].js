@@ -294,6 +294,7 @@ const JobDetails = () => {
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const workerId = Cookies.get('workerId');
   const [userDetails, setUserDetails] = useState(null);
+  const [editingFollowUpId, setEditingFollowUpId] = useState(null);
 
   console.log("Job ID from URL:", jobId);
 
@@ -417,6 +418,26 @@ const JobDetails = () => {
         }
       );
 
+      return () => unsubscribe();
+    }
+  }, [jobId]);
+
+  // Add this useEffect to listen for follow-up changes
+  useEffect(() => {
+    if (jobId) {
+      const jobRef = doc(db, 'jobs', jobId);
+      
+      const unsubscribe = onSnapshot(jobRef, (doc) => {
+        if (doc.exists()) {
+          const jobData = doc.data();
+          setJob(prevJob => ({
+            ...prevJob,
+            ...jobData
+          }));
+        }
+      });
+
+      // Cleanup subscription on unmount
       return () => unsubscribe();
     }
   }, [jobId]);
@@ -1718,6 +1739,18 @@ const JobDetails = () => {
     );
   };
 
+  // Modify the FollowUpModal implementation to include an onSuccess callback
+  const handleFollowUpSuccess = (newFollowUp) => {
+    // Update the local state immediately
+    setJob(prevJob => ({
+      ...prevJob,
+      followUps: {
+        ...prevJob.followUps,
+        [newFollowUp.id]: newFollowUp
+      }
+    }));
+  };
+
   // Add loading state check
   if (!job) {
     return (
@@ -1731,6 +1764,22 @@ const JobDetails = () => {
       </div>
     );
   }
+
+  const handleUpdateFollowUp = async (followUpId, newStatus) => {
+    try {
+      const jobRef = doc(db, 'jobs', jobId);
+      await updateDoc(jobRef, {
+        [`followUps.${followUpId}.status`]: newStatus,
+        [`followUps.${followUpId}.updatedAt`]: new Date().toISOString()
+      });
+      
+      setEditingFollowUpId(null);
+      toast.success('Follow-up updated successfully');
+    } catch (error) {
+      console.error('Error updating follow-up:', error);
+      toast.error('Failed to update follow-up');
+    }
+  };
 
   return (
     <>
@@ -1977,18 +2026,71 @@ const JobDetails = () => {
                   {job.followUps && Object.entries(job.followUps).length > 0 ? (
                     <div className={styles.followUpList}>
                       {Object.entries(job.followUps).map(([id, followUp]) => (
-                        <div key={id} className={styles.followUpItem}>
-                          <Badge 
-                            bg={followUp.status === 'Logged' ? 'warning' : 
-                                followUp.status === 'In Progress' ? 'info' : 
-                                followUp.status === 'Closed' ? 'success' : 'secondary'}
-                            className="me-2"
-                          >
-                            {followUp.status}
-                          </Badge>
-                          <span className="text-muted small">
-                            {followUp.type} - {new Date(followUp.createdAt).toLocaleDateString()}
-                          </span>
+                        <div key={id} className={`${styles.followUpItem} d-flex justify-content-between align-items-center`}>
+                          <div className="d-flex align-items-center gap-2">
+                            {editingFollowUpId === id ? (
+                              <Form.Select
+                                size="sm"
+                                value={followUp.status}
+                                onChange={(e) => handleUpdateFollowUp(id, e.target.value)}
+                                style={{ width: 'auto' }}
+                                autoFocus
+                                onBlur={() => setEditingFollowUpId(null)}
+                              >
+                                <option value="Logged">Logged</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Closed">Closed</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </Form.Select>
+                            ) : (
+                              <Badge 
+                                bg={followUp.status === 'Logged' ? 'warning' : 
+                                    followUp.status === 'In Progress' ? 'info' : 
+                                    followUp.status === 'Closed' ? 'success' : 
+                                    followUp.status === 'Cancelled' ? 'danger' : 'secondary'}
+                                className="me-2"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => setEditingFollowUpId(id)}
+                              >
+                                {followUp.status}
+                              </Badge>
+                            )}
+                            <span className="text-muted small">
+                              {followUp.type} - {new Date(followUp.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="d-flex gap-2">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-0"
+                              onClick={() => setEditingFollowUpId(id)}
+                            >
+                              <i className="fe fe-edit-2"></i>
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-0 text-danger"
+                              onClick={() => {
+                                Swal.fire({
+                                  title: 'Delete Follow-up?',
+                                  text: 'This action cannot be undone',
+                                  icon: 'warning',
+                                  showCancelButton: true,
+                                  confirmButtonColor: '#d33',
+                                  cancelButtonColor: '#3085d6',
+                                  confirmButtonText: 'Yes, delete it!'
+                                }).then((result) => {
+                                  if (result.isConfirmed) {
+                                    handleDeleteFollowUp(id);
+                                  }
+                                });
+                              }}
+                            >
+                              <i className="fe fe-trash-2"></i>
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2257,6 +2359,7 @@ const JobDetails = () => {
         jobId={jobId}
         technicianId={workerId}
         technicianName={userDetails?.fullName || 'Unknown Technician'}
+        onSuccess={handleFollowUpSuccess}
       />
     </>
   );

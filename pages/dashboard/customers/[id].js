@@ -32,13 +32,20 @@ const ViewCustomer = () => {
   const { id } = router.query;
   
   useEffect(() => {
+    // Wait for router to be ready
+    if (!router.isReady) return;
+
     const fetchCustomerData = async () => {
-      if (!id) return;
+      console.log('Current ID:', id);
+      if (!id || id === '[id]') {
+        console.log('Skipping fetch - invalid ID');
+        return;
+      }
 
       setLoading(true);
       try {
         const [customerResponse, equipmentResponse] = await Promise.all([
-          fetch(`/api/getCustomerCode?cardCode=${id}`),
+          fetch(`/api/getCustomerCode?cardCode=${encodeURIComponent(id)}`),
           fetch('/api/getEquipments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -64,9 +71,9 @@ const ViewCustomer = () => {
         setLoading(false);
       }
     };
-  
+
     fetchCustomerData();
-  }, [id]);
+  }, [router.isReady, id]); // Add router.isReady to dependencies
 
   const handleTabChange = (key) => {
     if (key) setActiveTab(key);
@@ -74,7 +81,7 @@ const ViewCustomer = () => {
 
   if (loading) {
     return (
-      <Container className="mt-5">
+      <Container>
         <Row>
           <Col lg={12} md={12} sm={12}>
             <div
@@ -183,11 +190,20 @@ const ViewCustomer = () => {
           <Col>
             <Card className="text-center">
               <Card.Body>
-                <Card.Title className="text-danger">Error</Card.Title>
-                <Card.Text>{error}</Card.Text>
-                <Button variant="primary" onClick={() => router.push('/customers')}>
-                  Back to Customers List
-                </Button>
+                <Card.Title className="text-danger">Error Loading Customer</Card.Title>
+                <Card.Text>
+                  {error}
+                  <br />
+                  <small className="text-muted">Customer ID: {id}</small>
+                </Card.Text>
+                <div className="d-flex gap-2 justify-content-center">
+                  <Button variant="primary" onClick={() => router.push('/customers')}>
+                    Back to Customers List
+                  </Button>
+                  <Button variant="secondary" onClick={() => window.location.reload()}>
+                    Retry Loading
+                  </Button>
+                </div>
               </Card.Body>
             </Card>
           </Col>

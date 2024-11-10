@@ -11,7 +11,8 @@ const FollowUpModal = ({
   onHide, 
   jobId, 
   technicianId, 
-  technicianName 
+  technicianName, 
+  onSuccess
 }) => {
   const [type, setType] = useState('');
   const [notes, setNotes] = useState('');
@@ -47,6 +48,10 @@ const FollowUpModal = ({
         lastFollowUp: serverTimestamp(),
         [`subStatus.${type.toLowerCase()}`]: true
       });
+
+      if (onSuccess) {
+        onSuccess(followUpData);
+      }
 
       toast.success("Follow-up created successfully!");
       onHide();
