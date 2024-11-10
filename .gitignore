@@ -2,3 +2,10 @@ node_modules
 .next/
 .vscode
 .env
+fb-admin-key.json
+.env.local
+.env.development
+.env.production
+.env.test
+.env.staging
+
