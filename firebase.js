@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -15,42 +15,98 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase only if no apps exist
+let app;
 let analytics;
-if (typeof window !== "undefined") {
-  analytics = getAnalytics(app);
+let db;
+let storage;
+let auth;
+
+try {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+    console.log('Firebase initialized successfully');
+  } else {
+    app = getApps()[0];
+    console.log('Using existing Firebase instance');
+  }
+
+  // Initialize services
+  if (typeof window !== "undefined") {
+    analytics = getAnalytics(app);
+  }
+  
+  db = getFirestore(app);
+  storage = getStorage(app);
+  auth = getAuth(app);
+
+} catch (error) {
+  console.error('Firebase initialization error:', error);
 }
 
-const db = getFirestore(app); 
-const storage = getStorage(app);
-const auth = getAuth(app);
-
-// Add a test function to verify connection and permissions
+// Add a more comprehensive test function
 export async function testFirebaseConnection() {
   try {
+    // Test Firestore
     const workersRef = collection(db, 'workers');
     const snapshot = await getDocs(workersRef);
     
+    // Test Authentication
+    const currentUser = auth.currentUser;
+    
+    // Test Storage
+    const storageRef = storage.ref();
+    
     console.log('Firebase connection test:', {
       success: true,
+      firestoreConnection: true,
       documentsFound: snapshot.size,
-      firstDoc: snapshot.docs[0]?.data()
+      authInitialized: !!auth,
+      storageInitialized: !!storage,
+      currentUser: currentUser?.email || 'No user logged in'
     });
     
     return {
       success: true,
+      firestoreConnection: true,
       documentsFound: snapshot.size,
-      firstDoc: snapshot.docs[0]?.data()
+      authInitialized: !!auth,
+      storageInitialized: !!storage,
+      currentUser: currentUser?.email || 'No user logged in'
     };
   } catch (error) {
-    console.error('Firebase connection test failed:', error);
+    console.error('Firebase connection test failed:', {
+      error: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      code: error.code
     };
   }
 }
 
-// Export firebaseConfig if needed elsewhere
+// Verify Firebase configuration
+export function verifyFirebaseConfig() {
+  const requiredKeys = [
+    'apiKey',
+    'authDomain',
+    'projectId',
+    'storageBucket',
+    'messagingSenderId',
+    'appId'
+  ];
+
+  const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
+  
+  if (missingKeys.length > 0) {
+    console.error('Missing Firebase configuration keys:', missingKeys);
+    return false;
+  }
+  
+  return true;
+}
+
 export { firebaseConfig, app, db, storage, analytics, auth };

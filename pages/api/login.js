@@ -13,23 +13,52 @@ const COOKIE_OPTIONS = {
   httpOnly: true
 };
 
-export default async function handler(req, res) {
-  console.log('🔐 Server: Login request received', {
-    method: req.method,
-    body: { email: req.body.email, passwordLength: req.body?.password?.length }
-  });
+// Add CORS headers
+export const config = {
+  api: {
+    externalResolver: true,
+    bodyParser: true,
+  },
+};
 
-  if (req.method !== 'POST') {
-    console.log('❌ Server: Invalid method:', req.method);
-    return res.status(405).json({ message: 'Method Not Allowed' });
+export default async function handler(req, res) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,DELETE,PATCH,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
 
-  const { email, password } = req.body;
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  let workerId = null;
+  // Ensure method is POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
 
   try {
+    const { email, password } = req.body;
+    
+    // Add request validation
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    console.log('🔐 Server: Login request received', {
+      method: req.method,
+      body: { email: req.body.email, passwordLength: req.body?.password?.length }
+    });
+
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    let workerId = null;
+
     console.log('🔍 Server: Attempting Firebase authentication...');
     
     // Firebase Authentication

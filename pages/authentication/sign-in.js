@@ -7,6 +7,7 @@ import { useSettings } from "../../hooks/useSettings";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Toaster } from 'react-hot-toast';
 import Swal from 'sweetalert2';
+import { handleFirebaseError } from '../../utils/firebaseErrorHandler';
 
 // Move loadingMessages outside the component
 const loadingMessages = [
@@ -186,8 +187,13 @@ const SignIn = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email, 
+          password,
+          timestamp: new Date().toISOString() 
+        }),
         credentials: 'include'
       });
 
@@ -197,9 +203,16 @@ const SignIn = () => {
       });
 
       const data = await response.json();
-      console.log('📦 Client: Response data:', data);
 
       if (!response.ok) {
+        // Handle Firebase errors specifically
+        if (data.code && data.code.startsWith('auth/')) {
+          const firebaseError = handleFirebaseError({ 
+            code: data.code, 
+            message: data.message 
+          });
+          throw new Error(firebaseError.message);
+        }
         throw new Error(data.message || 'Authentication failed');
       }
 
@@ -243,15 +256,36 @@ const SignIn = () => {
       // Close any existing alert
       Swal.close();
       
-      // Show error message
+      // Show error message with custom styling
       Swal.fire({
         icon: 'error',
         title: 'Login Failed',
-        text: error.message,
+        text: error.message || 'An unexpected error occurred',
         customClass: {
-          popup: 'animated fadeInUp'
+          popup: 'animated fadeInUp error-popup'
+        },
+        showClass: {
+          popup: 'animate__animated animate__fadeInUp'
+        },
+        hideClass: {
+          popup: 'animate__animated animate__fadeOutDown'
         }
       });
+
+      // Optional: Show toast notification for specific errors
+      if (error.code === 'auth/network-request-failed') {
+        toast.error('Network connection issue. Please check your internet connection.', {
+          duration: 4000,
+          position: 'top-right',
+          style: {
+            background: '#FEE2E2',
+            color: '#DC2626',
+            border: '1px solid #DC2626',
+          },
+        });
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -652,6 +686,59 @@ const SignIn = () => {
 
         .fadeInUp {
           animation-name: fadeInUp;
+        }
+
+        /* Error Popup Styles */
+        .error-popup {
+          background: linear-gradient(to right, #fff5f5, #fff);
+          border-left: 4px solid #dc2626;
+          padding: 1.5rem;
+        }
+
+        .error-popup .swal2-title {
+          color: #dc2626 !important;
+          font-size: 1.25rem !important;
+        }
+
+        .error-popup .swal2-content {
+          color: #4b5563;
+        }
+
+        .error-popup .swal2-icon {
+          border-color: #dc2626;
+          color: #dc2626;
+        }
+
+        /* Toast Notification Styles */
+        .toast-error {
+          background: linear-gradient(to right, #fff5f5, #fff) !important;
+          border-left: 4px solid #dc2626 !important;
+          color: #dc2626 !important;
+          font-weight: 500 !important;
+          padding: 1rem !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                      0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        }
+
+        /* Error Input Styles */
+        .input-error {
+          border-color: #dc2626 !important;
+          background-color: #fff5f5 !important;
+        }
+
+        .input-error:focus {
+          box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+        }
+
+        /* Error Message Animation */
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .shake {
+          animation: shake 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
         }
       `}</style>
     </Fragment>
