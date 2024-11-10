@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Row, Col, Table, Button, Modal, Form, Alert, InputGroup } from 'react-bootstrap';
-import { Eye, MapPin, Search, CaretUpFill, CaretDownFill } from 'react-bootstrap-icons';
+import { Eye, PinMap, Search, CaretUpFill, CaretDownFill } from 'react-bootstrap-icons';
 import { toast } from 'react-toastify';
 
 const headerStyle = {
@@ -221,7 +221,7 @@ export const ServiceLocationTab = ({ customerData }) => {
               Close
             </Button>
             <Button variant="primary" onClick={() => handleViewOnMap(selectedLocation)}>
-              <MapPin size={16} className="me-1" /> View on Map
+              <PinMap size={16} className="me-1" /> View on Map
             </Button>
           </Modal.Footer>
         </Modal>
