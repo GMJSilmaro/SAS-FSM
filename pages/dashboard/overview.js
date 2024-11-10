@@ -2122,7 +2122,7 @@ const Overview = () => {
 
             <div className="d-flex gap-3 align-items-center">
               {/* Search Container */}
-              <div className={styles.searchContainer}>
+              {/* <div className={styles.searchContainer}>
                 <Form onSubmit={handleSearchSubmit}>
                   <InputGroup>
                     <Form.Control
@@ -2156,7 +2156,7 @@ const Overview = () => {
                     </Button>
                   </InputGroup>
                 </Form>
-              </div>
+              </div> */}
 
               {/* Action Buttons */}
               <div className="d-flex gap-3">
