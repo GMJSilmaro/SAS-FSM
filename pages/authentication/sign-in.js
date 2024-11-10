@@ -195,8 +195,13 @@ const SignIn = () => {
               credentials: 'include'
             });
 
+            if (!response.ok) {
+              // Extract error message from response if available
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.message || 'Authentication failed');
+            }
+
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Authentication failed');
 
             // Simulate SAP B1 Service Layer connection steps
             for (let i = 1; i < loadingMessages.length; i++) {
@@ -288,19 +293,40 @@ const SignIn = () => {
             });
 
           } catch (error) {
-            throw error; // Re-throw to be caught by outer catch block
+            console.error('❌ Authentication error:', error);
+            Swal.close(); // Close the loading modal
+            
+            // Show error message
+            await Swal.fire({
+              icon: 'error',
+              title: 'Authentication Failed',
+              text: error.message || 'Unable to connect to the server. Please try again.',
+              confirmButtonText: 'Try Again',
+              showCancelButton: true,
+              cancelButtonText: 'Need Help?',
+              customClass: {
+                popup: 'shadow-lg',
+                confirmButton: 'btn btn-primary px-4 me-2',
+                cancelButton: 'btn btn-outline-secondary px-4'
+              },
+              buttonsStyling: false
+            });
+            
+            setIsLoading(false); // Make sure to reset loading state
           }
         }
       });
 
     } catch (error) {
-      console.error('❌ Authentication error:', error.message);
+      console.error('❌ Authentication error:', error);
+      setIsLoading(false); // Reset loading state
       
+      // Show error message
       Swal.fire({
         icon: 'error',
         iconColor: '#dc3545',
         title: 'Authentication Failed',
-        text: 'Unable to establish connection with SAP Business One. Please try again.',
+        text: error.message || 'Unable to establish connection with SAP Business One. Please try again.',
         showConfirmButton: true,
         showCancelButton: true,
         confirmButtonText: 'Try Again',
@@ -311,39 +337,9 @@ const SignIn = () => {
           cancelButton: 'btn btn-outline-secondary px-4'
         },
         buttonsStyling: false
-      }).then((result) => {
-        if (result.dismiss === Swal.DismissReason.cancel) {
-          Swal.fire({
-            title: 'Connection Troubleshooting',
-            html: `
-              <div class="text-start">
-                <p class="mb-3">Common connection issues:</p>
-                <ul class="list-unstyled text-muted">
-                  <li class="mb-2">✓ Check your network connection</li>
-                  <li class="mb-2">✓ Verify SAP server status</li>
-                  <li class="mb-2">✓ Confirm your credentials</li>
-                  <li class="mb-2">✓ Check VPN connection if required</li>
-                </ul>
-                <div class="alert alert-info mt-3">
-                  <i class="fas fa-info-circle me-2"></i>
-                  Contact IT Support:
-                  <a href="mailto:support@company.com" class="d-block mt-1">
-                    support@company.com
-                  </a>
-                </div>
-              </div>
-            `,
-            showConfirmButton: true,
-            confirmButtonText: 'Close',
-            customClass: {
-              popup: 'shadow-lg',
-              confirmButton: 'btn btn-primary px-4'
-            },
-            buttonsStyling: false
-          });
-        }
       });
     } finally {
+      // Ensure loading state is always reset
       setIsLoading(false);
     }
   };
