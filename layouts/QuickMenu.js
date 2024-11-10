@@ -29,6 +29,7 @@ import {
   deleteDoc,
   limit,
   orderBy,
+  getDoc,
 } from "firebase/firestore";
 import DotBadge from "components/bootstrap/DotBadge";
 import { format } from "date-fns";
@@ -911,6 +912,36 @@ const QuickMenu = ({ children }) => {
     });
   };
 
+  // Add this state at the top with other states
+  const [followUpTypes, setFollowUpTypes] = useState([]);
+
+  // Update the fetchFollowUpTypes function
+  const fetchFollowUpTypes = async () => {
+    try {
+      const settingsRef = doc(db, 'settings', 'followUp');
+      const settingsDoc = await getDoc(settingsRef);
+      
+      console.log('Raw followUp settings:', settingsDoc.data());
+      
+      if (settingsDoc.exists() && settingsDoc.data().types) {
+        const types = settingsDoc.data().types;
+        const processedTypes = Object.entries(types).map(([id, type]) => ({
+          id,
+          ...type
+        }));
+        console.log('Processed follow-up types:', processedTypes);
+        setFollowUpTypes(processedTypes);
+      }
+    } catch (error) {
+      console.error('Error fetching follow-up types:', error);
+    }
+  };
+
+  // Add this useEffect to fetch types when component mounts
+  useEffect(() => {
+    fetchFollowUpTypes();
+  }, []);
+
   return (
     <Fragment>
       <ListGroup
@@ -1002,16 +1033,30 @@ const QuickMenu = ({ children }) => {
                         <div className="mb-3">
                           <small className="text-muted d-block mb-2">Type</small>
                           <div className="d-flex gap-2 flex-wrap">
-                            {['all', 'Appointment', 'Repair', 'Contract', 'VerifyCustomer'].map(type => (
+                            <Badge
+                              key="all"
+                              bg={filters.type === 'all' ? 'primary' : 'light'}
+                              text={filters.type === 'all' ? 'white' : 'dark'}
+                              className="px-3 py-2 cursor-pointer"
+                              onClick={() => handleFilterChange('type', 'all')}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              All Types
+                            </Badge>
+                            {followUpTypes.map(type => (
                               <Badge
-                                key={type}
-                                bg={filters.type === type ? 'primary' : 'light'}
-                                text={filters.type === type ? 'white' : 'dark'}
+                                key={type.id}
+                                bg={filters.type === type.name ? 'primary' : 'light'}
+                                text={filters.type === type.name ? 'white' : 'dark'}
                                 className="px-3 py-2 cursor-pointer"
-                                onClick={() => handleFilterChange('type', type)}
-                                style={{ cursor: 'pointer' }}
+                                onClick={() => handleFilterChange('type', type.name)}
+                                style={{ 
+                                  cursor: 'pointer',
+                                  backgroundColor: filters.type === type.name ? 'primary' : type.color,
+                                  color: filters.type === type.name ? 'white' : 'black'
+                                }}
                               >
-                                {type === 'all' ? 'All Types' : type}
+                                {type.name}
                               </Badge>
                             ))}
                           </div>

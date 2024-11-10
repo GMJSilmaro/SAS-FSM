@@ -11,7 +11,7 @@ import {
   Table,
   Dropdown
 } from 'react-bootstrap';
-import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { format } from 'date-fns';
 import { FaFilter, FaEllipsisV } from 'react-icons/fa';
@@ -31,6 +31,7 @@ const FollowUpsPage = () => {
   });
   const [workers, setWorkers] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [followUpTypes, setFollowUpTypes] = useState([]);
 
   // Fetch workers for filter dropdown
   useEffect(() => {
@@ -147,6 +148,47 @@ const FollowUpsPage = () => {
     return <Badge bg={statusColors[status] || 'secondary'}>{status}</Badge>;
   };
 
+  // Add function to fetch follow-up types
+  const fetchFollowUpTypes = async () => {
+    try {
+      const settingsRef = doc(db, 'settings', 'followUp');
+      const settingsDoc = await getDoc(settingsRef);
+      
+      if (settingsDoc.exists() && settingsDoc.data().types) {
+        const types = settingsDoc.data().types;
+        setFollowUpTypes(Object.entries(types).map(([id, type]) => ({
+          id,
+          ...type
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching follow-up types:', error);
+    }
+  };
+
+  // Add useEffect to fetch types
+  useEffect(() => {
+    fetchFollowUpTypes();
+  }, []);
+
+  // Add this helper function
+  const getTypeWithColor = (typeName) => {
+    const type = followUpTypes.find(t => t.name === typeName);
+    return type ? (
+      <div className="d-flex align-items-center gap-2">
+        <div 
+          style={{ 
+            width: '12px', 
+            height: '12px', 
+            borderRadius: '50%', 
+            backgroundColor: type.color 
+          }} 
+        />
+        {typeName}
+      </div>
+    ) : typeName;
+  };
+
   return (
     <Container fluid className="px-6 py-4">
       <Row className="align-items-center justify-content-between g-3 mb-4">
@@ -187,10 +229,11 @@ const FollowUpsPage = () => {
               style={{ width: '150px' }}
             >
               <option value="all">All Types</option>
-              <option value="Appointment">Appointment</option>
-              <option value="Repair">Repair</option>
-              <option value="Contract">Contract</option>
-              <option value="VerifyCustomer">Verify Customer</option>
+              {followUpTypes.map(type => (
+                <option key={type.id} value={type.name}>
+                  {type.name}
+                </option>
+              ))}
             </Form.Select>
 
             <Form.Control
@@ -274,7 +317,7 @@ const FollowUpsPage = () => {
                         {followUp.customerName}
                       </a>
                     </td>
-                    <td>{followUp.type}</td>
+                    <td>{getTypeWithColor(followUp.type)}</td>
                     <td>{getStatusBadge(followUp.status)}</td>
                     <td>
                       <Badge bg={followUp.priority === 'High' ? 'danger' : 

@@ -217,13 +217,14 @@ const Settings = () => {
 useEffect(() => {
   const fetchSettings = async () => {
     try {
-      const settingsRef = doc(db, "settings", "followUps");
+      const settingsRef = doc(db, "settings", "followUp");
       const settingsDoc = await getDoc(settingsRef);
       
-      console.log('Fetched follow-up settings:', settingsDoc.data());
+      console.log('Raw Firestore data:', settingsDoc.data());
       
       if (settingsDoc.exists()) {
         setFollowUpSettings(settingsDoc.data());
+        console.log('Settings updated:', settingsDoc.data());
       } else {
         console.log('No settings document found');
       }
@@ -998,13 +999,9 @@ useEffect(() => {
         return (
           <div className={styles.followUpContainer}>
             <Row>
-              {/* Follow-Up Types Section */}
-              <Col  className="mb-4">
+              <Col className="mb-4">
                 <Card className={styles.taskCard}>
-                  <Card.Header className={styles.cardHeader}>
-                    <h6 className="mb-0">Follow-Up Types</h6>
-                    <small className="text-muted">Manage different types of follow-up tasks</small>
-                  </Card.Header>
+                 
                   <Card.Body className={styles.cardBody}>
                     {/* Add New Type Form */}
                     <div className={styles.addTypeForm}>
@@ -1028,29 +1025,7 @@ useEffect(() => {
                           variant="primary" 
                           onClick={handleAddType}
                           disabled={isSaving}
-                          style={{
-                            backgroundColor: "#3b82f6",
-                            border: "none",
-                            borderRadius: "12px",
-                            color: "white",
-                            padding: "10px 20px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            transition: "all 0.2s ease",
-                            fontWeight: "500",
-                            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                            width: "100%",
-                            justifyContent: "center"
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = "translateY(-2px)";
-                            e.currentTarget.style.boxShadow = "0 6px 8px rgba(0, 0, 0, 0.15)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
-                          }}
+                          className={styles.addButton}
                         >
                           <FaPlus size={16} /> Add Type
                         </Button>
@@ -1059,7 +1034,7 @@ useEffect(() => {
 
                     {/* Types List */}
                     <div className={styles.typesList}>
-                      {Object.entries(followUpSettings?.types || {}).map(([typeId, type]) => (
+                      {followUpSettings?.types && Object.entries(followUpSettings.types).map(([typeId, type]) => (
                         <div key={typeId} className={styles.typeItem}>
                           {editingType?.id === typeId ? (
                             // Edit mode
@@ -1090,7 +1065,7 @@ useEffect(() => {
                                 onClick={() => handleUpdateType(typeId)}
                                 className="px-3"
                               >
-                                Save
+                                <FaCheck />
                               </Button>
                               <Button
                                 variant="secondary"
@@ -1098,12 +1073,12 @@ useEffect(() => {
                                 onClick={() => setEditingType(null)}
                                 className="px-3"
                               >
-                                Cancel
+                                <FaTimes />
                               </Button>
                             </div>
                           ) : (
                             // View mode
-                            <>
+                            <div className="d-flex justify-content-between align-items-center w-100">
                               <div className="d-flex align-items-center gap-2">
                                 <div 
                                   className={styles.colorBox} 
@@ -1129,7 +1104,7 @@ useEffect(() => {
                                   <FaTrash />
                                 </Button>
                               </div>
-                            </>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -1137,7 +1112,6 @@ useEffect(() => {
                   </Card.Body>
                 </Card>
               </Col>
-
             </Row>
           </div>
         );
@@ -1155,7 +1129,7 @@ useEffect(() => {
   // Add function to fetch follow-up settings
   const fetchFollowUpSettings = async () => {
     try {
-      const settingsRef = doc(db, "settings", "followUps");
+      const settingsRef = doc(db, "settings", "followUp");
       const settingsDoc = await getDoc(settingsRef);
       
       console.log('Fetched follow-up settings:', settingsDoc.data());
@@ -1620,7 +1594,7 @@ useEffect(() => {
 
       const loadingToast = toast.loading('Adding type...');
       
-      const settingsRef = doc(db, 'settings', 'followUps');
+      const settingsRef = doc(db, 'settings', 'followUp');
       
       const updatedTypes = {
         ...followUpSettings.types,
@@ -1660,22 +1634,30 @@ useEffect(() => {
     try {
       const loadingToast = toast.loading('Deleting type...');
       
-      if (!followUpSettings?.types?.[typeId]) {
+      // Reference to the followUp document
+      const settingsRef = doc(db, 'settings', 'followUp');
+      
+      // Get current data
+      const currentDoc = await getDoc(settingsRef);
+      if (!currentDoc.exists()) {
         toast.dismiss(loadingToast);
-        toast.error('Type not found');
+        toast.error('Settings document not found');
         return;
       }
 
-      const updatedTypes = { ...followUpSettings.types };
+      // Create a copy of the current types
+      const currentData = currentDoc.data();
+      const updatedTypes = { ...currentData.types };
+      
+      // Delete the specific type
       delete updatedTypes[typeId];
 
-      const settingsRef = doc(db, 'settings', 'followUps');
-
-      await setDoc(settingsRef, {
-        ...followUpSettings,
+      // Update the document with the new types object
+      await updateDoc(settingsRef, {
         types: updatedTypes
-      }, { merge: true });
+      });
 
+      // Update local state
       setFollowUpSettings(prev => ({
         ...prev,
         types: updatedTypes
@@ -1683,6 +1665,7 @@ useEffect(() => {
 
       toast.dismiss(loadingToast);
       toast.success('Type deleted successfully');
+      
     } catch (error) {
       console.error('Error deleting type:', error);
       toast.error(`Failed to delete type: ${error.message}`);
@@ -1693,7 +1676,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchFollowUpSettings = async () => {
       try {
-        const settingsDoc = await getDoc(doc(db, 'settings', 'followUps'));
+        const settingsDoc = await getDoc(doc(db, 'settings', 'followUp'));
         if (settingsDoc.exists()) {
           setFollowUpSettings(settingsDoc.data());
         }
@@ -1804,7 +1787,7 @@ useEffect(() => {
       };
 
       // Update Firestore
-      const settingsRef = doc(db, 'settings', 'followUps');
+      const settingsRef = doc(db, 'settings', 'followUp');
       await setDoc(settingsRef, {
         ...followUpSettings,
         types: updatedTypes

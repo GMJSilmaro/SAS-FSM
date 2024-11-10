@@ -1812,6 +1812,19 @@ const JobDetails = () => {
                     >
                       Job #{job.jobNo}
                     </h1>
+                    <div 
+                      className="d-flex align-items-center gap-2 mb-2"
+                      style={{
+                        fontSize: "13px", // Changed from 14px to 12px
+                        color: "rgba(255, 255, 255, 0.8)",
+                      }}
+                    >
+                      <PersonFill size={12} /> {/* Also reduced icon size from 14 to 12 */}
+                      <span>Created by: {job.createdBy?.fullName || "System User"}</span>
+                      <span className="mx-2">•</span>
+                      <Calendar4 size={12} /> {/* Also reduced icon size from 14 to 12 */}
+                      <span>Created: {formatDateTime(job.createdAt)}</span>
+                    </div>
                     <p
                       className="mb-2"
                       style={{
