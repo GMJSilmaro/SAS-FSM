@@ -9,4 +9,3 @@ fb-admin-key.json
 .env.test
 .env.staging
 
-*.json
