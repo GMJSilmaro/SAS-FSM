@@ -721,10 +721,10 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   useEffect(() => {
     console.log(
       "Initial Job Equipments:",
-      initialJobData?.equipments.map((e) => ({
+      initialJobData?.equipments?.map((e) => ({
         serialNo: e.serialNo,
         modelSeries: e.modelSeries,
-      }))
+      })) || []
     );
 
     console.log(
@@ -735,7 +735,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       }))
     );
 
-    const syncedEquipments = initialJobData.equipments
+    const syncedEquipments = (initialJobData?.equipments || [])
       .map((equipment) => {
         const matchingEquipment = equipments.find((e) => {
           const isMatch =
