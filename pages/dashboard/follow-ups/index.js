@@ -265,12 +265,12 @@ const FollowUpsPage = () => {
                   <tr key={followUp.id}>
                     <td>{followUp.id}</td>
                     <td>
-                      <a href={`/dashboard/jobs/${followUp.jobID}`}>
+                      <a href={`/jobs/${followUp.jobID}`}>
                         #{followUp.jobID}
                       </a>
                     </td>
                     <td>
-                      <a href={`/dashboard/customers/${followUp.customerID}`}>
+                      <a href={`/customers/${followUp.customerID}`}>
                         {followUp.customerName}
                       </a>
                     </td>
