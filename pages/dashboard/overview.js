@@ -1276,25 +1276,39 @@ const Overview = () => {
   // Modified fetchUserDetails function
   const fetchUserDetails = async () => {
     try {
-      // First check localStorage
-      const cachedUser = localStorage.getItem("userDetails");
-      if (cachedUser) {
-        const userData = JSON.parse(cachedUser);
-        const cacheTime = localStorage.getItem("userDetailsCacheTime");
-        const cacheAge = Date.now() - parseInt(cacheTime);
+      // Get current email from cookie
+      const currentEmail = Cookies.get("email");
+      
+      // Get cached email
+      const cachedEmail = localStorage.getItem("cachedEmail");
 
-        if (cacheAge < 24 * 60 * 60 * 1000) {
-          console.log("Using cached user details:", userData);
-          setUserDetails(userData);
-          return;
+      // If email changed or no cached email, clear cached user details
+      if (!cachedEmail || currentEmail !== cachedEmail) {
+        localStorage.removeItem("userDetails");
+        localStorage.removeItem("userDetailsCacheTime");
+        localStorage.removeItem("cachedEmail");
+      }
+
+      // Check localStorage only if emails match
+      if (currentEmail === cachedEmail) {
+        const cachedUser = localStorage.getItem("userDetails");
+        if (cachedUser) {
+          const userData = JSON.parse(cachedUser);
+          const cacheTime = localStorage.getItem("userDetailsCacheTime");
+          const cacheAge = Date.now() - parseInt(cacheTime);
+
+          if (cacheAge < 24 * 60 * 60 * 1000) {
+            console.log("Using cached user details:", userData);
+            setUserDetails(userData);
+            return;
+          }
         }
       }
 
       // If no cache or cache expired, fetch from Firebase
-      const email = Cookies.get("email");
-      if (email) {
+      if (currentEmail) {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", email));
+        const q = query(usersRef, where("email", "==", currentEmail));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
@@ -1312,19 +1326,24 @@ const Overview = () => {
           const updatedUserData = updatedUserSnap.data();
           console.log("Updated user details with last login:", updatedUserData);
 
-          // Store in localStorage with timestamp
+          // Store in localStorage with timestamp and email
           localStorage.setItem("userDetails", JSON.stringify(updatedUserData));
           localStorage.setItem("userDetailsCacheTime", Date.now().toString());
+          localStorage.setItem("cachedEmail", currentEmail);
           setUserDetails(updatedUserData);
+        } else {
+          // No user found for email
+          console.log("No user found for email:", currentEmail);
+          setUserDetails(null);
         }
+      } else {
+        // No email in cookies
+        console.log("No email found in cookies");
+        setUserDetails(null);
       }
     } catch (error) {
       console.error("Error fetching user details:", error);
-      // If error, try to use cached data as fallback
-      const cachedUser = localStorage.getItem("userDetails");
-      if (cachedUser) {
-        setUserDetails(JSON.parse(cachedUser));
-      }
+      setUserDetails(null);
     }
   };
 
@@ -2092,6 +2111,13 @@ const Overview = () => {
       ],
     });
   };
+
+  // Add this useEffect to clear user details when component unmounts
+  useEffect(() => {
+    return () => {
+      setUserDetails(null);
+    };
+  }, []);
 
   return (
     <div className="dashboard-wrapper">
