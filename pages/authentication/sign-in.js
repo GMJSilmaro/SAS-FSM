@@ -142,10 +142,11 @@ const SignIn = () => {
     e.preventDefault();
     setIsLoading(true);
     let currentIndex = 0;
+    let loadingAlert;
 
     try {
-      // Show the first loading message
-      const loadingAlert = Swal.fire({
+      // Store the Swal instance in a variable
+      loadingAlert = await Swal.fire({
         title: loadingMessages[0].title,
         html: `
           <div class="progress mb-3" style="height: 6px;">
@@ -156,28 +157,33 @@ const SignIn = () => {
         allowOutsideClick: false,
         showConfirmButton: false,
         didOpen: () => {
-          // Update loading messages every 1.5 seconds
           const interval = setInterval(() => {
             currentIndex = (currentIndex + 1) % loadingMessages.length;
             const currentMessage = loadingMessages[currentIndex];
             
-            Swal.update({
-              title: currentMessage.title,
-              html: `
-                <div class="progress mb-3" style="height: 6px;">
-                  <div class="progress-bar" role="progressbar" style="width: ${currentMessage.progress}%" aria-valuenow="${currentMessage.progress}" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-                <p class="mb-0">${currentMessage.message}</p>
-              `
-            });
+            // Check if the alert is still open before updating
+            if (Swal.isVisible()) {
+              Swal.update({
+                title: currentMessage.title,
+                html: `
+                  <div class="progress mb-3" style="height: 6px;">
+                    <div class="progress-bar" role="progressbar" style="width: ${currentMessage.progress}%" aria-valuenow="${currentMessage.progress}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                  <p class="mb-0">${currentMessage.message}</p>
+                `
+              });
+            }
           }, 1500);
 
-          // Store the interval ID in Swal instance
+          // Store the interval ID
           Swal.intervalId = interval;
         },
         willClose: () => {
           // Clear the interval when the alert is closed
-          clearInterval(Swal.intervalId);
+          if (Swal.intervalId) {
+            clearInterval(Swal.intervalId);
+            Swal.intervalId = null;
+          }
         }
       });
 
@@ -251,13 +257,17 @@ const SignIn = () => {
 
     } catch (error) {
       console.error('Login error:', error);
-      setIsLoading(false);
       
-      // Close any existing alert
-      Swal.close();
+      // Ensure loading alert is closed and interval is cleared
+      if (loadingAlert) {
+        await Swal.close();
+      }
       
-      // Show error message with custom styling
-      Swal.fire({
+      // Small delay before showing error message
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Show error message
+      await Swal.fire({
         icon: 'error',
         title: 'Login Failed',
         text: error.message || 'An unexpected error occurred',
@@ -269,7 +279,9 @@ const SignIn = () => {
         },
         hideClass: {
           popup: 'animate__animated animate__fadeOutDown'
-        }
+        },
+        allowOutsideClick: true,
+        confirmButtonText: 'OK'
       });
 
       // Optional: Show toast notification for specific errors
@@ -285,7 +297,14 @@ const SignIn = () => {
         });
       }
     } finally {
+      // Ensure loading state is reset
       setIsLoading(false);
+      
+      // Clear any remaining intervals
+      if (Swal.intervalId) {
+        clearInterval(Swal.intervalId);
+        Swal.intervalId = null;
+      }
     }
   };
 
