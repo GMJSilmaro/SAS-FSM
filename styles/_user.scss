@@ -19,6 +19,7 @@
 @import '@syncfusion/ej2-react-grids/styles/bootstrap5.css';
 
 @import '@syncfusion/ej2-react-schedule/styles/bootstrap5.3.css';
+@import '../node_modules/animate.css/animate.css';
 
 .container {
     width: 100%;
@@ -445,65 +446,762 @@
     }
   }
 
-  /* Add these styles to your CSS file */
+//// DASHBOARD /////
+/// 
+/// /* Dashboard.css */
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animated {
+  animation-duration: 0.5s;
+  animation-fill-mode: both;
+}
+
+.fadeInDown {
+  animation-name: fadeInDown;
+}
+
+////////
+/// 
+/// 
+.dashboard-container {
+  background-color: #f8f9fc;
+  min-height: 100vh;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.search-input:focus {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  box-shadow: none;
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.stat-card:hover .card-icon {
+  transform: scale(1.1);
+}
+
+.chart-card {
+  transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-3px);
+}
+
+/* Add smooth transitions */
+.time-filter-button, 
+.view-toggle-button {
+  transition: all 0.3s ease;
+}
+
+/* Add custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.swal2-title-custom {
+  padding: 0 !important;
+  margin-bottom: 0.5em !important;
+}
+
+.swal2-container-custom {
+  backdrop-filter: blur(5px);
+}
+
+// Global Search Styles
+.search-container {
+  position: relative;
+  width: 100%;
+  
+  .search-input {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid #e3e6f0;
+    border-radius: 0.35rem;
+    transition: border-color 0.15s ease-in-out;
+    
+    &:focus {
+      outline: none;
+      border-color: #4e73df;
+    }
+  }
+
+  .clear-button {
+    position: absolute;
+    right: 4.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    color: #858796;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease-in-out;
+
+    &:hover {
+      color: #4e73df;
+    }
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  .search-button {
+    min-width: 40px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    padding: 0.4rem 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #333;
+    font-weight: 500;
+    margin-left: 8px;
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+      background: white;
+    }
+
+    &:disabled {
+      background: #e9ecef;
+      cursor: not-allowed;
+    }
+  }
+  
+  .search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    margin-top: 0.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    max-height: 400px;
+    overflow-y: auto;
+    
+    // Custom scrollbar
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #dee2e6;
+      border-radius: 8px;
+      
+      &:hover {
+        background: #adb5bd;
+      }
+    }
+
+    .list-group-item {
+      padding: 0.75rem 1rem;
+      border-left: none;
+      border-right: none;
+      transition: all 0.2s ease;
+      
+      &:first-child {
+        border-top: none;
+      }
+      
+      &:last-child {
+        border-bottom: none;
+      }
+      
+      &:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+      }
+      
+      .text-body {
+        font-weight: 500;
+        color: #2c3e50;
+        margin-bottom: 0.25rem;
+      }
+      
+      small {
+        color: #6c757d;
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+// Navbar-specific search styles
+.navbar {
+  .search-container {
+    background: white;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 300px;
+    margin-right: 20px;
+    display: flex;
+    align-items: center;
+    
+    .search-input {
+      background: white;
+      border: 1px solid #e3e6f0;
+      color: #333;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      outline: none;
+      width: 250px;
+      flex: none;
+
+      &::placeholder {
+        color: #6c757d;
+      }
+
+      &:focus {
+        border-color: #e3e6f0;
+        box-shadow: none;
+      }
+    }
+
+    .search-button {
+      margin-left: auto;
+      flex: none;
+    }
+  }
+
+  // Search results dropdown
+  .search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    width: 300px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Overview-specific search styles
+.dashboard-container {
+  .search-container {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 4px;
+    
+    .search-input {
+      background: transparent;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      width: 280px;
+      font-size: 0.875rem;
+      outline: none;
+      
+      &:focus {
+        outline: none;
+        box-shadow: none;
+        border: none;
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    .search-button {
+      background: rgba(255, 255, 255, 0.2) !important;
+      border: none !important;
+      color: white !important;
+      padding: 8px 16px;
+      border-radius: 6px;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.3) !important;
+      }
+    }
+  }
+}
+
+// Update the search results dropdown styles
+.navbar {
+  .search-container {
+    position: relative;
+    
+    .search-results-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 4px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1050;
+      width: 350px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      max-height: 300px;
+      overflow-y: auto;
+      
+      // Custom scrollbar styling
+      &::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      &::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 8px;
+      }
+      
+      &::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 8px;
+        
+        &:hover {
+          background: #a8a8a8;
+        }
+      }
+
+      // Search result items
+      .search-result-item {
+        padding: 10px 16px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        
+        &:last-child {
+          border-bottom: none;
+        }
+        
+        &:hover {
+          background-color: #f8f9fa;
+        }
+      }
+    }
+  }
+}
+
+// Search Component Styles
+.search-container {
+  position: relative;
+  min-width: 300px;
+
+  .search-input {
+    width: 100%;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    border: 1px solid #e5e9f2;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    
+    &:focus {
+      outline: none;
+      border-color: #4e73df;
+      box-shadow: none;
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  .search-button {
+    min-width: 40px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    padding: 0.4rem 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #333;
+    font-weight: 500;
+    margin-left: 8px;
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+      background: white;
+    }
+
+    &:disabled {
+      background: #e9ecef;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Navbar-specific search styles
+.navbar {
+  .search-container {
+    background: white;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 300px;
+    margin-right: 20px;
+    display: flex;
+    align-items: center;
+    
+    .search-input {
+      background: white;
+      border: 1px solid #e3e6f0;
+      color: #333;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      outline: none;
+      width: 250px;
+      flex: none;
+
+      &::placeholder {
+        color: #6c757d;
+      }
+
+      &:focus {
+        border-color: #e3e6f0;
+        box-shadow: none;
+      }
+    }
+
+    .search-button {
+      margin-left: auto;
+      flex: none;
+    }
+  }
+}
+
+// Search Results Dropdown
+.search-results-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 0.35rem;
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+  margin-top: 0.25rem;
+  z-index: 1000;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  width: 350px;
+
+  .search-result-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+    transition: all 0.2s ease;
+    cursor: pointer;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: #f8f9fa;
+    }
+
+    .fw-medium {
+      color: #2c3e50;
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    small {
+      font-size: 0.8rem;
+    }
+  }
+
+  // Custom scrollbar
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 8px;
+
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}
+
+// Overview-specific search styles
+.dashboard-container {
+  .search-container {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 4px;
+    
+    .search-input {
+      background: transparent;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      width: 280px;
+      font-size: 0.875rem;
+      outline: none;
+      
+      &:focus {
+        outline: none;
+        box-shadow: none;
+        border: none;
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    .search-button {
+      background: rgba(255, 255, 255, 0.2) !important;
+      border: none !important;
+      color: white !important;
+      padding: 8px 16px;
+      border-radius: 6px;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.3) !important;
+      }
+    }
+  }
+}
+
+// Update the navbar search styles
+.navbar {
+  .search-container {
+    .form-control {
+      &:focus {
+        background-color: #fff;
+        box-shadow: none;
+        border-color: #e3e6f0;
+      }
+
+      &::placeholder {
+        color: #6e84a3;
+        font-size: 0.875rem;
+      }
+    }
+
+    .btn-primary {
+      background-color: #4e73df;
+      
+      &:hover:not(:disabled) {
+        background-color: #2e59d9;
+        transform: translateY(-1px);
+      }
+
+      &:disabled {
+        background-color: #b7c0d8;
+      }
+    }
+  }
+}
+
+
+
+// TABLE
+
 .table {
-  background-color: white;
-  border-radius: 8px;
-  overflow: hidden;
+  width: 100%;
+  margin-bottom: 1rem;
+  background-color: transparent;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.75rem;
+  vertical-align: middle;
+  border-top: 1px solid #e2e8f0;
 }
 
 .table thead th {
-  background-color: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
-  color: #495057;
+  vertical-align: bottom;
+  border-bottom: 2px solid #e2e8f0;
+  background-color: #f8fafc;
   font-weight: 600;
+  color: #475569;
 }
 
 .table tbody tr:hover {
-  background-color: #f8f9fa;
-  cursor: pointer;
+  background-color: #f1f5f9;
 }
 
-.badge {
-  padding: 8px 12px;
-  font-weight: 500;
-  border-radius: 6px;
+.table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.cursor-pointer {
-  cursor: pointer;
+
+/// SESSION
+/// 
+.session-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 0.5rem;
+  font-family: monospace;
+  font-size: 0.875rem;
 }
 
-/* Improve responsive behavior */
-@media (max-width: 768px) {
-  .table-responsive {
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+.session-timer span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+
+@keyframes pulseAndGlow {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3),
+                0 0 20px rgba(59, 130, 246, 0.1);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1);
   }
 }
-  
-.hover-shadow {
-  transition: all 0.2s ease-in-out;
+
+@keyframes rotatePlus {
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(90deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  75% {
+    transform: rotate(270deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-.hover-shadow:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-  cursor: pointer;
+.create-job-button:hover .plus-icon {
+  animation: rotatePlus 1s ease-in-out;
 }
 
-.search-results {
-  max-width: 900px;
-  margin: 0 auto;
+.create-job-button {
+  position: relative;
 }
 
-// Add this CSS
-.swal2-actions-custom {
-  gap: 0.1rem;  // Adds 16px space between buttons
+.create-job-button::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.3s ease;
 }
 
-// Alternative: if you prefer margin
-.swal2-actions-custom .btn:not(:last-child) {
-  margin-right: 1rem;
+.create-job-button:hover::after {
+  opacity: 0.1;
 }
-// /// COLOR!
+
+/* Add this to your CSS */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker {
+  font-family: 'Inter', sans-serif;
+}
+
+.react-datepicker__header {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.react-datepicker__current-month {
+  color: white;
+}
+
+.react-datepicker__day--selected {
+  background-color: #3b82f6;
+}
+
+.react-datepicker__day--in-range {
+  background-color: rgba(59, 130, 246, 0.1);
+}

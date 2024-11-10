@@ -9,9 +9,10 @@ import {
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 
-const CACHE_KEY = 'notifications';
-const CACHE_TIMESTAMP_KEY = 'notificationsTimestamp';
-const CACHE_DURATION = 300000; // 5 minutes
+const NOTIFICATION_CACHE_KEY = 'notifications_cache';
+const NOTIFICATION_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+const CACHE_KEY = 'notifications_cache';
+const DEFAULT_LIMIT = 10;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return Date.now();
@@ -39,10 +40,10 @@ const formatTimestamp = (timestamp) => {
 const serializeNotification = (notification) => {
   try {
     let timestamp;
-    console.log('Serializing notification timestamp:', notification.timestamp);
+   
 
     if (!notification.timestamp) {
-      console.log('No timestamp found, using current time');
+    
       timestamp = Date.now();
     } else if (notification.timestamp?.toDate) {
       timestamp = notification.timestamp.toDate().getTime();
@@ -51,7 +52,7 @@ const serializeNotification = (notification) => {
     } else if (typeof notification.timestamp === 'number') {
       timestamp = notification.timestamp;
     } else {
-      console.log('Using fallback timestamp');
+
       timestamp = Date.now();
     }
 
@@ -72,7 +73,7 @@ const serializeNotification = (notification) => {
 const deserializeNotification = (notification) => {
   try {
     const timestamp = notification.timestamp;
-    console.log('Deserializing timestamp:', timestamp);
+  
 
     return {
       ...notification,
@@ -96,29 +97,29 @@ const deserializeNotification = (notification) => {
   }
 };
 
-export const getNotifications = async (db, workerId, limitCount = 20) => {
+export const getNotifications = async (limitParam = DEFAULT_LIMIT) => {
   try {
-    // Check localStorage first
-    const cachedData = localStorage.getItem(CACHE_KEY);
-    const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+    // Convert limitParam to number if it's a string
+    const limit = parseInt(limitParam, 10) || DEFAULT_LIMIT;
     
-    if (cachedData && cachedTimestamp) {
-      const isExpired = Date.now() - parseInt(cachedTimestamp) > CACHE_DURATION;
-      if (!isExpired) {
-        console.log('Using cached notifications');
-        const parsedData = JSON.parse(cachedData);
-        return parsedData.map(deserializeNotification);
+    // Get cached notifications
+    const cachedData = localStorage.getItem(CACHE_KEY);
+    if (cachedData) {
+      const { notifications, timestamp } = JSON.parse(cachedData);
+      // Check if cache is still valid (e.g., less than 5 minutes old)
+      if (Date.now() - timestamp < 5 * 60 * 1000) {
+        return notifications.slice(0, limit);
       }
     }
 
-    // If no cache or expired, fetch from Firebase
-    console.log('Fetching fresh notifications from Firebase');
+    // If no cache or cache expired, fetch from server
     const notificationsRef = collection(db, "notifications");
     const q = query(
       notificationsRef,
-      where("workerId", "in", [workerId, "all"]),
+      where("workerId", "in", [workerID, "all"]),
+      where("hidden", "==", false),
       orderBy("timestamp", "desc"),
-      limit(limitCount)
+      limit(limit)
     );
 
     const querySnapshot = await getDocs(q);
@@ -127,12 +128,14 @@ export const getNotifications = async (db, workerId, limitCount = 20) => {
       ...doc.data()
     }));
 
-    // Serialize before caching
-    const serializedNotifications = notifications.map(serializeNotification);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(serializedNotifications));
-    localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-
-    return notifications;
+    // Cache the new results
+    const cacheData = {
+      notifications: notifications,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+    
+    return notifications.slice(0, limit);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return [];
@@ -152,7 +155,6 @@ export const updateNotificationCache = (notifications) => {
 export const invalidateNotificationCache = () => {
   try {
     localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
   } catch (error) {
     console.error('Error invalidating notification cache:', error);
   }

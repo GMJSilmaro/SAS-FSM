@@ -1,81 +1,65 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-import { renewSAPSession } from '../../utils/renewSAPSession';
 
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, query, where, collection, getDocs } from 'firebase/firestore';
-import { app } from '../../firebase'; 
-import jwt from 'jsonwebtoken';
-import https from 'https';
+import { app } from '../../firebase';
+import { serverLogActivity } from '../../utils/serverLogActivity';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { serialize } from 'cookie';
 
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Add this constant at the top level
 const COOKIE_OPTIONS = {
-  path: '/',
   secure: true,
   sameSite: 'lax',
-  maxAge: 30 * 60 // 30 minutes in seconds
+  maxAge: 30 * 60, // 30 minutes
+  httpOnly: true
 };
 
-// Fetch Firestore data by email to get workerId and user details
-async function fetchUserDataByEmail(email) {
-  const usersRef = collection(db, 'users');
-  const q = query(usersRef, where('email', '==', email)); 
-  
-  try {
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-      throw new Error('User not found in Firestore');
-    }
-    
-    const userData = querySnapshot.docs[0].data();
-    return userData;
-  } catch (error) {
-    throw new Error(`Error fetching user data: ${error.message}`);
-  }
-}
-
-export default async function handler(req, res) { 
-  const agent = new https.Agent({
-    rejectUnauthorized: false // Only for testing
+export default async function handler(req, res) {
+  console.log('🔐 Server: Login request received', {
+    method: req.method,
+    body: { email: req.body.email, passwordLength: req.body?.password?.length }
   });
-  const { email, password } = req.body;
 
   if (req.method !== 'POST') {
+    console.log('❌ Server: Invalid method:', req.method);
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
+  const { email, password } = req.body;
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  let workerId = null;
+
   try {
+    console.log('🔍 Server: Attempting Firebase authentication...');
+    
+    // Firebase Authentication
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    const { user } = userCredential;
+    
+    console.log('✅ Server: Firebase auth successful', {
+      uid: user.uid,
+      email: user.email
+    });
 
-    const userData = await fetchUserDataByEmail(email);
+    // Get user details from Firestore
+    console.log('📚 Server: Fetching Firestore user data...');
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', email));
+    const querySnapshot = await getDocs(q);
 
-    if (user.uid !== userData.uid) {
-      return res.status(403).json({ message: 'UID does not match the user data in Firestore.' });
+    if (querySnapshot.empty) {
+      console.log('❌ Server: User not found in Firestore');
+      return res.status(404).json({ message: 'User not found in database' });
     }
 
-    if (userData.activeUser === false) {
-      return res.status(403).json({ message: 'Account is not active. Please contact an administrator to renew.' });
-    }
+    const userData = querySnapshot.docs[0].data();
+    console.log('📋 Server: User data retrieved', {
+      workerId: userData.workerId,
+      role: userData.role
+    });
 
-    if (userData.expirationDate) {
-      const expirationDate = userData.expirationDate.toDate 
-        ? userData.expirationDate.toDate() 
-        : new Date(userData.expirationDate); 
-
-      const currentDate = new Date();
-      if (currentDate >= expirationDate) {
-        return res.status(403).json({ message: 'Account has expired. Please contact an administrator.' });
-      }
-    }
-
-    if (!userData.isAdmin) {
-      return res.status(403).json({ message: 'Access denied. Admins only.' });
-    }
-
-    console.log('Attempting SAP B1 connection test');
+    // SAP B1 Login
+    console.log('🔄 Server: Attempting SAP B1 login...');
     const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,184 +67,104 @@ export default async function handler(req, res) {
         CompanyDB: process.env.SAP_B1_COMPANY_DB,
         UserName: process.env.SAP_B1_USERNAME,
         Password: process.env.SAP_B1_PASSWORD
-      }),
-      agent: agent
+      })
     });
 
-    if (!sapLoginResponse.ok) {
-      const errorText = await sapLoginResponse.text();
-      throw new Error(`SAP B1 responded with status: ${sapLoginResponse.status}, message: ${errorText}`);
-    }
+    console.log('🔍 Server: SAP B1 response status:', sapLoginResponse.status);
 
     const sapLoginData = await sapLoginResponse.json();
-    console.log('SAP B1 connection successful');
-
     const sessionId = sapLoginData.SessionId;
-    const sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
-    
-    // Generate custom token
-    const token = { 
-      uid: user.uid, 
-      isAdmin: userData.isAdmin,
-      expirationDate: userData.expirationDate ? new Date(userData.expirationDate).toISOString() : null
-    };
-    const secretKey = process.env.JWT_SECRET_KEY || 'your_fallback_secret_key';
-    const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
+    const sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+    const customToken = await user.getIdToken();
 
-    // Set cookies using res.setHeader
-    res.setHeader('Set-Cookie', [
+    // Set all required cookies with proper configuration
+    const cookies = [
       `B1SESSION=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
-      `B1SESSION_EXPIRY=${sessionExpiryTime.toISOString()}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
+      `B1SESSION_EXPIRY=${sessionExpiryTime.toISOString()}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
       `ROUTEID=.node4; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
       `customToken=${customToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
       `uid=${user.uid}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
       `email=${email}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
       `workerId=${userData.workerId}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
-      `isAdmin=${userData.isAdmin}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
+      `isAdmin=${userData.role === 'admin'}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`,
       `LAST_ACTIVITY=${Date.now()}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`
-    ]);
+    ];
 
-    return res.status(200).json({
-      message: 'Login successful',
-      uid: user.uid,
-      email: user.email,
-      workerId: userData.workerId,
-      fullName: userData.fullName,
-      isAdmin: userData.isAdmin,
-      customToken,
-      sessionId
+    // Set cookies in response header
+    res.setHeader('Set-Cookie', cookies);
+
+    console.log('🔐 Server: Setting session cookies:', {
+      sessionId: sessionId.substring(0, 8) + '...',
+      expiryTime: sessionExpiryTime.toISOString()
     });
-    
+
+    // Log successful login
+    await serverLogActivity(userData.workerId, 'LOGIN_SUCCESS', {
+      email,
+      timestamp: new Date().toISOString(),
+      userDetails: {
+        workerId: userData.workerId,
+        isAdmin: userData.isAdmin === 'true',
+        role: userData.role
+      }
+    });
+
+    // Return success response with cookie information
+    return res.status(200).json({
+      success: true,
+      message: 'Authentication successful',
+      user: {
+        email,
+        workerId: userData.workerId,
+        uid: user.uid,
+        isAdmin: userData.role === 'admin'
+      },
+      cookies: cookies.map(cookie => {
+        const [name, value] = cookie.split('=');
+        return { name, value: value.split(';')[0] };
+      })
+    });
+
   } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ 
-      message: 'An error occurred during login', 
-      error: error.message 
+    console.error('❌ Server: Login error:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+
+    // Log SAP B1 login failure
+    await serverLogActivity(workerId || 'SYSTEM', 'SAP_B1_LOGIN_FAILED', {
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+
+    // Log login failure with detailed error
+    await serverLogActivity(workerId || 'SYSTEM', 'LOGIN_FAILED', {
+      email,
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      errorCode: error.code,
+      stack: error.stack
+    });
+
+    // Clear all cookies on error
+    const clearCookies = [
+      'B1SESSION',
+      'B1SESSION_EXPIRY',
+      'ROUTEID',
+      'customToken',
+      'uid',
+      'email',
+      'workerId',
+      'isAdmin',
+      'LAST_ACTIVITY'
+    ].map(name => `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
+
+    res.setHeader('Set-Cookie', clearCookies);
+
+    return res.status(401).json({
+      message: 'Authentication failed',
+      error: error.message
     });
   }
 }
-
-// process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-// import { renewSAPSession } from '../../utils/renewSAPSession';
-
-// import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-// import { getFirestore, query, where, collection, getDocs } from 'firebase/firestore';
-// import { app } from '../../firebase'; 
-// import jwt from 'jsonwebtoken';
-// import https from 'https';
-
-// const db = getFirestore(app);
-// const auth = getAuth(app);
-
-// // Fetch Firestore data by email to get workerId and user details
-// async function fetchUserDataByEmail(email) {
-//   const usersRef = collection(db, 'users');
-//   const q = query(usersRef, where('email', '==', email)); 
-  
-//   try {
-//     const querySnapshot = await getDocs(q);
-//     if (querySnapshot.empty) {
-//       throw new Error('User not found in Firestore');
-//     }
-    
-//     const userData = querySnapshot.docs[0].data();
-//     return userData;
-//   } catch (error) {
-//     throw new Error(`Error fetching user data: ${error.message}`);
-//   }
-// }
-
-// export default async function handler(req, res) { 
-//   const agent = new https.Agent({
-//     rejectUnauthorized: false // Only for testing
-//   });
-//   const { email, password } = req.body;
-
-//   if (req.method !== 'POST') {
-//     return res.status(405).json({ message: 'Method Not Allowed' });
-//   }
-
-//   try {
-//     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-//     const user = userCredential.user;
-
-//     const userData = await fetchUserDataByEmail(email);
-
-//     if (user.uid !== userData.uid) {
-//       return res.status(403).json({ message: 'UID does not match the user data in Firestore.' });
-//     }
-
-//     if (userData.activeUser === false) {
-//       return res.status(403).json({ message: 'Account is not active. Please contact an administrator to renew.' });
-//     }
-
-//     if (userData.expirationDate) {
-//       const expirationDate = userData.expirationDate.toDate 
-//         ? userData.expirationDate.toDate() 
-//         : new Date(userData.expirationDate); 
-
-//       const currentDate = new Date();
-//       if (currentDate >= expirationDate) {
-//         return res.status(403).json({ message: 'Account has expired. Please contact an administrator.' });
-//       }
-//     }
-
-//     if (!userData.isAdmin) {
-//       return res.status(403).json({ message: 'Access denied. Admins only.' });
-//     }
-
-//     console.log('Attempting SAP B1 connection test');
-//     const sapLoginResponse = await fetch(`${process.env.SAP_SERVICE_LAYER_BASE_URL}Login`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({
-//         CompanyDB: process.env.SAP_B1_COMPANY_DB,
-//         UserName: process.env.SAP_B1_USERNAME,
-//         Password: process.env.SAP_B1_PASSWORD
-//       }),
-//       agent: agent
-//     });
-
-//     if (!sapLoginResponse.ok) {
-//       const errorText = await sapLoginResponse.text();
-//       throw new Error(`SAP B1 responded with status: ${sapLoginResponse.status}, message: ${errorText}`);
-//     }
-
-//     const sapLoginData = await sapLoginResponse.json();
-//     console.log('SAP B1 connection successful');
-
-//     const sessionId = sapLoginData.SessionId;
-//     const sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
-    
-//     res.setHeader('Set-Cookie', [
-//       `B1SESSION=${sessionId}; HttpOnly; Secure; SameSite=None`,
-//       `ROUTEID=.node4; Secure; SameSite=None`,
-//       `B1SESSION_EXPIRY=${sessionExpiryTime.toISOString()}; HttpOnly; Secure; SameSite=None`
-//     ]);
-
-//     const token = { 
-//       uid: user.uid, 
-//       isAdmin: userData.isAdmin,
-//       expirationDate: userData.expirationDate ? new Date(userData.expirationDate).toISOString() : null
-//     };
-//     const secretKey = process.env.JWT_SECRET_KEY || 'your_fallback_secret_key';
-//     const customToken = jwt.sign(token, secretKey, { expiresIn: '30m' });
-    
-//     return res.status(200).json({
-//       message: 'Login successful',
-//       uid: user.uid,
-//       email: user.email,
-//       workerId: userData.workerId, 
-//       fullName: userData.fullName,
-//       isAdmin: userData.isAdmin,
-//       expirationDate: userData.expirationDate ? new Date(userData.expirationDate).toISOString() : null,
-//       customToken,
-//       sessionId,
-//     });
-    
-//   } catch (error) {
-//     console.error('Login error:', error);
-//     console.error('Error stack:', error.stack);
-//     return res.status(500).json({ message: 'An error occurred during login', error: error.message, stack: error.stack });
-//   }
-// }

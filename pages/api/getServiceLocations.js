@@ -1,6 +1,4 @@
 // pages/api/getServiceLocations.js
-import { renewSAPSession } from '../../utils/renewSAPSession';
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -9,12 +7,10 @@ export default async function handler(req, res) {
 
   let b1session = req.cookies.B1SESSION;
   let routeid = req.cookies.ROUTEID;
+  let sessionExpiry = req.cookies.B1SESSION_EXPIRY;
 
-  // Debug log cookies
-  console.log('Cookies received:', { b1session, routeid });
-
-  if (!b1session || !routeid) {
-    return res.status(401).json({ error: 'Missing session cookies' });
+  if (!b1session || !routeid || !sessionExpiry || Date.now() >= new Date(sessionExpiry).getTime()) {
+    return res.status(401).json({ error: 'Session expired or invalid' });
   }
 
   try {

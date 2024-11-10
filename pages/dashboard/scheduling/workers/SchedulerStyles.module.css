@@ -101,6 +101,16 @@
   color: #c62828;
 }
 
+.normal {
+  background-color: #e0f2fe;
+  color: #0284c7;
+}
+
+.low {
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
 .infoRow {
   display: flex;
   align-items: flex-start;
@@ -245,5 +255,28 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 1.5s linear infinite;
+}
+
+.backdrop-blur {
+  backdrop-filter: blur(8px);
+}
+
+.bg-clip-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.text-transparent {
+  color: transparent;
 }
 

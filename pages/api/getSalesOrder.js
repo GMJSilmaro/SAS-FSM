@@ -1,6 +1,6 @@
 // pages/api/getSalesOrder.js
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-import { renewSAPSession } from '../../utils/renewSAPSession';
+
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

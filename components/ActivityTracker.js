@@ -48,7 +48,7 @@ const ActivityTracker = () => {
     } catch (error) {
       console.error('Session renewal error:', error);
       toast.error('Session expired. Please login again.');
-      router.push('/authentication/sign-in');
+      router.push('/sign-in');
     } finally {
       renewalInProgress.current = false;
     }

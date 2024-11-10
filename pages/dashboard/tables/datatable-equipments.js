@@ -3,7 +3,7 @@ import { Col, Row, Card } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { Pagination } from 'sub-components';
 
-const EquipmentsTable = ({ equipments, onSelectedRowsChange }) => {
+const EquipmentsTable = ({ equipments, onSelectedRowsChange, initialSelected }) => {
 
   const customStyles = {
     headCells: {
@@ -39,6 +39,7 @@ const EquipmentsTable = ({ equipments, onSelectedRowsChange }) => {
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(equipments);
+  const [selectedRows, setSelectedRows] = useState(initialSelected || []);
 
   useEffect(() => {
     setFilter(equipments);
@@ -60,6 +61,12 @@ const EquipmentsTable = ({ equipments, onSelectedRowsChange }) => {
     });
     setFilter(result);
   }, [search, equipments]);
+
+  useEffect(() => {
+    if (initialSelected) {
+      setSelectedRows(initialSelected);
+    }
+  }, [initialSelected]);
 
   const subHeaderComponentMemo = useMemo(() => {
     return (

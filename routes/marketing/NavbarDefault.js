@@ -665,7 +665,7 @@ const NavbarDefault = [
 					{
 						id: uuid(),
 						menuitem: 'Go to Dashboard',
-						link: '/dashboard/overview',
+						link: '/',
 						type: 'button'
 					}
 				]
@@ -677,7 +677,7 @@ const NavbarDefault = [
 			{
 				id: uuid(),
 				menuitem: 'Sign In',
-				link: '/authentication/sign-in'
+				link: '/sign-in'
 			},
 			{
 				id: uuid(),

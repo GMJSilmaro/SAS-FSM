@@ -1,12 +1,13 @@
 import { getAuth } from 'firebase/auth';
 import { app } from '../../firebase';
+import { serverLogActivity } from '../../utils/serverLogActivity';
 
 const COOKIE_OPTIONS = {
   path: '/',
   secure: true,
   sameSite: 'lax',
   httpOnly: true,
-  expires: new Date(0) // Set to epoch time to expire immediately
+  expires: new Date(0)
 };
 
 export default async function handler(req, res) {
@@ -15,8 +16,16 @@ export default async function handler(req, res) {
   }
 
   const auth = getAuth(app);
+  const workerId = req.cookies.workerId;
 
   try {
+    // Log the start of logout process
+    await serverLogActivity(workerId, 'LOGOUT_INITIATED', {
+      timestamp: new Date().toISOString(),
+      userAgent: req.headers['user-agent'],
+      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress
+    });
+
     // Sign out from Firebase
     await auth.signOut();
 
@@ -37,7 +46,6 @@ export default async function handler(req, res) {
     const cookieStrings = cookiesToClear.map(cookieName => {
       const options = {
         ...COOKIE_OPTIONS,
-        // Only set httpOnly for sensitive cookies
         httpOnly: ['B1SESSION', 'B1SESSION_EXPIRY', 'customToken'].includes(cookieName)
       };
 
@@ -56,11 +64,27 @@ export default async function handler(req, res) {
             'Cookie': `B1SESSION=${b1Session}`
           }
         });
+
+        // Log successful SAP B1 logout
+        await serverLogActivity(workerId, 'SAP_B1_LOGOUT_SUCCESS', {
+          timestamp: new Date().toISOString(),
+          sessionId: b1Session.substring(0, 8) + '...' // Log only part of the session ID for security
+        });
       } catch (error) {
         console.warn('Failed to invalidate SAP B1 session:', error);
-        // Continue with logout even if session invalidation fails
+        // Log SAP B1 logout failure
+        await serverLogActivity(workerId, 'SAP_B1_LOGOUT_FAILED', {
+          timestamp: new Date().toISOString(),
+          error: error.message
+        });
       }
     }
+
+    // Log successful logout
+    await serverLogActivity(workerId, 'LOGOUT_SUCCESS', {
+      timestamp: new Date().toISOString(),
+      clearedCookies: cookiesToClear
+    });
 
     return res.status(200).json({ 
       message: 'Logout successful',
@@ -68,6 +92,13 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Logout error:', error);
+    
+    // Log logout failure
+    await serverLogActivity(workerId, 'LOGOUT_FAILED', {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      stack: error.stack
+    });
     
     // Attempt to clear cookies even if logout fails
     const emergencyCookieClear = [

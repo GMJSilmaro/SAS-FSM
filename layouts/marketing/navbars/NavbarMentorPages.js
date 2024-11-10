@@ -66,7 +66,7 @@ const NavbarMentorPages = ({ transparent }) => {
 							<div className="mt-3 mt-lg-0 d-flex align-items-center">
 								<DarkLightMode className="me-2" />
 								<Nav.Link
-									href="/authentication/sign-in/"
+									href="/sign-in"
 									bsPrefix="btn"
 									className="btn btn-outline-primary me-2"
 									as={Link}

@@ -1,7 +1,3 @@
-// pages/api/getLocations.js
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-import { renewSAPSession } from '../../utils/renewSAPSession';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -20,28 +16,6 @@ export default async function handler(req, res) {
 
   if (!b1session || !routeid || !sessionExpiry) {
     return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Check if session needs renewal
-  const currentTime = Date.now();
-  const expiryTime = new Date(sessionExpiry).getTime();
-  const fiveMinutesInMilliseconds = 5 * 60 * 1000;
-
-  if (expiryTime - currentTime <= fiveMinutesInMilliseconds) {
-    const renewalResult = await renewSAPSession(b1session, routeid);
-    if (renewalResult) {
-      b1session = renewalResult.newB1Session;
-      routeid = renewalResult.newRouteId;
-      sessionExpiry = renewalResult.newExpiryTime;
-      
-      res.setHeader('Set-Cookie', [
-        `B1SESSION=${b1session}; HttpOnly; Secure; SameSite=None`,
-        `ROUTEID=${routeid}; Secure; SameSite=None`,
-        `B1SESSION_EXPIRY=${sessionExpiry}; HttpOnly; Secure; SameSite=None`
-      ]);
-    } else {
-      return res.status(401).json({ error: 'Failed to renew session' });
-    }
   }
 
   try {
@@ -82,7 +56,8 @@ export default async function handler(req, res) {
       address: item.Address,
       city: item.City,
       countryName: item.CountryName,
-      zipCode: item.ZipCode
+      zipCode: item.ZipCode,
+      addressType: item.AdresType
     }));
 
     res.status(200).json(locations);
@@ -90,4 +65,4 @@ export default async function handler(req, res) {
     console.error('Error fetching locations:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+} 

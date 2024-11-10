@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Fragment, useCallback } from "react";
+import React, { useState, useEffect, useMemo, Fragment, useCallback, useRef } from "react";
 import {
   Row,
   Col,
@@ -14,11 +14,13 @@ import { useRouter } from "next/router";
 import { toast, ToastContainer } from "react-toastify";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../../firebase";
-import DataTable from "react-data-table-component";
+import { useReactTable, createColumnHelper, getCoreRowModel, getPaginationRowModel, getSortedRowModel, flexRender } from '@tanstack/react-table';
 import Swal from "sweetalert2";
 import { Search } from 'react-feather';
 import { format, parseISO } from 'date-fns'; // Add this import for date formatting
-import { useWorkers } from 'hooks/useWorkers';
+import { useWorkers } from '../../../hooks/useWorkers';
+import { MailIcon, PhoneIcon, MapPinIcon, CheckIcon, XIcon, Eye } from 'lucide-react';
+import { Users, Clock, CheckCircle, Activity } from 'lucide-react';
 
 const formatDate = (date) => {
   try {
@@ -72,23 +74,39 @@ const formatAddress = (address) => {
     .join(', ');
 };
 
+// Helper function to determine expiration status color
+const getExpirationColor = (expirationDate) => {
+  if (!expirationDate) return 'secondary';
+  
+  const today = new Date();
+  const expDate = new Date(expirationDate);
+  const daysUntilExpiration = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+  
+  if (daysUntilExpiration <= 7) return 'danger';    // Less than 7 days
+  if (daysUntilExpiration <= 30) return 'warning';  // Less than 30 days
+  return 'success';                                 // More than 30 days
+};
+
 const WorkersListItems = () => {
   const { 
     workers, 
     loading, 
     error, 
     fetchWorkers, 
-    clearCache,
-    removeWorker 
+    clearCache 
   } = useWorkers();
   
   const [search, setSearch] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    console.log('Workers data:', workers); // Debug log
-  }, [workers]);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    active: 0,
+    inactive: 0,
+    fieldWorkers: 0,
+  });
 
   // Memoized filtered workers
   const filteredWorkers = useMemo(() => {
@@ -124,7 +142,7 @@ const WorkersListItems = () => {
     setSearch(value);
   }, []);
 
-  // Handle refresh
+  // Modify handleRefresh to force a fresh fetch
   const handleRefresh = useCallback(async () => {
     try {
       clearCache();
@@ -141,7 +159,7 @@ const WorkersListItems = () => {
     }
   }, [clearCache, fetchWorkers]);
 
-  // Handle worker removal
+  // Modify handleRemoveWorker to not need manual refresh
   const handleRemoveWorker = useCallback(async (row) => {
     const confirmDelete = await Swal.fire({
       title: 'Are you sure?',
@@ -156,20 +174,23 @@ const WorkersListItems = () => {
 
     if (confirmDelete.isConfirmed) {
       try {
-        await removeWorker(row.id);
+        const workerRef = doc(db, 'workers', row.id);
+        await deleteDoc(workerRef);
+        // No need to manually refresh - onSnapshot will handle it
+        
         toast.success('Worker removed successfully', {
           position: "top-right",
           className: 'bg-success text-white'
         });
       } catch (error) {
         console.error("Error removing worker:", error);
-        toast.error('Error removing worker', {
+        toast.error('Error removing worker: ' + error.message, {
           position: "top-right",
           className: 'bg-danger text-white'
         });
       }
     }
-  }, [removeWorker]);
+  }, []);
 
   // Handle row click
   const handleRowClick = useCallback(async (row) => {
@@ -202,12 +223,12 @@ const WorkersListItems = () => {
       didOpen: () => {
         document.getElementById('viewBtn').addEventListener('click', () => {
           Swal.close();
-          router.push(`/dashboard/workers/${row.id}`);
+          router.push(`/workers/view/${row.id}`);
         });
         document.getElementById('editBtn').addEventListener('click', async () => {
           setIsEditing(true);
           Swal.close();
-          await router.push(`/dashboard/workers/${row.id}`);
+          await router.push(`/workers/edit-worker/${row.id}`);
           setIsEditing(false);
         });
         document.getElementById('removeBtn').addEventListener('click', () => {
@@ -217,6 +238,49 @@ const WorkersListItems = () => {
       }
     });
   }, [router, handleRemoveWorker]);
+
+  // Add new bulk delete handler
+  const handleBulkDelete = useCallback(async () => {
+    if (!selectedRows.length) return;
+
+    const confirmDelete = await Swal.fire({
+      title: 'Delete Selected Workers?',
+      text: `Are you sure you want to delete ${selectedRows.length} worker${selectedRows.length > 1 ? 's' : ''}? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (confirmDelete.isConfirmed) {
+      try {
+        // Delete all selected workers from Firebase
+        await Promise.all(
+          selectedRows.map(async (row) => {
+            const workerRef = doc(db, 'workers', row.id);
+            await deleteDoc(workerRef);
+          })
+        );
+        
+        // Refresh the workers list
+        await fetchWorkers(true);
+        
+        setSelectedRows([]); // Clear selection
+        toast.success(`Successfully deleted ${selectedRows.length} worker${selectedRows.length > 1 ? 's' : ''}`, {
+          position: "top-right",
+          className: 'bg-success text-white'
+        });
+      } catch (error) {
+        console.error("Error deleting workers:", error);
+        toast.error('Error deleting workers: ' + error.message, {
+          position: "top-right",
+          className: 'bg-danger text-white'
+        });
+      }
+    }
+  }, [selectedRows, fetchWorkers]);
 
   // Memoized subheader component
   const subHeaderComponentMemo = useMemo(() => (
@@ -242,6 +306,16 @@ const WorkersListItems = () => {
             }}
           />
         </div>
+        {selectedRows.length > 0 && (
+          <Button 
+            variant="danger"
+            onClick={handleBulkDelete}
+            className="d-flex align-items-center gap-2"
+          >
+            <i className="fas fa-trash-alt"></i>
+            Delete ({selectedRows.length})
+          </Button>
+        )}
         <Button 
           variant="light"
           onClick={handleRefresh}
@@ -252,343 +326,349 @@ const WorkersListItems = () => {
         </Button>
       </div>
     </div>
-  ), [search, loading, handleSearch, handleRefresh]);
+  ), [search, loading, handleSearch, handleRefresh, selectedRows.length, handleBulkDelete]);
+
+  const columnHelper = createColumnHelper();
 
   const columns = [
-    {
-      name: "#",
-      selector: row => row.index,
-      sortable: true,
-      sortFunction: (a, b) => a.index - b.index,
-      minWidth: "60px",
-      maxWidth: "60px",
-      cell: row => (
-        <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>
-          {row.index}
-        </span>
-      )
-    },
-    {
-      name: "Worker ID",
-      selector: row => row.workerId,
-      sortable: true,
-      sortFunction: (a, b) => a.workerId.localeCompare(b.workerId),
-      minWidth: "120px",
-      maxWidth: "120px",
-      cell: row => (
-        <span 
-          className="px-2 py-1 rounded"
-          style={{
-            backgroundColor: '#f8f9fa',
-            color: '#495057',
-            fontSize: '13px',
-            fontWeight: '500',
-            border: '1px solid #e9ecef'
-          }}
-        >
-          {row.workerId}
-        </span>
-      )
-    },
-    {
-      name: "Worker Name",
-      selector: row => row.fullName,
-      sortable: true,
-      sortFunction: (a, b) => (a.fullName || '').localeCompare(b.fullName || ''),
-      minWidth: "250px",
-      grow: 2,
-      cell: (row) => (
+    columnHelper.accessor((row, index) => index + 1, {
+      id: 'index',
+      header: '#',
+      size: 60,
+      cell: info => <span className="text-muted">{info.getValue()}</span>
+    }),
+
+    columnHelper.accessor('fullName', {
+      header: 'Worker Info',
+      size: 250,
+      cell: info => (
         <div className="d-flex align-items-center">
-          <div className="position-relative">
-            <Image
-              src={row.profilePicture || '/images/avatar-placeholder.png'}
-              alt={row.fullName}
-              className="rounded-circle"
-              style={{ 
-                width: "42px", 
-                height: "42px", 
-                objectFit: "cover",
-                backgroundColor: '#f8f9fa',
-                border: "2px solid #fff",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
-              }}
-            />
-            <div 
-              className={`position-absolute bottom-0 end-0 border-2 border-white rounded-circle`}
-              style={{
-                width: '10px',
-                height: '10px',
-                backgroundColor: row.isActive ? '#12b886' : '#fa5252',
-                boxShadow: '0 0 0 2px #fff'
-              }}
-            />
-          </div>
-          <div className="ms-3">
-            <div className="text-dark fw-medium mb-0" style={{ fontSize: '14px' }}>{row.fullName}</div>
-            <div className="text-muted" style={{ fontSize: '12px' }}>#{row.workerId}</div>
+          <Image
+            src={info.row.original.profilePicture || '/images/avatar/default-avatar.png'}
+            alt={info.getValue()}
+            width={40}
+            height={40}
+            className="rounded-circle me-2"
+          />
+          <div>
+            <div className="fw-semibold text-dark">{info.getValue()}</div>
+            <small className="text-secondary d-block">{info.row.original.workerId}</small>
+            <small className="text-secondary d-block">{info.row.original.role}</small>
           </div>
         </div>
-      ),
-    },
-    {
-      name: "Contact",
-      selector: row => row.email,
-      sortable: true,
-      sortFunction: (a, b) => (a.email || '').localeCompare(b.email || ''),
-      minWidth: "230px",
-      maxWidth: "230px",
-      cell: (row) => (
-        <div className="d-flex flex-column">
-          <OverlayTrigger
-            placement="top"
-            overlay={<Tooltip>Click to copy email</Tooltip>}
-          >
-            <div
-              className="d-flex align-items-center mb-1 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(row.email);
-                toast.success('Email copied!');
-              }}
-              style={{ fontSize: '13px' }}
-            >
-              <i className="fas fa-envelope text-muted me-2" style={{ fontSize: '12px' }}></i>
-              <span className="text-primary">{row.email}</span>
+      )
+    }),
+
+    columnHelper.accessor('contact', {
+      header: 'Contact Details',
+      size: 200,
+      cell: info => (
+        <div>
+          <div className="d-flex align-items-center mb-1">
+            <MailIcon size={14} className="text-secondary me-2" />
+            <span className="text-dark">{info.row.original.email || '-'}</span>
+          </div>
+          <div className="d-flex align-items-center mb-1">
+            <PhoneIcon size={14} className="text-secondary me-2" />
+            <span className={info.row.original.activePhone1 ? 'text-success fw-medium' : 'text-secondary'}>
+              {info.row.original.primaryPhone || '-'}
+            </span>
+          </div>
+          {info.row.original.secondaryPhone && (
+            <div className="d-flex align-items-center">
+              <PhoneIcon size={14} className="text-secondary me-2" />
+              <span className={info.row.original.activePhone2 ? 'text-success fw-medium' : 'text-secondary'}>
+                {info.row.original.secondaryPhone}
+              </span>
             </div>
-          </OverlayTrigger>
-          <div className="d-flex align-items-center" style={{ fontSize: '13px' }}>
-            <i className="fas fa-phone text-muted me-2" style={{ fontSize: '12px' }}></i>
-            <span className="text-muted">{row.primaryPhone}</span>
-          </div>
+          )}
         </div>
-      ),
-    },
-    {
-      name: "Address",
-      selector: row => formatAddress(row.address),
-      sortable: true,
-      sortFunction: (a, b) => formatAddress(a.address).localeCompare(formatAddress(b.address)),
-      minWidth: "200px",
-      maxWidth: "200px",
-      cell: (row) => (
-        <OverlayTrigger
-          placement="top"
-          overlay={<Tooltip>{formatAddress(row.address)}</Tooltip>}
-        >
-          <div 
-            className="text-truncate text-muted"
-            style={{ 
-              fontSize: '13px',
-              maxWidth: "200px"
-            }}
-          >
-            <i className="fas fa-map-marker-alt me-2" style={{ fontSize: '12px' }}></i>
-            {formatAddress(row.address)}
+      )
+    }),
+
+    columnHelper.accessor('skills', {
+      header: 'Skills & Role',
+      size: 200,
+      cell: info => (
+        <div>
+          <div className="d-flex flex-wrap gap-1 mb-2">
+            {info.getValue()?.slice(0, 3).map((skill, index) => (
+              <Badge 
+                key={index} 
+                bg="primary" 
+                className="text-white"
+                style={{ 
+                  fontSize: '0.75rem',
+                  padding: '0.35em 0.8em',
+                  backgroundColor: '#0d6efd'
+                }}
+              >
+                {skill}
+              </Badge>
+            ))}
+            {info.getValue()?.length > 3 && (
+              <Badge 
+                bg="secondary" 
+                className="text-white"
+                style={{ 
+                  fontSize: '0.75rem',
+                  padding: '0.35em 0.8em'
+                }}
+              >
+                +{info.getValue().length - 3}
+              </Badge>
+            )}
           </div>
-        </OverlayTrigger>
-      ),
-    },
-    {
-      name: "Skills",
-      selector: row => Array.isArray(row.skills) ? row.skills.join(', ') : '',
-      sortable: true,
-      sortFunction: (a, b) => {
-        const skillsA = Array.isArray(a.skills) ? a.skills.length : 0;
-        const skillsB = Array.isArray(b.skills) ? b.skills.length : 0;
-        return skillsA - skillsB;
-      },
-      minWidth: "100px",
-      maxWidth: "100px",
-      cell: (row) => {
-        const skills = Array.isArray(row.skills) ? row.skills : [];
-        const skillCount = skills.length;
+          {info.row.original.isFieldWorker && (
+            <Badge 
+              bg="info" 
+              className="text-white"
+              style={{ 
+                fontSize: '0.75rem',
+                padding: '0.35em 0.8em'
+              }}
+            >
+              Field Worker
+            </Badge>
+          )}
+        </div>
+      )
+    }),
+
+    columnHelper.accessor('emergency', {
+      header: 'Emergency Contact',
+      size: 200,
+      cell: info => (
+        <div>
+          <div className="fw-medium text-dark">{info.row.original.emergencyContactName}</div>
+          <small className="text-secondary d-block">{info.row.original.emergencyContactPhone}</small>
+          <small className="text-secondary d-block">{info.row.original.emergencyRelationship}</small>
+        </div>
+      )
+    }),
+
+    columnHelper.accessor('status', {
+      header: 'Status',
+      size: 120,
+      cell: info => {
+        // Check if account is expired
+        const expirationDate = info.row.original.expirationDate;
+        const isExpired = expirationDate ? new Date(expirationDate) < new Date() : false;
         
         return (
-          <OverlayTrigger
-            placement="top"
-            overlay={
-              <Tooltip>
-                {skills.length > 0 ? skills.join(', ') : 'No skills'}
-              </Tooltip>
-            }
-          >
-            <span 
-              className="px-2 py-1 rounded-pill"
-              style={{
-                fontSize: '11px',
-                backgroundColor: skillCount > 0 
-                  ? 'rgba(0, 123, 255, 0.08)'
-                  : 'rgba(108, 117, 125, 0.08)',
-                color: skillCount > 0 ? '#007bff' : '#6c757d',
-                border: skillCount > 0 
-                  ? '1px solid rgba(0, 123, 255, 0.1)'
-                  : '1px solid rgba(108, 117, 125, 0.1)',
-                fontWeight: '500'
-              }}
+          <div className="d-flex flex-column gap-1">
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip>
+                  Account status: {isExpired ? 'Expired' : (info.row.original.isActive ? 'Active' : 'Inactive')}
+                  {expirationDate && (
+                    <div>Expires: {formatDate(expirationDate)}</div>
+                  )}
+                </Tooltip>
+              }
             >
-              {skillCount > 0 ? `${skillCount}+ skills` : 'No skills'}
-            </span>
-          </OverlayTrigger>
-        );
-      },
-    },
-    {
-      name: "Status",
-      selector: row => Boolean(row.isActive),
-      sortable: true,
-      sortFunction: (a, b) => {
-        const isActiveA = Boolean(a.isActive);
-        const isActiveB = Boolean(b.isActive);
-        return isActiveA === isActiveB ? 0 : isActiveA ? -1 : 1;
-      },
-      minWidth: "115px",
-      maxWidth: "115px",
-      cell: row => {
-        const isActive = Boolean(row.isActive);
-        return (
-          <span 
-            className="px-3 py-1 rounded-pill d-inline-flex align-items-center"
-            style={{
-              fontSize: '12px',
-              backgroundColor: isActive ? 'rgba(18, 184, 134, 0.1)' : 'rgba(250, 82, 82, 0.1)',
-              color: isActive ? '#12b886' : '#fa5252',
-              fontWeight: '500'
-            }}
-          >
-            <i className={`fas fa-${isActive ? 'check' : 'times'} me-1`} style={{ fontSize: '10px' }}></i>
-            {isActive ? 'Active' : 'Inactive'}
-          </span>
+              <Badge 
+                bg={isExpired ? 'danger' : (info.row.original.isActive ? 'success' : 'danger')}
+                className="text-white"
+                style={{ 
+                  fontSize: '0.75rem',
+                  padding: '0.35em 0.8em'
+                }}
+              >
+                {isExpired ? 'Expired' : (info.row.original.isActive ? 'Active' : 'Inactive')}
+              </Badge>
+            </OverlayTrigger>
+
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip>
+                  Indicates if the user is currently online or offline
+                </Tooltip>
+              }
+            >
+              <Badge 
+                bg={info.row.original.isOnline ? 'success' : 'danger'}
+                className="text-white"
+                style={{ 
+                  fontSize: '0.75rem',
+                  padding: '0.35em 0.8em'
+                }}
+              >
+                {info.row.original.isOnline ? 'Online' : 'Offline'}
+              </Badge>
+            </OverlayTrigger>
+
+            {/* Show expiration date with warning if approaching */}
+            {expirationDate && !isExpired && (
+              <OverlayTrigger
+                placement="top"
+                overlay={
+                  <Tooltip>
+                    Account expiration date
+                  </Tooltip>
+                }
+              >
+                <small 
+                  className={`text-${getExpirationColor(expirationDate)} d-flex align-items-center`}
+                  style={{ fontSize: '0.7rem' }}
+                >
+                  <Clock size={12} className="me-1" />
+                  Exp: {formatDate(expirationDate)}
+                </small>
+              </OverlayTrigger>
+            )}
+          </div>
         );
       }
-    },
-    {
-      name: "Role",
-      selector: row => row.role,
-      sortable: true,
-      sortFunction: (a, b) => (a.role || '').localeCompare(b.role || ''),
-      minWidth: "125px",
-      maxWidth: "125px",
-      cell: row => (
-        <span 
-          className="px-3 py-1 rounded-pill"
-          style={{
-            fontSize: '12px',
-            backgroundColor: 'rgba(0, 199, 255, 0.1)',
-            color: '#00c7ff',
-            fontWeight: '500'
-          }}
-        >
-          {row.role}
-        </span>
+    }),
+
+    columnHelper.accessor(() => 'actions', {
+      id: 'actions',
+      header: 'Actions',
+      size: 100,
+      cell: info => (
+        <div className="d-flex gap-2">
+          <Button 
+            variant="light"
+            size="sm"
+            className="d-flex align-items-center gap-2"
+            onClick={() => handleRowClick(info.row.original)}
+          >
+            <Eye size={14} />
+            View
+          </Button>
+        </div>
       )
-    },
-    {
-      name: "Gender",
-      selector: row => row.gender,
-      sortable: true,
-      sortFunction: (a, b) => (a.gender || '').localeCompare(b.gender || ''),
-      minWidth: "100px",
-      maxWidth: "100px",
-      cell: row => <span className="text-capitalize">{row.gender}</span>
-    },
-    {
-      name: "Date of Birth",
-      selector: row => row.dateOfBirth,
-      sortable: true,
-      sortFunction: (a, b) => {
-        const dateA = a.dateOfBirth?.toDate?.() || new Date(a.dateOfBirth);
-        const dateB = b.dateOfBirth?.toDate?.() || new Date(b.dateOfBirth);
-        return dateA - dateB;
-      },
-      minWidth: "150px",
-      maxWidth: "150px",
-      cell: row => <span>{formatDate(row.dateOfBirth)}</span>
-    }
+    })
   ];
 
-  const customStyles = {
-    table: {
-      style: {
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        width: '100%',
-      }
-    },
-    tableWrapper: {
-      style: {
-        display: 'block',
-        width: '100%',
+  const table = useReactTable({
+    data: filteredWorkers,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+      pagination: {
+        pageIndex: 0,
+        pageSize: 10,
       },
     },
-    responsiveWrapper: {
-      style: {
-        width: '100%',
-        height: '90%',
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        msOverflowStyle: '-ms-autohiding-scrollbar',
-      },
-    },
-    headRow: {
-      style: {
-        backgroundColor: '#f8f9fa',
-        borderTopLeftRadius: '8px',
-        borderTopRightRadius: '8px',
-        borderBottom: '1px solid #e9ecef',
-        minHeight: '48px',
-      }
-    },
-    headCells: {
-      style: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#495057',
-        paddingTop: '12px',
-        paddingBottom: '12px',
-      }
-    },
-    cells: {
-      style: {
-        paddingTop: '12px',
-        paddingBottom: '12px',
-        borderBottom: '1px solid #f1f3f5',
-      }
-    },
-    rows: {
-      style: {
-        backgroundColor: '#ffffff',
-        minWidth: 'fit-content',
-        '&:hover': {
-          backgroundColor: '#f8f9fa',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-        },
-      },
-      stripedStyle: {
-        backgroundColor: '#fbfbfc',
-      }
-    },
-    pagination: {
-      style: {
-        borderTop: '1px solid #e9ecef',
-        padding: '16px',
-      },
-      pageButtonsStyle: {
-        borderRadius: '4px',
-        height: '32px',
-        minWidth: '32px',
-        padding: '0 6px',
-        margin: '0 4px',
-        cursor: 'pointer',
-        transition: '0.2s ease',
-        backgroundColor: '#ffffff',
-        border: '1px solid #dee2e6',
-        '&:hover:not(:disabled)': {
-          backgroundColor: '#e9ecef',
-        }
+  });
+
+  // Add debug logs
+  useEffect(() => {
+    console.log('Component state:', {
+      workersCount: workers?.length,
+      loading,
+      error: error?.message
+    });
+  }, [workers, loading, error]);
+
+  useEffect(() => {
+    console.log('Workers data:', {
+      raw: workers,
+      transformed: filteredWorkers,
+      loading,
+      error
+    });
+  }, [workers, filteredWorkers, loading, error]);
+
+  // Add near the top of your component
+  useEffect(() => {
+    // Test direct Firestore access
+    async function testAccess() {
+      try {
+        const workersRef = collection(db, 'workers');
+        const snapshot = await getDocs(workersRef);
+        console.log('Direct Firestore test:', {
+          success: true,
+          count: snapshot.size,
+          data: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        });
+      } catch (error) {
+        console.error('Direct Firestore test failed:', error);
       }
     }
+    
+    testAccess();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const usersRef = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersRef);
+      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Filter to only get users with role "Worker"
+      const workersList = usersList.filter(user => user.role === "Worker");
+
+      // Calculate stats from workers
+      const totalWorkers = workersList.length;
+      const active = workersList.filter(worker => worker.activeUser).length;
+      const inactive = workersList.filter(worker => !worker.activeUser).length;
+      const fieldWorkers = workersList.filter(worker => worker.isFieldWorker).length;
+
+      setStats({
+        totalUsers: totalWorkers,
+        active,
+        inactive,
+        fieldWorkers,
+      });
+
+      console.log('Workers Stats:', {
+        total: totalWorkers,
+        active,
+        inactive,
+        fieldWorkers
+      });
+
+    } catch (error) {
+      console.error("Error fetching worker stats:", error);
+      toast.error('Error loading worker statistics');
+    }
   };
+
+  useEffect(() => {
+    fetchStats();
+  }, [workers]); // This will update stats whenever workers data changes
+
+  const statCards = [
+    {
+      title: 'Workers Statistics',
+      value: stats.totalUsers,
+      icon: <Users className="text-primary" />,
+      badge: { text: 'Total', variant: 'primary' },
+      background: '#e7f1ff',
+      summary: `${stats.active} Active | ${stats.inactive} Inactive`
+    },
+    {
+      title: 'Active Workers',
+      value: stats.active,
+      icon: <Activity className="text-success" />,
+      badge: { text: 'Active', variant: 'success' },
+      background: '#e6f8f0',
+      summary: 'Currently Active Users'
+    },
+    {
+      title: 'Field Workers',
+      value: stats.fieldWorkers,
+      icon: <Clock className="text-warning" />,
+      badge: { text: 'Field', variant: 'warning' },
+      background: '#fff8ec',
+      summary: 'Field Workers Available'
+    },
+    {
+      title: 'Inactive Workers',
+      value: stats.inactive,
+      icon: <CheckCircle className="text-info" />,
+      badge: { text: 'Inactive', variant: 'secondary' },
+      background: '#e7f6f8',
+      summary: 'Currently Inactive Users'
+    }
+  ];
 
   return (
     <Fragment>
@@ -597,16 +677,77 @@ const WorkersListItems = () => {
           <Spinner animation="border" variant="primary" />
         </div>
       )}
+      
+      {/* Stats Cards Row with updated styling */}
+      <Row className="g-4 mb-4">
+        {statCards.map((card, index) => (
+          <Col key={index} lg={3} sm={6}>
+            <Card 
+              className="border-0" 
+              style={{
+                borderRadius: '16px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+              }}
+            >
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <p className="text-muted mb-1" style={{ fontSize: '0.875rem' }}>{card.title}</p>
+                    <h3 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '600' }}>{card.value}</h3>
+                    <Badge 
+                      bg={card.badge.variant}
+                      style={{
+                        padding: '0.35em 0.8em',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem'
+                      }}
+                    >
+                      {card.badge.text}
+                    </Badge>
+                    <div className="small text-muted mt-2">{card.summary}</div>
+                  </div>
+                  <div 
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: card.background,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'transform 0.2s ease'
+                    }}
+                  >
+                    {card.icon}
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* Main Table Card with updated styling */}
       <Row>
-        <Col md={12} xs={12} className="mb-5">
-          <Card className="border-0 shadow-sm">
+        <Col md={12} xs={12}>
+          <Card 
+            className="border-0" 
+            style={{
+              borderRadius: '16px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}
+          >
             <Card.Body className="p-4">
+              {/* Search and Actions */}
+              {subHeaderComponentMemo}
+              
               <div className="table-container">
                 {error ? (
                   <div className="text-center py-5 text-danger">
                     <p>Error loading workers: {error.message}</p>
                     <Button 
-                      variant="outline-danger"
+                      variant="primary"
                       onClick={() => fetchWorkers(true)}
                     >
                       Retry
@@ -614,44 +755,92 @@ const WorkersListItems = () => {
                   </div>
                 ) : (
                   <>
-                    {loading ? (
-                      <div className="text-center py-5">
-                        <Spinner animation="border" variant="primary" />
-                        <p className="mt-2">Loading workers...</p>
+                    <div className="table-responsive">
+                      <table className="table table-hover">
+                        <thead>
+                          {table.getHeaderGroups().map(headerGroup => (
+                            <tr key={headerGroup.id}>
+                              {headerGroup.headers.map(header => (
+                                <th 
+                                  key={header.id}
+                                  style={{
+                                    width: header.getSize(),
+                                    cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                                  }}
+                                  onClick={header.column.getToggleSortingHandler()}
+                                >
+                                  {flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                                </th>
+                              ))}
+                            </tr>
+                          ))}
+                        </thead>
+                        <tbody>
+                          {loading ? (
+                            <tr>
+                              <td colSpan={columns.length} className="text-center py-5">
+                                <Spinner animation="border" variant="primary" className="me-2" />
+                                <span className="text-muted">Loading workers...</span>
+                              </td>
+                            </tr>
+                          ) : table.getRowModel().rows.length === 0 ? (
+                            <tr>
+                              <td colSpan={columns.length} className="text-center py-5">
+                                <div className="text-muted mb-2">No workers found</div>
+                                <small>Try adjusting your search terms</small>
+                              </td>
+                            </tr>
+                          ) : (
+                            table.getRowModel().rows.map(row => (
+                              <tr key={row.id}>
+                                {row.getVisibleCells().map(cell => (
+                                  <td key={cell.id}>
+                                    {flexRender(
+                                      cell.column.columnDef.cell,
+                                      cell.getContext()
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="d-flex justify-content-between align-items-center mt-4">
+                      <div>
+                        <span className="text-muted">
+                          Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+                          {Math.min(
+                            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                            filteredWorkers.length
+                          )}{' '}
+                          of {filteredWorkers.length} entries
+                        </span>
                       </div>
-                    ) : (
-                      <DataTable
-                        columns={columns}
-                        data={filteredWorkers}
-                        pagination
-                        defaultSortFieldId="index"
-                        defaultSortAsc={true}
-                        sortServer={false}
-                        onRowClicked={handleRowClick}
-                        customStyles={customStyles}
-                        subHeader
-                        subHeaderComponent={subHeaderComponentMemo}
-                        responsive
-                        fixedHeader
-                        fixedHeaderScrollHeight="calc(100vh - 300px)"
-                        dense
-                        persistTableHead
-                        paginationComponentOptions={{
-                          noRowsPerPage: true // Hide rows per page selector
-                        }}
-                        progressPending={loading}
-                        noDataComponent={
-                          <div className="text-center py-5">
-                            <div className="text-muted mb-2">
-                              {workers?.length === 0 ? 'No workers found' : 'No matching results'}
-                            </div>
-                            <small>
-                              {search ? 'Try adjusting your search terms' : 'Add workers to get started'}
-                            </small>
-                          </div>
-                        }
-                      />
-                    )}
+                      <div>
+                        <Button
+                          variant="outline-primary"
+                          className="me-2"
+                          onClick={() => table.previousPage()}
+                          disabled={!table.getCanPreviousPage()}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline-primary"
+                          onClick={() => table.nextPage()}
+                          disabled={!table.getCanNextPage()}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -659,13 +848,14 @@ const WorkersListItems = () => {
           </Card>
         </Col>
       </Row>
-      <ToastContainer />
+
       <style jsx>{`
         .table-container {
           width: 100%;
           min-width: 0;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
+          border-radius: 12px;
         }
 
         .loading-overlay {
@@ -681,29 +871,38 @@ const WorkersListItems = () => {
           z-index: 9999;
         }
 
-        /* Custom scrollbar styles */
-        .table-container::-webkit-scrollbar {
-          height: 8px;
+        /* Add hover effects for cards */
+        .card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
         }
 
-        .table-container::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 4px;
+        /* Style the table */
+        .table thead th {
+          background-color: #f8fafc;
+          border-bottom: 2px solid #e2e8f0;
+          color: #64748b;
+          font-weight: 600;
+          text-transform: uppercase;
+          font-size: 0.75rem;
+          letter-spacing: 0.05em;
         }
 
-        .table-container::-webkit-scrollbar-thumb {
-          background: #888;
-          border-radius: 4px;
+        .table tbody tr:hover {
+          background-color: #f1f5f9;
         }
 
-        .table-container::-webkit-scrollbar-thumb:hover {
-          background: #555;
+        /* Style the buttons */
+        .btn {
+          border-radius: 8px;
+          padding: 0.5rem 1rem;
+          font-weight: 500;
+          transition: all 0.2s ease;
         }
 
-        @media screen and (max-width: 1200px) {
-          .table-container {
-            margin-bottom: 16px;
-          }
+        .btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
       `}</style>
     </Fragment>

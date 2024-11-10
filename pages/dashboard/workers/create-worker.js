@@ -18,6 +18,7 @@ import { toast, ToastContainer } from "react-toastify";
 import { useRouter } from "next/router";
 import Swal from "sweetalert2";
 import { GeeksSEO } from "widgets";
+import Link from 'next/link';
 
 const CreateWorker = () => {
   const [activeTab, setActiveTab] = useState("personal");
@@ -160,14 +161,156 @@ const CreateWorker = () => {
       <Tab.Container defaultActiveKey="add">
         <Row>
           <Col lg={12} md={12} sm={12}>
-            <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-              <div className="mb-3 mb-md-0">
-                <h1 className="mb-1 h2 fw-bold">Create New Worker</h1>
-                <Breadcrumb>
-                  <Breadcrumb.Item href="#">Dashboard</Breadcrumb.Item>
-                  <Breadcrumb.Item href="#">Workers</Breadcrumb.Item>
-                  <Breadcrumb.Item active>Add new Worker</Breadcrumb.Item>
-                </Breadcrumb>
+            <div 
+              style={{
+                background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
+                padding: "1.5rem 2rem",
+                borderRadius: "0 0 24px 24px",
+                marginTop: "-39px",
+                marginLeft: "10px",
+                marginRight: "10px",
+                marginBottom: "20px",
+              }}
+            >
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="d-flex flex-column">
+                  <div className="mb-3">
+                    <h1
+                      className="mb-2"
+                      style={{
+                        fontSize: "28px",
+                        fontWeight: "600",
+                        color: "#FFFFFF",
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      Create New Worker
+                    </h1>
+                    <p
+                      className="mb-2"
+                      style={{
+                        fontSize: "16px",
+                        color: "rgba(255, 255, 255, 0.7)",
+                        fontWeight: "400",
+                        lineHeight: "1.5",
+                      }}
+                    >
+                      Add a new worker to your team by filling out their personal, contact, and skill information
+                    </p>
+                    <div
+                      className="d-flex align-items-center gap-2"
+                      style={{
+                        fontSize: "14px",
+                        color: "rgba(255, 255, 255, 0.9)",
+                        background: "rgba(255, 255, 255, 0.1)",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        marginTop: "8px",
+                      }}
+                    >
+                      <i className="fe fe-info" style={{ fontSize: "16px" }}></i>
+                      <span>
+                        Complete all required fields across the three tabs: Personal, Contact, and Skills
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-2 mb-4">
+                    <span
+                      className="badge"
+                      style={{
+                        background: "#FFFFFF",
+                        color: "#4171F5",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        fontWeight: "500",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Worker Management
+                    </span>
+                    <span
+                      className="badge"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.2)",
+                        color: "#FFFFFF",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        fontWeight: "500",
+                        fontSize: "14px",
+                      }}
+                    >
+                      <i className="fe fe-user-plus me-1"></i>
+                      New Worker
+                    </span>
+                  </div>
+
+                  <nav
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    <div className="d-flex align-items-center">
+                      <i
+                        className="fe fe-home"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      ></i>
+                      <Link
+                        href="/"
+                        className="text-decoration-none ms-2"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        Dashboard
+                      </Link>
+                      <span
+                        className="mx-2"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        /
+                      </span>
+                      <Link
+                        href="/workers"
+                        className="text-decoration-none d-flex align-items-center"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        <i className="fe fe-users me-1"></i>
+                        Workers
+                      </Link>
+                      <span
+                        className="mx-2"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        /
+                      </span>
+                      <span style={{ color: "#FFFFFF" }}>
+                        <i className="fe fe-user-plus me-1"></i>
+                        Create Worker
+                      </span>
+                    </div>
+                  </nav>
+                </div>
+
+                <div>
+                  <Link 
+                    href="/workers"
+                    className="btn btn-light btn-sm d-flex align-items-center gap-2"
+                    style={{
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "10px 20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s ease",
+                      fontWeight: "500",
+                      boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                    }}
+                  >
+                    <i className="fe fe-arrow-left"></i>
+                    Back to Workers
+                  </Link>
+                </div>
               </div>
             </div>
           </Col>
@@ -230,6 +373,24 @@ const CreateWorker = () => {
           </Tab.Pane>
         </Tab.Content>
       </Tab.Container>
+      <style jsx global>{`
+        .breadcrumb-link {
+          transition: all 0.2s ease-in-out;
+        }
+        
+        .breadcrumb-link:hover {
+          color: #ffffff !important;
+          transform: translateY(-1px);
+          text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+        }
+
+        .badge {
+          font-weight: 500;
+          padding: 0.35em 0.8em;
+          font-size: 0.75rem;
+          border-radius: 6px;
+        }
+      `}</style>
     </Container>
   );
 };

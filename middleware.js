@@ -1,29 +1,5 @@
 import { NextResponse } from 'next/server';
 
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-
-const COOKIE_OPTIONS = {
-  path: '/',
-  secure: true,
-  sameSite: 'lax',
-  maxAge: 30 * 60
-};
-
-function handleSessionError(request, error = null) {
-  if (request.nextUrl.pathname === '/authentication/sign-in') {
-    return NextResponse.next();
-  }
-
-  console.log('Session Error:', {
-    error: error?.message,
-    path: request.nextUrl.pathname,
-    cookies: request.cookies.getAll().map(c => c.name)
-  });
-
-  const response = NextResponse.redirect(new URL('/authentication/sign-in', request.url));
-  return response;
-}
-
 // Helper function to check if a path is static
 function isStaticPath(pathname) {
   return (
@@ -50,56 +26,59 @@ function isStaticPath(pathname) {
 export async function middleware(request) {
   const pathname = request.nextUrl.pathname;
 
-  // Immediately allow static files and public assets
-  if (isStaticPath(pathname)) {
+  // Skip middleware for static paths
+  if (isStaticPath(pathname) || 
+      pathname === '/sign-in' ||
+      pathname.startsWith('/api/') ||
+      pathname === '/') {
     return NextResponse.next();
   }
 
-  // Allow authentication routes
-  if (pathname.startsWith('/authentication') || 
-      pathname.startsWith('/api/login') ||
-      pathname.startsWith('/api/renewSAPB1Session') ||
-      pathname.startsWith('/api/logout')) {
-    return NextResponse.next();
+  // If trying to access /authentication/sign-in, redirect to /sign-in
+  if (pathname === '/authentication/sign-in') {
+    return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
-  // Check session cookies
-  const b1Session = request.cookies.get('B1SESSION');
-  const sessionExpiry = request.cookies.get('B1SESSION_EXPIRY');
-  const customToken = request.cookies.get('customToken');
-  const uid = request.cookies.get('uid');
+  // Check essential cookies
+  const essentialCookies = [
+    'B1SESSION',
+    'B1SESSION_EXPIRY',
+    'uid',
+    'workerId'
+  ];
 
-  if (!b1Session || !sessionExpiry || !customToken || !uid) {
-    return handleSessionError(request);
+  const missingCookies = essentialCookies.filter(
+    cookieName => !request.cookies.get(cookieName)?.value
+  );
+
+  if (missingCookies.length > 0) {
+    console.log('Missing essential cookies:', missingCookies);
+    // Clear all cookies before redirecting
+    const response = NextResponse.redirect(new URL('/sign-in', request.url));
+    essentialCookies.forEach(cookieName => {
+      response.cookies.delete(cookieName);
+    });
+    return response;
   }
 
   // Check session expiry
-  const expiryTime = new Date(sessionExpiry.value).getTime();
+  const expiryTime = new Date(request.cookies.get('B1SESSION_EXPIRY').value).getTime();
+  
   if (Date.now() >= expiryTime) {
-    return handleSessionError(request, new Error('Session expired'));
+    console.log('Session expired, redirecting to login');
+    // Clear all cookies before redirecting
+    const response = NextResponse.redirect(new URL('/sign-in', request.url));
+    essentialCookies.forEach(cookieName => {
+      response.cookies.delete(cookieName);
+    });
+    return response;
   }
 
-  // Allow the request and extend cookie expiry
-  const response = NextResponse.next();
-  
-  const currentCookies = request.cookies.getAll();
-  currentCookies.forEach(cookie => {
-    response.cookies.set(cookie.name, cookie.value, {
-      ...COOKIE_OPTIONS,
-      httpOnly: ['B1SESSION', 'B1SESSION_EXPIRY', 'customToken'].includes(cookie.name)
-    });
-  });
-
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    // Only match specific routes that need protection
-    '/dashboard/:path*',
-    '/api/:path*',
-    
-    // Exclude static files and auth routes
-    '/((?!_next/static|_next/image|_next/media|favicon.ico|images|styles|fonts|assets|authentication/sign-in|api/login|api/renewSAPB1Session|api/logout).*)'
-  ]
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };

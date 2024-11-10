@@ -1,78 +1,93 @@
 // hooks/useWorkers.js
-import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { collection, getDocs, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../firebase';
-
-const CACHE_KEY = 'workers-cache';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export const useWorkers = () => {
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const unsubscribeRef = useRef(null);
 
-  const processWorkersData = (workersData) => {
-    return workersData.map((doc, index) => ({
-      id: doc.id,
-      index: index + 1,
-      ...doc.data(),
-      joinDate: doc.data().timestamp ? new Date(doc.data().timestamp.toDate()) : new Date(),
-    }));
-  };
+  // Setup real-time listener
+  useEffect(() => {
+    console.log('Setting up Firestore listener...');
+    setLoading(true);
 
-  const fetchWorkers = async (forceRefresh = false) => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Check cache if not ignoring
-      if (!forceRefresh) {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        if (cachedData) {
-          const { data, timestamp } = JSON.parse(cachedData);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            setWorkers(data);
-            setLoading(false);
-            return;
-          }
+      const workersRef = collection(db, 'users');
+      const q = query(workersRef);
+
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          console.log('Received Firestore update:', snapshot.size, 'documents');
+          
+          const workersData = snapshot.docs.map((doc, index) => ({
+            ...doc.data(),
+            id: doc.id,
+            index: index + 1
+          }));
+
+          console.log('Processed workers data:', workersData);
+          setWorkers(workersData);
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Firestore error:', error);
+          setError(error);
+          setLoading(false);
         }
-      }
+      );
 
-      // Fetch fresh data
-      const usersRef = collection(db, "users");
-      const snapshot = await getDocs(usersRef);
-      const workersData = processWorkersData(snapshot.docs);
+      unsubscribeRef.current = unsubscribe;
+      
+      // Cleanup function
+      return () => {
+        console.log('Cleaning up Firestore listener...');
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+        }
+      };
+    } catch (err) {
+      console.error('Error in useWorkers setup:', err);
+      setError(err);
+      setLoading(false);
+    }
+  }, []); // Empty dependency array for single setup
 
-      // Update cache
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        data: workersData,
-        timestamp: Date.now()
+  const fetchWorkers = useCallback(async (force = false) => {
+    console.log('Manual fetch triggered, force:', force);
+    setLoading(true);
+
+    try {
+      const workersRef = collection(db, 'workers');
+      const snapshot = await getDocs(workersRef);
+      
+      console.log('Fetch response:', snapshot.size, 'documents');
+      
+      const workersData = snapshot.docs.map((doc, index) => ({
+        ...doc.data(),
+        id: doc.id,
+        index: index + 1
       }));
 
-      console.log('Fetched workers:', workersData); // Debug log
-
+      console.log('Fetched workers data:', workersData);
       setWorkers(workersData);
+      setError(null);
+      return workersData;
     } catch (err) {
-      console.error("Error fetching workers:", err);
+      console.error('Error fetching workers:', err);
       setError(err);
+      throw err;
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchWorkers();
-  }, []);
-
-  const clearCache = useCallback(() => {
-    localStorage.removeItem(CACHE_KEY);
   }, []);
 
   return {
     workers,
     loading,
     error,
-    fetchWorkers,
-    clearCache
+    fetchWorkers
   };
 };

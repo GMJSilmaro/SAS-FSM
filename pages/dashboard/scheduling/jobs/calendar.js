@@ -54,6 +54,10 @@ import "react-toastify/dist/ReactToastify.css";
 import Swal from "sweetalert2";
 import { format } from "date-fns";
 import Legend from "./legends";
+import { Plus } from 'react-feather'; // Add this import
+import Link from 'next/link';
+import { Button } from 'react-bootstrap';
+import { FaPlus } from 'react-icons/fa';
 
 const DEFAULT_LEGEND_ITEMS = [
   { id: 'created', status: "Created", color: "#9e9e9e" },
@@ -624,7 +628,7 @@ const Calendar = () => {
         {/* Action Button */}
         <button 
           className={styles.viewDetailsButton}
-          onClick={() => router.push(`/dashboard/jobs/${props.Id}`)}
+          onClick={() => router.push(`/jobs/view/${props.Id}`)}
         >
           <span>View Details</span>
           <BsArrowRight size={16} />
@@ -924,7 +928,7 @@ const Calendar = () => {
         }).then((result) => {
           if (result.isConfirmed) {
             router.push({
-              pathname: "/dashboard/jobs/create-jobs",
+              pathname: "/jobs/create",
               query: {
                 startDate: formattedStartDate,
               },
@@ -1253,30 +1257,197 @@ const Calendar = () => {
       />
       
    
-      <div className="border-bottom d-flex align-items-center justify-content-between">
-            <div className="mb-1">
-              <h1 className="mb-1 h2 fw-bold">Jobs Calendar</h1>
-              <Breadcrumb>
-                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item active href="/dashboard/scheduling/workers/schedules">Schedules</Breadcrumb.Item>
-              </Breadcrumb>
+      <Row>
+        <Col lg={12} md={12} sm={12}>
+          <div 
+            style={{
+              background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
+              padding: "1.5rem 2rem",
+              borderRadius: "0 0 24px 24px",
+              marginTop: "-39px",
+              marginLeft: "10px",
+              marginRight: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-start">
+              <div className="d-flex flex-column">
+                <div className="mb-3">
+                  <h1 
+                    className="mb-2" 
+                    style={{ 
+                      fontSize: "28px",
+                      fontWeight: "600",
+                      color: "#FFFFFF",
+                      letterSpacing: "-0.02em"
+                    }}
+                  >
+                    Job Calendar
+                  </h1>
+                  <p 
+                    className="mb-2" 
+                    style={{ 
+                      fontSize: "16px",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      fontWeight: "400",
+                      lineHeight: "1.5"
+                    }}
+                  >
+                    View and manage all job schedules in an interactive calendar view
+                  </p>
+                  <div 
+                    className="d-flex align-items-center gap-2"
+                    style={{
+                      fontSize: "14px",
+                      color: "rgba(255, 255, 255, 0.9)",
+                      background: "rgba(255, 255, 255, 0.1)",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <i className="fe fe-info" style={{ fontSize: "16px" }}></i>
+                    <span>
+                      Double-click on any date to create a new job assignment
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Badges */}
+                <div className="d-flex align-items-center gap-2 mb-4">
+                  <span 
+                    className="badge"
+                    style={{
+                      background: "#FFFFFF",
+                      color: "#4171F5",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Schedule Management
+                  </span>
+                  <span 
+                    className="badge"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.2)",
+                      color: "#FFFFFF",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <i className="fe fe-calendar me-1"></i>
+                    Calendar View
+                  </span>
+                </div>
+
+                {/* Breadcrumbs */}
+                <nav
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                >
+                  <div className="d-flex align-items-center">
+                    <i 
+                      className="fe fe-home"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    ></i>
+                    <Link
+                      href="/"
+                      className="text-decoration-none ms-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      Dashboard
+                    </Link>
+                    <span className="mx-2" style={{ color: "rgba(255, 255, 255, 0.7)" }}>/</span>
+                    <Link
+                      href="/jobs"
+                      className="text-decoration-none"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      Jobs
+                    </Link>
+                    <span className="mx-2" style={{ color: "rgba(255, 255, 255, 0.7)" }}>/</span>
+                    <span style={{ color: "#FFFFFF" }}>Calendar</span>
+                  </div>
+                </nav>
+              </div>
+
+              {/* Stats Badges */}
+              <div className="d-flex gap-3">
+                <OverlayTrigger
+                  placement="bottom"
+                  overlay={
+                    <Tooltip>
+                      <div className="text-start">
+                        <div className="fw-semibold mb-1">Total Jobs</div>
+                        <div className="small">
+                          Last updated: {new Date().toLocaleTimeString()}
+                        </div>
+                        <div className="small text-muted">
+                          Total number of jobs in the calendar
+                        </div>
+                      </div>
+                    </Tooltip>
+                  }
+                >
+                  <div 
+                    className="badge d-flex align-items-center gap-2"
+                    style={{
+                      background: "#FFFFFF",
+                      color: "#4171F5",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      cursor: "help"
+                    }}
+                  >
+                    <i className="fe fe-calendar"></i>
+                    Total Jobs: {filteredEvents.length}
+                  </div>
+                </OverlayTrigger>
+
+                {/* Create New Job Button */}
+                <Button 
+                  variant="light" 
+                  href="/jobs/create"
+                  className="create-job-button"
+                  style={{
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '10px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s ease',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <FaPlus size={16} />
+                  <span>Create New Job</span>
+                </Button>
+              </div>
             </div>
           </div>
-     
-      <div style={{ 
-        display: "flex", 
-        width: "100%",  // Changed from 95%
-        marginRight: "20px" 
-      }}>
+        </Col>
+      </Row>
+
+      <div style={{ display: "flex", width: "100%", marginRight: "20px" }}>
         {/* Left side: Calendar */}
         <div style={{ flex: 8, marginRight: "20px" }}>
-        <TextBoxComponent 
-      placeholder="Search Job Name, Job No., Customer, Location etc........"
-      cssClass="e-bigger"
-      floatLabelType="Auto"
-      value={searchTerm}
-      input={handleSearch}
-    />
+          <TextBoxComponent 
+            placeholder="Search Job Name, Job No., Customer, Location etc........"
+            cssClass="e-bigger"
+            floatLabelType="Auto"
+            value={searchTerm}
+            input={handleSearch}
+          />
 
           {/* Display loading spinner when loading is true */}
           {loading ? (
@@ -1306,6 +1477,7 @@ const Calendar = () => {
                   equipment: { name: "Equipment" },
                   serviceCall: { name: "ServiceCall" },
                 },
+                enableTooltip: true,
                 allowEditing: false,
                 allowAdding: false,
               }}
@@ -1336,130 +1508,25 @@ const Calendar = () => {
           )}
         </div>
 
-       
-      {/* Right side: Legend - update styles */}
-  <div style={{ 
-    flex: 1,
-    minWidth: "250px",
-    maxWidth: "300px", 
-    height: '650px',
-    display: 'flex',
-    flexDirection: 'column',
-    marginRight: "5px" // Add right margin to prevent sticking to edge
-  }}>
-    <Legend
-      legendItems={legendItems}
-      defaultStatus={defaultStatus}
-      onAddLegend={handleAddLegend}
-      onEditLegend={handleEditLegend}
-      onDeleteLegend={handleDeleteLegend}
-      onSetDefault={handleSetDefault}
-    />
-  </div>
-        {/* <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h4>Legend</h4>
-            <button 
-              className="btn btn-sm btn-primary"
-              onClick={handleAddLegend}
-            >
-              Add Status
-            </button>
-          </div>
-          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
-            {legendItems.map((item) => (
-              <li 
-                key={item.id} 
-                style={{ 
-                  marginBottom: "10px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s",
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5'
-                  }
-                }}
-              >
-                <OverlayTrigger
-                  placement="left"
-                  overlay={
-                    <Tooltip>
-                      Click for options
-                    </Tooltip>
-                  }
-                >
-                  <div 
-                    style={{ 
-                      display: "flex", 
-                      alignItems: "center",
-                      flex: 1 
-                    }}
-                    onClick={() => handleEditLegend(item)}
-                  >
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: "20px",
-                        height: "20px",
-                        backgroundColor: item.color,
-                        marginRight: "10px",
-                        borderRadius: "4px"
-                      }}
-                    ></span>
-                    <span style={{ flex: 1 }}>{item.status}</span>
-                  </div>
-                </OverlayTrigger>
-                
-                <Dropdown align="end">
-                  <Dropdown.Toggle 
-                    variant="link" 
-                    size="sm"
-                    style={{ 
-                      border: 'none', 
-                      padding: '4px',
-                      background: 'transparent',
-                      color: '#6c757d'
-                    }}
-                  >
-                    <BsThreeDotsVertical />
-                  </Dropdown.Toggle>
-
-                  <Dropdown.Menu>
-                    <Dropdown.Item onClick={() => handleEditLegend(item)}>
-                      Edit
-                    </Dropdown.Item>
-                    <Dropdown.Item 
-                      onClick={() => handleSetDefault(item.id)}
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      Set as Default
-                      {defaultStatus === item.id && (
-                        <span style={{ color: '#28a745' }}>✓</span>
-                      )}
-                    </Dropdown.Item>
-                    <Dropdown.Divider />
-                    <Dropdown.Item 
-                      onClick={() => handleDeleteLegend(item.id)}
-                      className="text-danger"
-                    >
-                      Delete
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </li>
-            ))}
-          </ul>
-        </div> */}
-
-        
+        {/* Right side: Legend - update styles */}
+        <div style={{ 
+          flex: 1,
+          minWidth: "250px",
+          maxWidth: "300px", 
+          height: '650px',
+          display: 'flex',
+          flexDirection: 'column',
+          marginRight: "5px" // Add right margin to prevent sticking to edge
+        }}>
+          <Legend
+            legendItems={legendItems}
+            defaultStatus={defaultStatus}
+            onAddLegend={handleAddLegend}
+            onEditLegend={handleEditLegend}
+            onDeleteLegend={handleDeleteLegend}
+            onSetDefault={handleSetDefault}
+          />
+        </div>
       </div>
     </>
   );

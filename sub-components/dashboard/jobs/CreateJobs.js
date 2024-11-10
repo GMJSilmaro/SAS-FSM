@@ -29,14 +29,51 @@ import {
 } from "firebase/firestore";
 import Swal from "sweetalert2";
 import styles from "./CreateJobs.module.css";
-import { ToastContainer, toast } from "react-toastify";
+import toast from 'react-hot-toast';
 import JobTask from "./tabs/JobTasklist";
 import { useRouter } from "next/router";
 import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from "widgets";
 import { getAuth } from "firebase/auth";
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { FaAsterisk } from 'react-icons/fa';
 
-const AddNewJobs = () => {
+// Add this helper function at the top of your file
+const sanitizeDataForFirestore = (data) => {
+  // Remove undefined values and convert null to empty strings
+  const sanitized = {};
+  
+  Object.keys(data).forEach(key => {
+    const value = data[key];
+    
+    if (value === undefined) {
+      return; // Skip undefined values
+    }
+    
+    if (value === null) {
+      sanitized[key] = ""; // Convert null to empty string
+    } else if (Array.isArray(value)) {
+      // Sanitize arrays
+      sanitized[key] = value.map(item => {
+        if (typeof item === 'object') {
+          return sanitizeDataForFirestore(item);
+        }
+        return item ?? "";
+      }).filter(item => item !== undefined);
+    } else if (value instanceof Date) {
+      // Convert Date objects to Firestore Timestamp
+      sanitized[key] = Timestamp.fromDate(value);
+    } else if (typeof value === 'object' && value !== null) {
+      // Recursively sanitize nested objects
+      sanitized[key] = sanitizeDataForFirestore(value);
+    } else {
+      sanitized[key] = value;
+    }
+  });
+  
+  return sanitized;
+};
+
+const AddNewJobs = ({ validateJobForm }) => {
   const router = useRouter();
   const { startDate, endDate, startTime, endTime, workerId, scheduleSession } = router.query;
 
@@ -181,6 +218,11 @@ const AddNewJobs = () => {
       code: "",
       name: ""
     },
+    createdBy: {
+      workerId: "",
+      fullName: "",
+      timestamp: "",
+    },
   });
   const initialFormData = {
     jobID: "", // unique
@@ -265,6 +307,11 @@ const AddNewJobs = () => {
       code: "",
       name: ""
     },
+    createdBy: {
+      workerId: "",
+      fullName: "",
+      timestamp: "",
+    },
   };
 
   const [showServiceLocation, setShowServiceLocation] = useState(true);
@@ -276,25 +323,55 @@ const AddNewJobs = () => {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRY_ATTEMPTS = 3;
 
-  const forceLogout = async () => {
-    try {
-      const response = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include", // This is important for including cookies in the request
-      });
-      if (response.ok) {
-        toast.success(
-          "You have been logged out due to an authentication issue."
-        );
-        router.push("/authentication/sign-in"); // Redirect to login page
-      } else {
-        throw new Error("Logout failed");
+  const [currentUser, setCurrentUser] = useState({
+    workerId: "",
+    fullName: "",
+    uid: ""
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const getCurrentUserInfo = async () => {
+      try {
+        // Fetch user info from the existing endpoint
+        const response = await fetch('/api/getUserInfo');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user info');
+        }
+
+        const { user } = await response.json();
+        
+        console.log('Fetched user data:', user);
+
+        if (!user.workerId) {
+          throw new Error('Worker ID not found in user data');
+        }
+
+        // Set the current user data with actual full name from Firestore
+        setCurrentUser({
+          workerId: user.workerId,
+          fullName: user.name || 'anonymous',
+          uid: user.uid || ''
+        });
+
+        //toast.success("User information loaded successfully");
+
+      } catch (error) {
+        console.error("Error getting user info:", error);
+        toast.error("Unable to get user information. Using default values.");
+        setCurrentUser({
+          workerId: "unknown",
+          fullName: "anonymous",
+          uid: ""
+        });
       }
-    } catch (error) {
-      console.error("Logout error:", error);
-      toast.error("Failed to logout. Please try again.");
-    }
-  };
+    };
+
+    getCurrentUserInfo();
+  }, []);
 
   const fetchSchedulingWindows = async () => {
     try {
@@ -337,8 +414,7 @@ const AddNewJobs = () => {
       }
   
       const jobContactTypeData = await jobContactTypeResponse.json();
-      console.log("Fetched job contact types:", jobContactTypeData);
-  
+
       const formattedJobContactTypes = jobContactTypeData.map((item) => ({
         value: item.code,
         label: item.name
@@ -356,10 +432,11 @@ const AddNewJobs = () => {
   const fetchCustomers = async () => {
     try {
       setIsLoading(true);
-      toast.info("Fetching customers...", { autoClose: 2000 });
+      // Show loading toast while fetching
+      toast.loading("Fetching customers...", { id: "customersFetch" });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch("/api/getCustomers", {
         signal: controller.signal,
@@ -371,19 +448,10 @@ const AddNewJobs = () => {
 
       clearTimeout(timeoutId);
 
-      // Handle session expiration
-      if (response.redirected) {
-        toast.error("Session expired. Redirecting to login...");
-        await forceLogout();
-        return;
-      }
-
-      // Handle non-OK responses
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Validate response type
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         throw new Error("Invalid response format: Expected JSON");
@@ -391,49 +459,96 @@ const AddNewJobs = () => {
 
       const data = await response.json();
 
-      // Validate data structure
       if (!Array.isArray(data)) {
         throw new Error("Invalid data format: Expected array");
       }
 
-      // Format and set customer data
       const formattedOptions = data.map((item) => ({
         value: item.cardCode,
-        label: `${item.cardCode} - ${item.cardName}`,
-        cardName: item.cardName,
+        label: `${item.cardCode} - ${item.cardName}`, // Keep combined display label
+        cardCode: item.cardCode,  // Add separate cardCode
+        cardName: item.cardName,  // Add separate cardName
       }));
 
       setCustomers(formattedOptions);
       setIsLoading(false);
-      setRetryCount(0); // Reset retry count on success
+      setRetryCount(0);
+      toast.dismiss("customersFetch");
 
       if (formattedOptions.length === 0) {
-        toast.warning("No customers found in the database");
+        toast('No customers found in the database', {
+          icon: '⚠️',
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#856404',
+            padding: '16px',
+            borderLeft: '6px solid #ffc107',
+            borderRadius: '4px'
+          }
+        });
       } else {
-        toast.success(`Successfully loaded ${formattedOptions.length} customers`);
+        toast.success(`Successfully loaded ${formattedOptions.length} customers`, {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#28a745',
+            padding: '16px',
+            borderLeft: '6px solid #28a745',
+            borderRadius: '4px'
+          },
+          iconTheme: {
+            primary: '#28a745',
+            secondary: '#fff'
+          }
+        });
       }
 
     } catch (error) {
       console.error("Error fetching customers:", error);
       setCustomers([]);
       setIsLoading(false);
+      toast.dismiss("customersFetch");
 
-      // Handle specific errors
       if (error.name === 'AbortError') {
         toast.error("Request timed out. Retrying...", {
-          autoClose: 2000
+          duration: 3000,
+          style: {
+            background: '#fff',
+            color: '#dc3545',
+            padding: '16px',
+            borderLeft: '6px solid #dc3545',
+            borderRadius: '4px'
+          }
         });
       } else {
         toast.error(`Failed to fetch customers: ${error.message}`, {
-          autoClose: 3000
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#dc3545',
+            padding: '16px',
+            borderLeft: '6px solid #dc3545',
+            borderRadius: '4px'
+          },
+          iconTheme: {
+            primary: '#dc3545',
+            secondary: '#fff'
+          }
         });
       }
 
-      // Implement retry logic
       if (retryCount < MAX_RETRY_ATTEMPTS) {
-        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff
-        toast.info(`Retrying in ${retryDelay/1000} seconds...`, {
-          autoClose: retryDelay
+        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+        toast.error(`Retrying in ${retryDelay/1000} seconds...`, {
+          duration: retryDelay,
+          style: {
+            background: '#fff',
+            color: '#dc3545',
+            padding: '16px',
+            borderLeft: '6px solid #dc3545',
+            borderRadius: '4px'
+          }
         });
         
         setTimeout(() => {
@@ -441,15 +556,23 @@ const AddNewJobs = () => {
           fetchCustomers();
         }, retryDelay);
       } else {
-        toast.error("Maximum retry attempts reached. Reloading page...", {
-          autoClose: 2000
+        toast.error("Maximum retry attempts reached. Please refresh the page.", {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#dc3545',
+            padding: '16px',
+            borderLeft: '6px solid #dc3545',
+            borderRadius: '4px'
+          }
         });
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+        
+        // Reset retry count after max attempts
+        setRetryCount(0);
       }
     }
   };
+
   useEffect(() => {
     let isMounted = true;
   
@@ -481,12 +604,8 @@ const AddNewJobs = () => {
         const usersSnapshot = await getDocs(usersCollection);
         const usersList = usersSnapshot.docs.map((doc) => ({
           value: doc.id,
-          label:
-            doc.data().workerId +
-            " - " +
-            doc.data().firstName +
-            " " +
-            doc.data().lastName,
+          label: doc.data().firstName + " " + doc.data().lastName, // Remove workerId prefix
+          workerId: doc.data().workerId // Keep workerId as separate property if needed
         }));
         setWorkers(usersList);
       } catch (error) {
@@ -600,13 +719,13 @@ const AddNewJobs = () => {
 
   const handleCustomerChange = async (selectedOption) => {
     console.log("handleCustomerChange called with:", selectedOption);
-  
-    setSelectedContact(null);
-    setSelectedLocation(null);
+
+        setSelectedContact(null);
+        setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
-    setSelectedServiceCall(null);
-    setSelectedSalesOrder(null);
-  
+        setSelectedServiceCall(null);
+        setSelectedSalesOrder(null);
+        
     const selectedCustomer = customers.find(
       (option) => option.value === selectedOption.value
     );
@@ -615,7 +734,8 @@ const AddNewJobs = () => {
   
     setFormData((prevFormData) => ({
       ...prevFormData,
-      customerName: selectedCustomer ? selectedCustomer.label : "",
+      customerID: selectedCustomer ? selectedCustomer.cardCode : "",  // Use separate cardCode
+      customerName: selectedCustomer ? selectedCustomer.cardName : "", // Use separate cardName
     }));
   
     // Fetch related data for the selected customer
@@ -646,9 +766,30 @@ const AddNewJobs = () => {
       setContacts(formattedContacts);
   
       if (formattedContacts.length === 0) {
-        toast.warning("No contacts found for this customer.");
+        toast('No contacts found for this customer.', {
+          icon: '⚠️',
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#856404',
+            padding: '16px',
+            borderLeft: '6px solid #ffc107'
+          }
+        });
       } else {
-        toast.success(`Successfully fetched ${formattedContacts.length} contacts.`);
+        toast.success(`Successfully fetched ${formattedContacts.length} contacts.`, {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#28a745',
+            padding: '16px',
+            borderLeft: '6px solid #28a745'
+          },
+          iconTheme: {
+            primary: '#28a745',
+            secondary: '#fff'
+          }
+        });
       }
   
       // Fetch locations for the customer
@@ -667,17 +808,74 @@ const AddNewJobs = () => {
       const locationsData = await locationsResponse.json();
       console.log("Fetched locations:", locationsData);
   
-      const formattedLocations = locationsData.map((item) => ({
-        value: item.siteId,
-        label: item.siteId,
-        ...item,
-      }));
-      setLocations(formattedLocations);
+      // Format locations with more detailed information
+      const formattedLocations = locationsData
+        .sort((a, b) => {
+          // Sort by addressType ('B' comes before 'S')
+          if (a.addressType === 'B' && b.addressType === 'S') return -1;
+          if (a.addressType === 'S' && b.addressType === 'B') return 1;
+          return a.address.localeCompare(b.address);
+        })
+        .map((item) => ({
+          value: item.siteId,
+          label: (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontWeight: 'bold' }}>
+                {item.building ? `${item.building} - ` : ''}{item.address}
+              </div>
+              <div style={{ fontSize: '0.85em', color: '#666' }}>
+                {[
+                  item.city,
+                  item.stateProvince,
+                  item.zipCode,
+                  item.countryName
+                ].filter(Boolean).join(', ')}
+              </div>
+            </div>
+          ),
+          subLabel: `${item.city}, ${item.stateProvince} ${item.zipCode}`,
+          addressType: item.addressType,
+          ...item,
+        }));
+  
+      const groupedLocations = [
+        {
+          label: 'Billing Addresses',
+          options: formattedLocations.filter(loc => loc.addressType === 'B')
+        },
+        {
+          label: 'Shipping Addresses', 
+          options: formattedLocations.filter(loc => loc.addressType === 'S')
+        }
+      ];
+  
+      setLocations(groupedLocations);
   
       if (formattedLocations.length === 0) {
-        toast.warning("No locations found for this customer.");
+        toast('No locations found for this customer.', {
+          icon: '⚠️',
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#856404',
+            padding: '16px',
+            borderLeft: '6px solid #ffc107'
+          }
+        });
       } else {
-        toast.success(`Successfully fetched ${formattedLocations.length} locations.`);
+        toast.success(`Successfully fetched ${formattedLocations.length} locations.`, {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#28a745',
+            padding: '16px',
+            borderLeft: '6px solid #28a745'
+          },
+          iconTheme: {
+            primary: '#28a745',
+            secondary: '#fff'
+          }
+        });
       }
   
       // Fetch equipments for the customer
@@ -704,9 +902,30 @@ const AddNewJobs = () => {
       setEquipments(formattedEquipments);
   
       if (formattedEquipments.length === 0) {
-        toast.warning("No equipments found for this customer.");
+        toast('No equipments found for this customer.', {
+          icon: '⚠️',
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#856404',
+            padding: '16px',
+            borderLeft: '6px solid #ffc107'
+          }
+        });
       } else {
-        toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`);
+        toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`, {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#28a745',
+            padding: '16px',
+            borderLeft: '6px solid #28a745'
+          },
+          iconTheme: {
+            primary: '#28a745',
+            secondary: '#fff'
+          }
+        });
       }
   
       // Fetch service calls for the customer
@@ -732,9 +951,30 @@ const AddNewJobs = () => {
       setServiceCalls(formattedServiceCalls);
   
       if (formattedServiceCalls.length === 0) {
-        toast.warning("No service calls found for this customer.");
+        toast('No service calls found for this customer.', {
+          icon: '⚠️',
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#856404',
+            padding: '16px',
+            borderLeft: '6px solid #ffc107'
+          }
+        });
       } else {
-        toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`);
+        toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`, {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#28a745',
+            padding: '16px',
+            borderLeft: '6px solid #28a745'
+          },
+          iconTheme: {
+            primary: '#28a745',
+            secondary: '#fff'
+          }
+        });
       }
   
       // Clear sales orders when customer changes
@@ -742,7 +982,19 @@ const AddNewJobs = () => {
   
     } catch (error) {
       console.error("Error in handleCustomerChange:", error);
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`, {
+        duration: 5000,
+        style: {
+          background: '#fff',
+          color: '#dc3545',
+          padding: '16px',
+          borderLeft: '6px solid #dc3545'
+        },
+        iconTheme: {
+          primary: '#dc3545',
+          secondary: '#fff'
+        }
+      });
       setContacts([]);
       setLocations([]);
       setEquipments([]);
@@ -754,8 +1006,8 @@ const AddNewJobs = () => {
   const handleJobContactTypeChange = (selectedOption) => {
     setSelectedJobContactType(selectedOption);
     
-    setFormData(prevData => ({
-      ...prevData,
+      setFormData(prevData => ({
+        ...prevData,
       jobContactType: {
         code: selectedOption ? selectedOption.value : "",
         name: selectedOption ? selectedOption.label : ""
@@ -774,7 +1026,7 @@ const AddNewJobs = () => {
 
     setFormData((prevFormData) => ({
       ...prevFormData,
-      contact: {
+        contact: {
         ...prevFormData.contact, // Ensure you don't overwrite other fields like notification
         contactID: selectedOption.value || "",
         contactFullname: fullName,
@@ -789,34 +1041,59 @@ const AddNewJobs = () => {
   };
 
   const handleLocationChange = async (selectedOption) => {
-    const selectedLocation = locations.find(
-      (location) => location.value === selectedOption.value
-    );
+    console.log("Selected Location:", selectedOption); // For debugging
+
+    // Find the selected location from the flattened options
+    const selectedLocation = selectedOption;
 
     setSelectedLocation(selectedLocation);
 
     // Update nested `location` and `address` in `formData`
     setFormData((prevFormData) => ({
       ...prevFormData,
-      location: {
-        ...prevFormData.location, // Spread existing location object
-        locationName: selectedLocation.label || "",
-        address: {
+        location: {
+        ...prevFormData.location,
+        locationName: selectedLocation.address || "", // Changed from label
+        addressType: selectedLocation.addressType || "", // Added addressType
+          address: {
           ...prevFormData.location.address,
           streetNo: selectedLocation.streetNo || "",
-          streetAddress: selectedLocation.street || "",
+          streetAddress: selectedLocation.address || "",
           block: selectedLocation.block || "",
           buildingNo: selectedLocation.building || "",
           country: selectedLocation.countryName || "",
           stateProvince: selectedLocation.stateProvince || "",
           city: selectedLocation.city || "",
           postalCode: selectedLocation.zipCode || "",
+          addressType: selectedLocation.addressType === 'B' ? 'Billing' : 'Shipping', // Added human-readable addressType
         },
+        displayAddress: `${selectedLocation.building ? `${selectedLocation.building} - ` : ''}${selectedLocation.address}`, // Added formatted display address
+        fullAddress: [
+          selectedLocation.building && `${selectedLocation.building}`,
+          selectedLocation.address,
+          selectedLocation.city,
+          selectedLocation.stateProvince,
+          selectedLocation.zipCode,
+          selectedLocation.countryName
+        ].filter(Boolean).join(', '), // Added full formatted address
       },
     }));
 
     try {
-      const coordinates = await fetchCoordinates(selectedLocation.street);
+      // Construct full address for geocoding
+      const fullAddress = [
+        selectedLocation.building && `${selectedLocation.building}`,
+        selectedLocation.address,
+        selectedLocation.city,
+        selectedLocation.stateProvince,
+        selectedLocation.zipCode,
+        selectedLocation.countryName
+      ].filter(Boolean).join(', ');
+
+      console.log("Geocoding address:", fullAddress); // For debugging
+
+      const coordinates = await fetchCoordinates(fullAddress);
+      
       setFormData((prevFormData) => ({
         ...prevFormData,
         location: {
@@ -827,28 +1104,60 @@ const AddNewJobs = () => {
           },
         },
       }));
+
+      toast.success(`Location coordinates fetched successfully`, {
+        duration: 3000,
+        style: {
+          background: '#fff',
+          color: '#28a745',
+          padding: '16px',
+          borderLeft: '6px solid #28a745'
+        }
+      });
+
     } catch (error) {
-      console.error("Error fetching related data:", error);
-      toast.error(`Error: ${error.message}`);
-      setContacts([]);
-      setLocations([]);
-      setEquipments([]);
-      setServiceCalls([]);
-      setSalesOrders([]);
+      console.error("Error fetching coordinates:", error);
+      toast.error(`Error fetching location coordinates: ${error.message}`, {
+        duration: 5000,
+        style: {
+          background: '#fff',
+          color: '#dc3545',
+          padding: '16px',
+          borderLeft: '6px solid #dc3545'
+        }
+      });
     }
   };
 
   const handleSelectedServiceCallChange = async (selectedServiceCall) => {
     console.log("handleSelectedServiceCallChange called with:", selectedServiceCall);
     setSelectedServiceCall(selectedServiceCall);
+    setSelectedSalesOrder(null); // Reset sales order selection
     
+    if (!selectedServiceCall) {
+      setSalesOrders([]); // Clear sales orders if no service call selected
+      toast.error('Please select a service call', {
+        duration: 3000,
+        style: {
+          background: '#fff',
+          color: '#dc3545',
+          padding: '16px',
+          borderLeft: '6px solid #dc3545'
+        }
+      });
+      return;
+    }
+
     if (selectedCustomer && selectedServiceCall) {
       try {
+        // Show loading toast
+        toast.loading("Fetching sales orders...", { id: "salesOrdersFetch" });
+
         console.log('Fetching sales orders with:', {
           cardCode: selectedCustomer.value,
           serviceCallID: selectedServiceCall.value
         });
-  
+
         const salesOrderResponse = await fetch("/api/getSalesOrder", {
           method: "POST",
           headers: {
@@ -859,25 +1168,43 @@ const AddNewJobs = () => {
             serviceCallID: selectedServiceCall.value 
           }),
         });
-  
+
         if (!salesOrderResponse.ok) {
           const errorData = await salesOrderResponse.json();
           console.error('Sales order fetch error:', errorData);
-          toast.error(`Error fetching sales orders: ${errorData.error || 'Unknown error'}`);
+          toast.dismiss("salesOrdersFetch");
+          toast.error(`Error fetching sales orders: ${errorData.error || 'Unknown error'}`, {
+            duration: 5000,
+            style: {
+              background: '#fff',
+              color: '#dc3545',
+              padding: '16px',
+              borderLeft: '6px solid #dc3545'
+            }
+          });
           setSalesOrders([]);
           return;
         }
-  
+
         const response = await salesOrderResponse.json();
         console.log("Fetched sales orders:", response);
-  
+
         if (!response.value) {
           console.error('Unexpected response format:', response);
-          toast.error('Unexpected response format from server');
+          toast.dismiss("salesOrdersFetch");
+          toast.error('No sales orders found for this service call', {
+            duration: 5000,
+            style: {
+              background: '#fff',
+              color: '#dc3545',
+              padding: '16px',
+              borderLeft: '6px solid #dc3545'
+            }
+          });
           setSalesOrders([]);
           return;
         }
-  
+
         const formattedSalesOrders = response.value.map((item) => ({
           value: item.DocNum.toString(),
           label: `${item.DocNum} - ${getStatusText(item.DocStatus)}`,
@@ -886,20 +1213,53 @@ const AddNewJobs = () => {
         }));
         
         setSalesOrders(formattedSalesOrders);
-  
+        toast.dismiss("salesOrdersFetch");
+
+        // Show success or warning toast based on the number of sales orders found
         if (formattedSalesOrders.length === 0) {
-          toast.warning("No sales orders found for this service call.");
+          toast('No sales orders found for this service call', {
+            icon: '⚠️',
+            duration: 5000,
+            style: {
+              background: '#fff',
+              color: '#856404',
+              padding: '16px',
+              borderLeft: '6px solid #ffc107',
+              borderRadius: '4px'
+            }
+          });
         } else {
-          toast.success(`Successfully fetched ${formattedSalesOrders.length} sales orders.`);
+          toast.success(`Found ${formattedSalesOrders.length} sales order${formattedSalesOrders.length > 1 ? 's' : ''} for Service Call ${selectedServiceCall.value}`, {
+            duration: 5000,
+            style: {
+              background: '#fff',
+              color: '#28a745',
+              padding: '16px',
+              borderLeft: '6px solid #28a745',
+              borderRadius: '4px'
+            },
+            iconTheme: {
+              primary: '#28a745',
+              secondary: '#fff'
+            }
+          });
         }
 
       } catch (error) {
         console.error("Error fetching sales orders:", error);
-        toast.error(`Error: ${error.message}`);
+        toast.dismiss("salesOrdersFetch");
+        toast.error(`Error: ${error.message}`, {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#dc3545',
+            padding: '16px',
+            borderLeft: '6px solid #dc3545',
+            borderRadius: '4px'
+          }
+        });
         setSalesOrders([]);
       }
-    } else {
-      setSalesOrders([]); // Clear sales orders if either customer or service call is not selected
     }
   };
   
@@ -989,143 +1349,326 @@ const AddNewJobs = () => {
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prevState) => ({
-      ...prevState,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  const calculateDuration = (startTime, endTime) => {
+    if (!startTime || !endTime) return { hours: 0, minutes: 0 };
 
-    // If the scheduleSession is changed to 'custom', make sure the time inputs are editable
-    if (name === 'scheduleSession' && value === 'custom') {
-      setFormData(prevState => ({
-        ...prevState,
-        scheduleSession: 'custom',
-        // You might want to reset times here or keep the existing ones
-      }));
+    const start = new Date(`2000/01/01 ${startTime}`);
+    const end = new Date(`2000/01/01 ${endTime}`);
+    
+    // If end time is before start time, assume it's next day
+    if (end < start) {
+      end.setDate(end.getDate() + 1);
     }
 
-    // SENT API THRU SAP
+    const diffMs = end - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    return {
+      hours: Math.floor(diffMins / 60),
+      minutes: diffMins % 60
+    };
   };
 
-  const handleSubmitClick = async () => {
-    // Validation function to check required fields
-    const isValid = () => {
-      const requiredFields = [
-        formData.jobName,
-        formData.startDate,
-        formData.endDate,
-        formData.contact?.firstName,
-        formData.location?.locationName,
-      ];
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'startTime' || name === 'endTime') {
+      const newFormData = {
+        ...formData,
+        [name]: value
+      };
 
-      // Check for empty fields
-      for (const field of requiredFields) {
-        if (!field || field.trim() === "") {
-          return false;
-        }
+      // Calculate duration if both times are set
+      if (newFormData.startTime && newFormData.endTime) {
+        const duration = calculateDuration(newFormData.startTime, newFormData.endTime);
+        newFormData.estimatedDurationHours = duration.hours;
+        newFormData.estimatedDurationMinutes = duration.minutes;
       }
 
-      // Check if there are any assigned workers
-      if (selectedWorkers.length === 0) {
-        return false;
-      }
-
-      return true;
-    };
-
-    if (!isValid()) {
-      // If validation fails, show a SweetAlert message
-      Swal.fire({
-        title: "Validation Error!",
-        text: "Please fill in all required fields before submitting.",
-        icon: "error",
+      setFormData(newFormData);
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
       });
-      return;
     }
+  };
 
-    // Function to check for overlapping jobs for assigned workers
-    const checkForOverlappingJobs = async () => {
+  // Function to check for overlapping jobs with improved date handling and worker schedule checking
+  const checkForOverlappingJobs = async () => {
+    try {
       const existingJobsRef = collection(db, "jobs");
-
       const promises = selectedWorkers.map(async (worker) => {
         console.log(`Checking for overlaps for worker: ${worker.label}`);
 
+        // Update query to properly check assignedWorkers array
         const existingJobsQuery = query(
           existingJobsRef,
-          where("assignedWorkers", "array-contains", { workerId: worker.value })
+          where("assignedWorkers", "array-contains", {
+            workerId: worker.value,
+            workerName: worker.label
+          })
         );
 
         const querySnapshot = await getDocs(existingJobsQuery);
 
-        const formattedStartDateTime = new Date(
-          `${formData.startDate}T${formData.startTime}`
-        ).getTime(); // Convert to timestamp
-        const formattedEndDateTime = new Date(
-          `${formData.endDate}T${formData.endTime}`
-        ).getTime(); // Convert to timestamp
+        // Parse dates using a more reliable method
+        const newJobStart = new Date(`${formData.startDate}T${formData.startTime}`);
+        const newJobEnd = new Date(`${formData.endDate}T${formData.endTime}`);
 
-        console.log(`Formatted Start Time: ${formattedStartDateTime}`);
-        console.log(`Formatted End Time: ${formattedEndDateTime}`);
+        console.log(`New Job Schedule - Start: ${newJobStart}, End: ${newJobEnd}`);
+
+        const conflicts = [];
 
         for (const doc of querySnapshot.docs) {
           const jobData = doc.data();
-          const jobStartDateTime = new Date(jobData.startDate).getTime();
-          const jobEndDateTime = new Date(jobData.endDate).getTime();
+          
+          // Parse existing job dates
+          const existingJobStart = new Date(jobData.startDate);
+          const existingJobEnd = new Date(jobData.endDate);
 
-          console.log(`Checking job: ${jobData.jobName || "Unnamed Job"}`);
-          console.log(
-            `Job Start Time: ${jobStartDateTime}, Job End Time: ${jobEndDateTime}`
+          console.log(`Existing Job (${doc.id}) - Start: ${existingJobStart}, End: ${existingJobEnd}`);
+
+          // Check for overlap with improved date comparison
+          const hasOverlap = (
+            (newJobStart <= existingJobEnd && newJobEnd >= existingJobStart) ||
+            (existingJobStart <= newJobEnd && existingJobEnd >= newJobStart)
           );
 
-          // Check for overlap
-          if (
-            (formattedStartDateTime < jobEndDateTime &&
-              formattedEndDateTime > jobStartDateTime) || // New job starts before existing job ends
-            (jobStartDateTime < formattedEndDateTime &&
-              jobEndDateTime > formattedStartDateTime) // Existing job starts before new job ends
-          ) {
-            console.log(`Overlap found for worker: ${worker.label}`);
-            return {
+          if (hasOverlap) {
+            conflicts.push({
               workerId: worker.value,
-              message: `Worker ${worker.label} is already assigned to another job during this schedule.`,
-            };
+              workerName: worker.label,
+              conflictingJobId: doc.id,
+              conflictingJobTime: `${existingJobStart.toLocaleDateString()} ${existingJobStart.toLocaleTimeString()} - ${existingJobEnd.toLocaleTimeString()}`,
+              message: `Worker ${worker.label} has a scheduling conflict with Job #${doc.id} (${existingJobStart.toLocaleDateString()} ${existingJobStart.toLocaleTimeString()} - ${existingJobEnd.toLocaleTimeString()})`
+            });
           }
         }
 
-        console.log(`No overlap found for worker: ${worker.label}`);
+        return conflicts.length > 0 ? conflicts : undefined;
       });
 
       const results = await Promise.all(promises);
-      const errors = results.filter((result) => result !== undefined);
-
-      console.log(`Overlap checking completed. Found ${errors.length} errors.`);
-      return errors; // Return any overlap errors found
-    };
-
-    // Check for overlaps before creating the job
-    const overlapErrors = await checkForOverlappingJobs();
-    if (overlapErrors.length > 0) {
-      // If there are any overlap errors, ask for user confirmation
-      const errorMessages = overlapErrors
-        .map((error) => error.message)
-        .join("\n");
-
-      const confirmation = await Swal.fire({
-        title: "Overlap Warning!",
-        text: `The following overlaps were found:\n${errorMessages}\nDo you want to proceed anyway?`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Yes, proceed",
-        cancelButtonText: "No, cancel",
-      });
-
-      if (!confirmation.isConfirmed) {
-        return; // Exit if the user chooses to cancel
-      }
+      const allConflicts = results.filter(Boolean).flat();
+      
+      console.log("Schedule conflict check results:", allConflicts);
+      return allConflicts;
+    } catch (error) {
+      console.error("Error checking for schedule conflicts:", error);
+      throw new Error(`Failed to check schedule conflicts: ${error.message}`);
     }
+  };
 
+  // Add this function before handleSubmitClick
+  const handleSubmitSuccess = async ({ jobId }) => {
     try {
+      // Show success message with Swal
+      await Swal.fire({
+        icon: 'success',
+        title: 'Job Created Successfully!',
+        text: `Job #${jobId} has been created`,
+        confirmButtonText: 'View Job',
+        showCancelButton: true,
+        cancelButtonText: 'Create Another',
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#6c757d',
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // Redirect to job details page
+          router.push(`/dashboard/jobs/${jobId}`);
+        } else {
+          // Reset form for creating another job
+          setFormData({
+            ...initialFormState, // Make sure to define initialFormState at the top of your component
+            jobNo: generateNewJobNo(), // You'll need to implement this function
+          });
+          setSelectedCustomer(null);
+          setSelectedContact(null);
+          setSelectedLocation(null);
+          setSelectedWorkers([]);
+          setTasks([]);
+          setProgress(0);
+          setIsSubmitting(false);
+          setActiveKey('summary');
+        }
+      });
+    } catch (error) {
+      console.error("Error in success handling:", error);
+      toast.error("Error handling success state", {
+        duration: 5000,
+        style: {
+          background: '#fff',
+          color: '#dc3545',
+          padding: '16px',
+          borderLeft: '6px solid #dc3545'
+        }
+      });
+    }
+  };
+
+  // Add this at the top with your other state declarations
+  const initialFormState = {
+    jobID: "",
+    jobNo: "",
+    jobName: "",
+    jobDescription: "",
+    priority: "",
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
+    estimatedDurationHours: "",
+    estimatedDurationMinutes: "",
+    scheduleSession: "custom",
+    customerID: "",
+    customerName: "",
+    contact: {
+      contactID: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      phoneNumber: "",
+      mobilePhone: "",
+      email: "",
+    },
+    location: {
+      locationName: "",
+      address: {
+        streetNo: "",
+        streetAddress: "",
+        block: "",
+        buildingNo: "",
+        country: "",
+        stateProvince: "",
+        city: "",
+        postalCode: "",
+      }
+    },
+    equipments: [],
+    adminWorkerNotify: false,
+    customerNotify: false,
+  };
+
+  // Add this function to generate new job numbers
+  const generateNewJobNo = () => {
+    const date = new Date();
+    const year = date.getFullYear().toString().substr(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `JOB${year}${month}${day}${random}`;
+  };
+
+  // Updated handleSubmitClick function
+  const handleSubmitClick = async () => {
+    try {
+      // Log all form data before submission
+      console.log("=== FORM SUBMISSION DATA ===");
+      console.log("Form Data:", {
+        ...formData,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+      });
+      console.log("Selected Customer:", selectedCustomer);
+      console.log("Selected Contact:", selectedContact);
+      console.log("Selected Location:", selectedLocation);
+      console.log("Selected Service Call:", selectedServiceCall);
+      console.log("Selected Sales Order:", selectedSalesOrder);
+      console.log("Selected Workers:", selectedWorkers);
+      console.log("Tasks:", tasks);
+      console.log("Job Contact Type:", selectedJobContactType);
+      console.log("=== END FORM DATA ===");
+
+      // Validation check
+      const missingFields = [];
+      if (!selectedCustomer) missingFields.push("Customer");
+      if (!selectedContact) missingFields.push("Contact");
+      if (!selectedLocation) missingFields.push("Location");
+      if (!selectedWorkers.length) missingFields.push("Assigned Workers");
+      if (!formData.startDate) missingFields.push("Start Date");
+      if (!formData.endDate) missingFields.push("End Date");
+      if (!formData.startTime) missingFields.push("Start Time");
+      if (!formData.endTime) missingFields.push("End Time");
+      if (!formData.jobName) missingFields.push("Job Name");
+      if (!formData.priority) missingFields.push("Priority");
+      if (!selectedJobContactType) missingFields.push("Job Contact Type");
+
+      if (missingFields.length > 0) {
+        console.log("Missing Required Fields:", missingFields);
+        toast.error(
+          <div>
+            <strong>Please fill in all required fields:</strong>
+            <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+              {missingFields.map((field, index) => (
+                <li key={index}>{field}</li>
+              ))}
+            </ul>
+          </div>,
+          {
+            duration: 5000,
+            style: {
+              background: '#fff',
+              color: '#dc3545',
+              padding: '16px',
+              borderLeft: '6px solid #dc3545',
+              maxWidth: '500px'
+            }
+          }
+        );
+        return;
+      }
+
+      setProgress(0);
+      setIsSubmitting(true);
+
+      console.log("Starting submission process...");
+      setProgress(20);
+
+      // Check for overlaps
+      console.log("Checking for schedule conflicts...");
+      setProgress(40);
+      const conflicts = await checkForOverlappingJobs();
+
+      if (conflicts.length > 0) {
+        // Create a formatted message showing all conflicts
+        const conflictMessage = conflicts.map(conflict => 
+          `• ${conflict.message}`
+        ).join('\n');
+
+        const result = await Swal.fire({
+          title: 'Schedule Conflicts Detected',
+          html: `
+            <div class="text-start">
+              <p class="mb-3">The following scheduling conflicts were found:</p>
+              <div class="alert alert-warning">
+                ${conflicts.map(c => `<p class="mb-2">${c.message}</p>`).join('')}
+              </div>
+              <p class="mt-3">Do you want to proceed with creating this job anyway?</p>
+            </div>
+          `,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, proceed anyway',
+          cancelButtonText: 'No, let me adjust the schedule',
+          confirmButtonColor: '#28a745',
+          cancelButtonColor: '#dc3545',
+          customClass: {
+            htmlContainer: 'text-start'
+          }
+        });
+
+        if (!result.isConfirmed) {
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Format dates and create updated form data
+      console.log("Formatting dates and preparing form data...");
+      setProgress(60);
       const formattedStartDateTime = formatDateTime(
         formData.startDate,
         formData.startTime
@@ -1135,211 +1678,176 @@ const AddNewJobs = () => {
         formData.endTime
       );
 
-      const assignedWorkers = selectedWorkers.map((worker) => ({
-        workerId: worker.value,
-      }));
-
+      // Prepare the form data
       const updatedFormData = {
-        ...formData,
-        jobID: jobNo,
-        jobNo: jobNo,
-        serviceCallID: selectedServiceCall ? selectedServiceCall.value : "",
-        salesOrderID: selectedSalesOrder ? selectedSalesOrder.value : "",
-        assignedWorkers,
-        customerID: selectedCustomer ? selectedCustomer.value : "",
-        startDate: formattedStartDateTime,
-        endDate: formattedEndDateTime,
-        location: selectedLocation
-          ? {
-              locationName: selectedLocation.label,
-              address: {
-                streetNo: selectedLocation.streetNo || "",
-                streetAddress: selectedLocation.street || "",
-                block: selectedLocation.block || "",
-                city: selectedLocation.city || "",
-                stateProvince: selectedLocation.stateProvince || "",
-                postalCode: selectedLocation.postalCode || "",
-              },
-              coordinates: {
-                latitude: formData.location.coordinates.latitude,
-                longitude: formData.location.coordinates.longitude,
-              },
-            }
-          : null,
-        taskList: tasks.map((task) => ({
+        // Basic Job Info
+        jobID: jobNo || "",
+        jobNo: jobNo || "",
+        jobName: formData.jobName || "",
+        jobDescription: formData.jobDescription || "",
+        jobStatus: "Created",
+        priority: formData.priority || "",
+
+        // Customer Info
+        customerID: selectedCustomer?.cardCode || "",
+        customerName: selectedCustomer?.cardName || "",
+
+        // Dates and Times
+        startDate: formattedStartDateTime || null,
+        endDate: formattedEndDateTime || null,
+        startTime: formData.startTime || "",
+        endTime: formData.endTime || "",
+
+        // Location
+        location: {
+          locationName: selectedLocation?.address || "",
+          siteId: selectedLocation?.value || "",
+          addressType: selectedLocation?.addressType || "",
+          address: {
+            streetNo: selectedLocation?.streetNo || "",
+            streetAddress: selectedLocation?.address || "",
+            block: selectedLocation?.block || "",
+            buildingNo: selectedLocation?.building || "",
+            city: selectedLocation?.city || "",
+            stateProvince: selectedLocation?.stateProvince || "",
+            postalCode: selectedLocation?.zipCode || "",
+            country: selectedLocation?.countryName || "",
+          },
+          coordinates: formData.location?.coordinates || {
+            latitude: "",
+            longitude: ""
+          },
+          displayAddress: `${selectedLocation?.building ? `${selectedLocation.building} - ` : ''}${selectedLocation?.address}`,
+          fullAddress: [
+            selectedLocation?.building && `${selectedLocation.building}`,
+            selectedLocation?.address,
+            selectedLocation?.city,
+            selectedLocation?.stateProvince,
+            selectedLocation?.zipCode,
+            selectedLocation?.countryName
+          ].filter(Boolean).join(', ')
+        },
+
+        // Contact
+        contact: {
+          contactID: selectedContact?.contactID || "",
+          contactFullname: selectedContact?.contactFullname || "",
+          contactEmail: selectedContact?.contactEmail || "",
+          contactPhone: selectedContact?.contactPhone || "",
+        },
+
+        // Workers
+        assignedWorkers: selectedWorkers.map(worker => ({
+          workerId: worker.value || "",
+          workerName: worker.label || "",
+        })),
+
+        // Tasks
+        taskList: tasks.map(task => ({
           taskID: task.taskID || "",
           taskName: task.taskName || "",
           taskDescription: task.taskDescription || "",
           assignedTo: task.assignedTo || "",
-          isPriority: task.isPriority || false,
-          isDone: task.isDone || false,
-          completionDate: task.completionDate || null,
+          isPriority: Boolean(task.isPriority),
+          isDone: Boolean(task.isDone),
+          completionDate: task.completionDate ? Timestamp.fromDate(new Date(task.completionDate)) : null,
         })),
-        equipments: formData.equipments.map((equipment) => ({
-          itemCode: equipment.itemCode || "",
-          itemName: equipment.itemName || "",
-          itemGroup: equipment.itemGroup || "",
-          brand: equipment.brand || "",
-          equipmentLocation: equipment.equipmentLocation || "",
-          equipmentType: equipment.equipmentType || "",
-          modelSeries: equipment.modelSeries || "",
-          serialNo: equipment.serialNo || "",
-          notes: equipment.notes || "",
-          warrantyStartDate: equipment.warrantyStartDate || null,
-          warrantyEndDate: equipment.warrantyEndDate || null,
-        })),
-        customerSignature: {
-          signatureURL: formData.customerSignature.signatureURL || "",
-          signedBy: formData.contactFullname || "",
-          signatureTimestamp:
-            formData.customerSignature.signatureTimestamp || null,
+
+        // Metadata
+        createdBy: {
+          workerId: currentUser.workerId || "unknown",
+          fullName: currentUser.fullName || "anonymous",
+          timestamp: Timestamp.now(),
         },
+
+        // Timestamps
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
       };
-      // Save the job document
-      const jobRef = doc(db, "jobs", jobNo);
-      await setDoc(jobRef, updatedFormData);
 
-      // Step 1: Get the authenticated user's UID
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-      const uid = currentUser?.uid || "anonymous";
+      // Sanitize the data before saving
+      const sanitizedData = sanitizeDataForFirestore(updatedFormData);
 
-      console.log(
-        "Searching for workerId by matching uid in users collection:",
-        uid
-      );
+      console.log("Sanitized data to be saved:", sanitizedData);
 
-      // Step 2: Load all user documents
-      const usersCollectionRef = collection(db, "users");
-      const usersSnapshot = await getDocs(usersCollectionRef);
+      // Save to Firestore with error handling
+      try {
+        const jobRef = doc(db, "jobs", jobNo);
+        await setDoc(jobRef, sanitizedData);
+        console.log("Successfully saved to Firestore");
+        setProgress(100);
 
-      let workerId = null;
-      let userId = null;
-      let fullName = "anonymous"; // Default value if no match is found
-
-      // Step 3: Loop through each user document and check if `uid` matches
-      usersSnapshot.forEach((doc) => {
-        const userData = doc.data();
-        if (userData.uid === uid) {
-          workerId = userData.workerId;
-          userId = userData.userId; // Get the workerId from the document where uid matches
-          console.log("Matching workerId found:", workerId);
-        }
-      });
-
-      // Step 4: If a workerId was found, use it to get the user's full name
-      if (workerId) {
-        const workerDocRef = doc(db, "users", workerId); // Now fetch the document by workerId
-        const workerDoc = await getDoc(workerDocRef);
-
-        if (workerDoc.exists()) {
-          const workerData = workerDoc.data();
-          if (workerData.fullName) {
-            fullName = workerData.fullName; // Get the fullName from the worker document
-            console.log("Full name found:", fullName);
+        // Show success message
+        toast.success("Job created successfully!", {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#28a745',
+            padding: '16px',
+            borderLeft: '6px solid #28a745'
           }
-        } else {
-          console.log(`No document found for workerId: ${workerId}`);
-        }
-      } else {
-        console.log("No matching user found for the current UID");
+        });
+
+        // Handle success (redirect, reset form, etc.)
+        handleSubmitSuccess({ jobId: jobNo });
+
+      } catch (firestoreError) {
+        console.error("Firestore save error:", firestoreError);
+        throw new Error(`Failed to save job: ${firestoreError.message}`);
       }
 
-      const jobCreatedNotificationRef = collection(db, `notifications`);
-
-      const jobCreatedNotificationEntry = {
-        userID: "all",
-        workerId: "all",
-        jobID: jobNo,
-        notificationType: "Job Created", // Notification type for job creation
-        message: `Job ${formData.jobName} was created by ${fullName}.`,
-        timestamp: Timestamp.now(),
-        readBy: {},
-      };
-
-      const docRefCreated = await addDoc(
-        jobCreatedNotificationRef,
-        jobCreatedNotificationEntry
-      );
-      console.log(
-        `Job Created notification added with ID: ${docRefCreated.id}`
-      );
-
-      assignedWorkers.forEach(async (worker) => {
-        const notificationRef = collection(db, `notifications`);
-
-        // Define the notification entry for each worker
-        const notificationEntry = {
-          userID: userId || "unknown",
-          workerId: worker.workerId,
-          jobID: jobNo,
-          notificationType: "Job Assigned",
-          message: `You have been assigned to Job ${formData.jobName}.`,
-          timestamp: Timestamp.now(), // Current timestamp
-          read: false, // Initially unread
-        };
-
-        // Add the notification entry for the current worker using `addDoc` to generate an auto ID
-        const docRef = await addDoc(notificationRef, notificationEntry);
-        console.log(
-          `Notification created for worker ${worker.workerId} with ID: ${docRef.id}`
-        );
-      });
-
-      const logRef = doc(db, `jobs/${jobNo}/logs`, jobNo);
-      const logEntry = {
-        logID: `${jobNo}`,
-        jobID: jobNo,
-        workerId: workerId || "unknown",
-        uid: uid,
-        event: "Job Created",
-        details: `Job ${formData.jobName} was created by ${fullName}.`, // Use the full name here
-        previousStatus: null,
-        newStatus: formData.jobStatus,
-        timestamp: Timestamp.now(),
-        relatedDocuments: {},
-      };
-
-      // Use `setDoc` to save the document with `jobNo` as the ID
-      await setDoc(logRef, logEntry);
-
-      // Show success SweetAlert and redirect after clicking OK
-      Swal.fire({
-        title: "Success!",
-        text: "Job created successfully.",
-        icon: "success",
-      }).then(() => {
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      });
-
-      // Clear the form data after submission
-      setFormData(initialFormData);
-
-      // Increment jobNo for the UI
-      setJobNo((prevJobNo) =>
-        (parseInt(prevJobNo, 10) + 1).toString().padStart(6, "0")
-      );
-    } catch (e) {
-      console.error("Error adding document: ", e);
-      toast.error("An error occurred while saving data.");
-
-      Swal.fire({
-        title: "Error!",
-        text: "An error occurred while saving data.",
-        icon: "error",
+    } catch (error) {
+      console.error("Submit error:", error);
+      setIsSubmitting(false);
+      setProgress(0);
+      
+      toast.error(`Error creating job: ${error.message}`, {
+        duration: 5000,
+        style: {
+          background: '#fff',
+          color: '#dc3545',
+          padding: '16px',
+          borderLeft: '6px solid #dc3545'
+        }
       });
     }
   };
 
-  const handleSubmit = (event) => {
-    const form = event.currentTarget;
-    if (form.checkValidity() === false) {
-      event.preventDefault();
-      event.stopPropagation();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const missingFields = validateJobForm(formData);
+    
+    if (missingFields.length > 0) {
+      toast.error(
+        <div>
+          <strong>Please check the following:</strong>
+          <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+            {missingFields.map((field, index) => (
+              <li key={index}>{field}</li>
+            ))}
+          </ul>
+        </div>,
+        {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#dc3545',
+            padding: '16px',
+            borderLeft: '6px solid #dc3545',
+            maxWidth: '500px'
+          }
+        }
+      );
+      
+      // If there's a task-related error, switch to the Task tab
+      if (missingFields.some(field => field.toLowerCase().includes('task'))) {
+        setActiveKey('task');
+      }
+      return;
     }
-    setValidated(true);
+
+    // ... rest of your submit logic
   };
 
   // Function to toggle the visibility of the Service Location section
@@ -1369,721 +1877,790 @@ const AddNewJobs = () => {
     initializeCustomer();
   }, [customers]); // Dependency on customers ensures we wait for customer data to load
 
-  return (
-    <Tabs
-      id="noanim-tab-example"
-      activeKey={activeKey}
-      onSelect={(key) => setActiveKey(key)} // Handle tab change event
-      className="mb-3"
+  // Required field indicator component
+  const RequiredField = () => (
+    <OverlayTrigger
+      placement="top"
+      overlay={<Tooltip>This field is required</Tooltip>}
     >
-      <Tab eventKey="summary" title="Job Summary">
-        <Form noValidate validated={validated} onSubmit={handleSubmit}>
-          <Row className="mb-3">
-            <Form.Group as={Col} md="7" controlId="customerList">
-              <Form.Label>
-                Search Customer{' '}
-                <OverlayTrigger
-                  placement="right"
-                  overlay={
-                    <Tooltip id="customer-search-tooltip">
-                      <div className="text-start">
-                        <strong>Customer Search:</strong><br/>
-                        • Search by customer code or name<br/>
-                        • Selection will load related contacts and locations<br/>
-                        • Required to proceed with job creation
-                      </div>
-                    </Tooltip>
+      <FaAsterisk style={{ color: 'red', marginLeft: '4px', fontSize: '8px', verticalAlign: 'super' }} />
+    </OverlayTrigger>
+  );
+
+  // Add this component for fields that need tooltips
+  const RequiredFieldWithTooltip = ({ label }) => (
+    <Form.Label>
+      {label}
+      <OverlayTrigger
+        placement="top"
+        overlay={<Tooltip>This field is required</Tooltip>}
+      >
+        <span className="text-danger" style={{ marginLeft: '4px', cursor: 'help' }}>*</span>
+      </OverlayTrigger>
+    </Form.Label>
+  );
+
+  return (
+    <>
+      <Tabs
+        id="noanim-tab-example"
+        activeKey={activeKey}
+        onSelect={(key) => setActiveKey(key)} // Handle tab change event
+        className="mb-3"
+      >
+        <Tab eventKey="summary" title="Job Summary">
+          <Form noValidate validated={validated} onSubmit={handleSubmit}>
+            <Row className="mb-3">
+              <Form.Group as={Col} md="7" controlId="customerList">
+                <Form.Label>
+                  <RequiredFieldWithTooltip label="Customer"/>
+                  <OverlayTrigger
+                    placement="right"
+                    overlay={
+                      <Tooltip id="customer-search-tooltip">
+                        <div className="text-start">
+                          <strong>Customer Search:</strong><br/>
+                          • Search by customer code or name<br/>
+                          • Selection will load related contacts and locations<br/>
+                          • Required to proceed with job creation
+                        </div>
+                      </Tooltip>
+                    }
+                  >
+                    <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  </OverlayTrigger>
+                </Form.Label>
+                <Select
+                  instanceId="customer-select"
+                  options={customers}
+                  value={selectedCustomer}
+                  onChange={handleCustomerChange}
+                  placeholder={isLoading ? "Loading customers..." : "Enter Customer Name"}
+                  isDisabled={isLoading}
+                  noOptionsMessage={() => 
+                    isLoading ? "Loading..." : "No customers found"
                   }
-                >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-                </OverlayTrigger>
-              </Form.Label>
-              <Select
-                instanceId="customer-select"
-                options={customers}
-                value={selectedCustomer}
-                onChange={handleCustomerChange}
-                placeholder={isLoading ? "Loading customers..." : "Enter Customer Name"}
-                isDisabled={isLoading}
-                noOptionsMessage={() => 
-                  isLoading ? "Loading..." : "No customers found"
-                }
-              />
-            </Form.Group>
-          </Row>
-
-          <hr className="my-4" />
-          <h5 className="mb-1">Primary Contact</h5>
-          <p className="text-muted">Details about the customer.</p>
-
-          <Row className="mb-3">
-            <Form.Group as={Col} md="3" controlId="jobWorker">
-              <Form.Label>
-                Select Contact ID{' '}
-                <OverlayTrigger
-                  placement="right"
-                  overlay={
-                    <Tooltip id="contact-tooltip">
-                      <div className="text-start">
-                        <strong>Contact Information:</strong><br/>
-                        • Shows contacts linked to selected customer<br/>
-                        • Auto-fills contact details<br/>
-                        • Required for job communication
-                      </div>
-                    </Tooltip>
-                  }
-                >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-                </OverlayTrigger>
-              </Form.Label>
-              <Select
-                instanceId="contact-select"
-                options={contacts}
-                value={selectedContact}
-                onChange={handleContactChange}
-                placeholder="Select Contact ID"
-              />
-            </Form.Group>
-          </Row>
-
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="validationCustom01">
-              <Form.Label>First name</Form.Label>
-              <Form.Control
-                required
-                type="text"
-                value={formData.contact.firstName}
-                readOnly
-                disabled
-              />
-              <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="validationCustom02">
-              <Form.Label>Middle name</Form.Label>
-              <Form.Control
-                required
-                type="text"
-                value={formData.contact.middleName}
-                readOnly
-                disabled
-              />
-              <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="validationCustom03">
-              <Form.Label>Last name</Form.Label>
-              <Form.Control
-                required
-                type="text"
-                value={formData.contact.lastName}
-                readOnly
-                disabled
-              />
-              <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
-            </Form.Group>
-          </Row>
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="validationCustomPhoneNumber">
-              <Form.Label>Phone Number</Form.Label>
-              <Form.Control
-                defaultValue={formData.contact.phoneNumber}
-                type="text"
-                readOnly
-                disabled
-              />
-              <Form.Control.Feedback type="invalid">
-                Please provide a valid phone number.
-              </Form.Control.Feedback>
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="validationCustomMobilePhone">
-              <Form.Label>Mobile Phone</Form.Label>
-              <Form.Control
-                defaultValue={formData.contact.mobilePhone}
-                type="text"
-                readOnly
-                disabled
-              />
-              <Form.Control.Feedback type="invalid">
-                Please provide a valid mobile phone number.
-              </Form.Control.Feedback>
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="validationCustomEmail">
-              <Form.Label>Email</Form.Label>
-              <Form.Control
-                defaultValue={formData.contact.email}
-                type="email"
-                readOnly
-                disabled
-              />
-              <Form.Control.Feedback type="invalid">
-                Please provide a valid email.
-              </Form.Control.Feedback>
-            </Form.Group>
-          </Row>
-
-          <hr className="my-4" />
-          <h5
-            className="mb-1"
-            style={{ cursor: "pointer" }}
-            onClick={toggleServiceLocation}
-          >
-            Job Address {showServiceLocation ? "(-)" : "(+)"}
-          </h5>
-          {showServiceLocation && (
-            <>
-              <p className="text-muted">Details about the Job Address.</p>
-              <Row className="mb-3">
-                <Form.Group as={Col} md="4" controlId="jobLocation">
-                  <Form.Label>
-                    Select Location ID{' '}
-                    <OverlayTrigger
-                      placement="right"
-                      overlay={
-                        <Tooltip id="location-tooltip">
-                          <div className="text-start">
-                            <strong>Location Details:</strong><br/>
-                            • Shows addresses linked to customer<br/>
-                            • Auto-fills complete address<br/>
-                            • Used for job site information
-                          </div>
-                        </Tooltip>
-                      }
-                    >
-                      <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-                    </OverlayTrigger>
-                  </Form.Label>
-                  <Select
-                    instanceId="location-select"
-                    options={locations}
-                    value={selectedLocation}
-                    onChange={handleLocationChange}
-                    placeholder="Select Location ID"
-                  />
-                </Form.Group>
-              </Row>
-              <Row className="mb-3">
-                <Form.Group as={Col} controlId="locationName">
-                  <Form.Label>Location Name</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.locationName || ""} // Fallback to an empty string
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} controlId="streetNo">
-                  <Form.Label>Street No.</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.streetNo || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} controlId="streetAddress">
-                  <Form.Label>Street Address</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.streetAddress || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-              </Row>
-              <Row className="mb-3">
-                <Form.Group as={Col} controlId="block">
-                  <Form.Label>Block</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.block || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} controlId="buildingNo">
-                  <Form.Label>Building No.</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.buildingNo || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-              </Row>
-              <Row className="mb-3">
-                <Form.Group as={Col} md="3" controlId="country">
-                  <Form.Label>Country</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.country || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} md="3" controlId="stateProvince">
-                  <Form.Label>State/Province</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.stateProvince || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} md="3" controlId="city">
-                  <Form.Label>City</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.city || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-                <Form.Group as={Col} md="3" controlId="postalCode">
-                  <Form.Label>Zip/Postal Code</Form.Label>
-                  <Form.Control
-                    type="text"
-                    disabled
-                    value={formData.location?.address?.postalCode || ""} // Ensure fallback
-                    readOnly
-                  />
-                </Form.Group>
-              </Row>
-            </>
-          )}
-
-          <hr className="my-4" />
-          <h5
-            className="mb-1"
-            style={{ cursor: "pointer" }}
-            onClick={toggleEquipments}
-          >
-            Job Equipments {showEquipments ? "(-)" : "(+)"}
-          </h5>
-          {showEquipments && (
-            <>
-              <p className="text-muted">Details about the Equipments.</p>
-              <Row className="mb-3">
-                <EquipmentsTable
-                  equipments={equipments}
-                  onSelectedRowsChange={handleSelectedEquipmentsChange}
-                />
-              </Row>
-            </>
-          )}
-          <hr className="my-4" />
-        </Form>
-        <Row className="align-items-center">
-          <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-1">
-            <Button
-              variant="primary"
-              onClick={handleNextClick}
-              className="float-end"
-            >
-              Next
-            </Button>
-          </Col>
-        </Row>
-      </Tab>
-      <Tab eventKey="task" title="Job Task">
-        <JobTask
-          tasks={tasks}
-          addTask={addTask}
-          handleTaskChange={handleTaskChange}
-          handleCheckboxChange={handleCheckboxChange}
-          deleteTask={deleteTask}
-        />
-        <Row className="align-items-center">
-          <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-1">
-            <Button
-              variant="primary"
-              onClick={handleNextClick}
-              className="float-end"
-            >
-              Next
-            </Button>
-          </Col>
-        </Row>
-      </Tab>
-      <Tab eventKey="scheduling" title="Job Scheduling">
-        <Form>
-          <Row className="mb-3">
-            <Col xs="auto">
-              <Form.Group as={Col} controlId="jobNo">
-                <Form.Label>Job No.</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={jobNo}
-                  readOnly
-                  style={{ width: "95px" }}
                 />
               </Form.Group>
-            </Col>
-            {/* <Form.Group as={Col} md="2" controlId="scheduleSession">
-              <Form.Label>Service Call</Form.Label>
-              <Form.Select
-                name="scheduleSession"
-                value={formData.scheduleSession}
-                onChange={handleScheduleSessionChange}
-                aria-label="Select schedule session"
-              >
-                <option value="custom">Custom</option>
-                <option value="morning">Morning (9:30am to 1:00pm)</option>
-                <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group as={Col} md="2" controlId="scheduleSession">
-              <Form.Label>Sales Order</Form.Label>
-              <Form.Select
-                name="scheduleSession"
-                value={formData.scheduleSession}
-                onChange={handleScheduleSessionChange}
-                aria-label="Select schedule session"
-              >
-                <option value="custom">Custom</option>
-                <option value="morning">Morning (9:30am to 1:00pm)</option>
-                <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
-              </Form.Select>
-            </Form.Group> */}
-           <Form.Group as={Col} md="3" controlId="serviceCall">
-            <Form.Label>
-              Service Call{' '}
-              <OverlayTrigger
-                placement="right"
-                overlay={
-                  <Tooltip id="service-call-tooltip">
-                    <div className="text-start">
-                      <strong>Service Call Information:</strong><br/>
-                      • Shows active service calls for customer<br/>
-                      • Links job to existing service request<br/>
-                      • Required for service-related jobs
-                    </div>
-                  </Tooltip>
-                }
-              >
-                <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-              </OverlayTrigger>
-            </Form.Label>
-            <Select
-              instanceId="service-call-select"
-              options={serviceCalls}
-              value={selectedServiceCall}
-              onChange={handleSelectedServiceCallChange}
-              placeholder="Select Service Call"
-            />
-          </Form.Group>
+            </Row>
 
-          <Form.Group as={Col} md="3" controlId="salesOrder">
-            <Form.Label>
-              Sales Order{' '}
-              <OverlayTrigger
-                placement="right"
-                overlay={
-                  <Tooltip id="sales-order-tooltip">
-                    <div className="text-start">
-                      <strong>Sales Order Information:</strong><br/>
-                      • Only shows orders linked to selected service call<br/>
-                      • Displays order number and status<br/>
-                      • Select a service call first to view available orders
-                    </div>
-                  </Tooltip>
-                }
-              >
-                <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-              </OverlayTrigger>
-            </Form.Label>
-            <Select
-              instanceId="sales-order-select"
-              options={salesOrders}
-              value={selectedSalesOrder}
-              onChange={(selectedOption) => setSelectedSalesOrder(selectedOption)}
-              placeholder={selectedServiceCall ? "Select Sales Order" : "Select Service Call first"}
-              isDisabled={!selectedServiceCall}
-              noOptionsMessage={() => selectedServiceCall 
-                ? "No sales orders found for this service call"
-                : "Please select a service call first"
-              }
-            />
-            {!selectedServiceCall && (
-              <div className="mt-1 d-flex align-items-center text-muted">
-                <i className="fe fe-info me-1" style={{ fontSize: '14px' }}></i>
-                <small style={{ 
-                  fontStyle: 'italic',
-                  color: '#6c757d',
-                  lineHeight: '1.2'
-                }}>
-                  Please select a service call to view available sales orders
-                </small>
-              </div>
+            <hr className="my-4" />
+            <h5 className="mb-1">Primary Contact</h5>
+            <p className="text-muted">Details about the customer.</p>
+
+            <Row className="mb-3">
+              <Form.Group as={Col} md="3" controlId="jobWorker">
+                <Form.Label>
+                  <RequiredFieldWithTooltip label="Contact ID"/>
+                  <OverlayTrigger
+                    placement="right"
+                    overlay={
+                      <Tooltip id="contact-tooltip">
+                        <div className="text-start">
+                          <strong>Contact Information:</strong><br/>
+                          • Shows contacts linked to selected customer<br/>
+                           Auto-fills contact details<br/>
+                          • Required for job communication
+                        </div>
+                      </Tooltip>
+                    }
+                  >
+                    <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                  </OverlayTrigger>
+                </Form.Label>
+                <Select
+                  instanceId="contact-select"
+                  options={contacts}
+                  value={selectedContact}
+                  onChange={handleContactChange}
+                  placeholder="Select Contact ID"
+                />
+              </Form.Group>
+            </Row>
+
+            <Row className="mb-3">
+              <Form.Group as={Col} md="4" controlId="validationCustom01">
+                <Form.Label>First name</Form.Label>
+                <Form.Control
+                  required
+                  type="text"
+                  value={formData.contact.firstName}
+                  readOnly
+                  disabled
+                />
+                <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="validationCustom02">
+                <Form.Label>Middle name</Form.Label>
+                <Form.Control
+                  required
+                  type="text"
+                  value={formData.contact.middleName}
+                  readOnly
+                  disabled
+                />
+                <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="validationCustom03">
+                <Form.Label>Last name</Form.Label>
+                <Form.Control
+                  required
+                  type="text"
+                  value={formData.contact.lastName}
+                  readOnly
+                  disabled
+                />
+                <Form.Control.Feedback>Looks good!</Form.Control.Feedback>
+              </Form.Group>
+            </Row>
+            <Row className="mb-3">
+              <Form.Group as={Col} md="4" controlId="validationCustomPhoneNumber">
+                <Form.Label>Phone Number</Form.Label>
+                <Form.Control
+                  defaultValue={formData.contact.phoneNumber}
+                  type="text"
+                  readOnly
+                  disabled
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a valid phone number.
+                </Form.Control.Feedback>
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="validationCustomMobilePhone">
+                <Form.Label>Mobile Phone</Form.Label>
+                <Form.Control
+                  defaultValue={formData.contact.mobilePhone}
+                  type="text"
+                  readOnly
+                  disabled
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a valid mobile phone number.
+                </Form.Control.Feedback>
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="validationCustomEmail">
+                <Form.Label>Email</Form.Label>
+                <Form.Control
+                  defaultValue={formData.contact.email}
+                  type="email"
+                  readOnly
+                  disabled
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a valid email.
+                </Form.Control.Feedback>
+              </Form.Group>
+            </Row>
+
+            <hr className="my-4" />
+            <h5
+              className="mb-1"
+              style={{ cursor: "pointer" }}
+              onClick={toggleServiceLocation}
+            >
+              Job Address {showServiceLocation ? "(-)" : "(+)"}
+            </h5>
+            {showServiceLocation && (
+              <>
+                <p className="text-muted">Details about the Job Address.</p>
+                <Row className="mb-3">
+                  <Form.Group as={Col} md="4" controlId="jobLocation">
+                    <Form.Label>
+                      <RequiredFieldWithTooltip label="Site / Location"/>
+                      <OverlayTrigger
+                        placement="right"
+                        overlay={
+                          <Tooltip id="location-tooltip">
+                            <div className="text-start">
+                              <strong>Location Details:</strong><br/>
+                              • Shows addresses linked to customer<br/>
+                              • Auto-fills complete address<br/>
+                              • Used for job site information
+                            </div>
+                          </Tooltip>
+                        }
+                      >
+                        <i className="fe fe-help-circle text-muted ms-1" style={{ cursor: 'pointer' }}></i>
+                      </OverlayTrigger>
+                    </Form.Label>
+                    <Select
+                      instanceId="location-select"
+                      options={locations}
+                      value={selectedLocation}
+                      onChange={handleLocationChange}
+                      placeholder="Select Site ID"
+                      isGrouped={true}
+                      formatGroupLabel={data => (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          fontSize: '0.9em',
+                          fontWeight: 'bold',
+                          padding: '8px 0',
+                          color: '#2c3e50',
+                          borderBottom: '2px solid #eee',
+                          width: '100%'
+                        }}>
+                          <span>{data.label}</span>
+                          <span style={{
+                            background: '#e9ecef',
+                            borderRadius: '4px',
+                            padding: '2px 8px',
+                            fontSize: '0.8em'
+                          }}>
+                            {data.options.length}
+                          </span>
+                        </div>
+                      )}
+                      formatOptionLabel={option => (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          padding: '4px 0'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ 
+                              fontWeight: '500',
+                              color: '#2c3e50',
+                              marginBottom: '2px'
+                            }}>
+                              {option.building ? `${option.building} - ` : ''}{option.address}
+                            </div>
+                            <div style={{ 
+                              fontSize: '0.85em', 
+                              color: '#666',
+                              lineHeight: '1.3'
+                            }}>
+                              {[
+                                option.city,
+                                option.stateProvince,
+                                option.zipCode,
+                                option.countryName
+                              ].filter(Boolean).join(', ')}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontSize: '0.75em',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            background: option.addressType === 'B' ? '#e3f2fd' : '#fff3e0',
+                            color: option.addressType === 'B' ? '#1976d2' : '#f57c00',
+                            whiteSpace: 'nowrap',
+                            alignSelf: 'center'
+                          }}>
+                            {option.addressType === 'B' ? 'Billing' : 'Shipping'}
+                          </div>
+                        </div>
+                      )}
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: '45px',
+                          borderColor: '#dee2e6',
+                          '&:hover': {
+                            borderColor: '#80bdff'
+                          }
+                        }),
+                        group: (base) => ({
+                          ...base,
+                          paddingTop: 8,
+                          paddingBottom: 8
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          padding: '8px 12px',
+                          borderBottom: '1px solid #f0f0f0',
+                          backgroundColor: state.isFocused ? '#f8f9fa' : 'white',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: '#f8f9fa'
+                          }
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          zIndex: 9999,
+                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)'
+                        }),
+                        groupHeading: (base) => ({
+                          ...base,
+                          margin: '8px 0',
+                          fontSize: '0.9em',
+                          fontWeight: 'bold'
+                        })
+                      }}
+                      noOptionsMessage={() => (
+                        <div style={{ 
+                          padding: '8px', 
+                          textAlign: 'center',
+                          color: '#666'
+                        }}>
+                          No locations found for this customer
+                        </div>
+                      )}
+                    />
+                  </Form.Group>
+                </Row>
+                <Row className="mb-3">
+                  <Form.Group as={Col} controlId="locationName">
+                    <Form.Label>Location Name</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.locationName || ""} // Fallback to an empty string
+                      readOnly
+                    />
+                  </Form.Group>
+                  <Form.Group as={Col} controlId="streetNo">
+                    <Form.Label>Street No.</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.streetNo || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                  <Form.Group as={Col} controlId="streetAddress">
+                    <Form.Label>Street Address</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.streetAddress || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                </Row>
+                <Row className="mb-3">
+                  <Form.Group as={Col} controlId="block">
+                    <Form.Label>Block</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.block || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                  <Form.Group as={Col} controlId="buildingNo">
+                    <Form.Label>Building No.</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.buildingNo || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                </Row>
+                <Row className="mb-3">
+                  <Form.Group as={Col} md="3" controlId="country">
+                    <Form.Label>Country</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.country || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                  <Form.Group as={Col} md="3" controlId="stateProvince">
+                    <Form.Label>State/Province</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.stateProvince || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                  <Form.Group as={Col} md="3" controlId="city">
+                    <Form.Label>City</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.city || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                  <Form.Group as={Col} md="3" controlId="postalCode">
+                    <Form.Label>Zip/Postal Code</Form.Label>
+                    <Form.Control
+                      type="text"
+                      disabled
+                      value={formData.location?.address?.postalCode || ""} // Ensure fallback
+                      readOnly
+                    />
+                  </Form.Group>
+                </Row>
+              </>
             )}
-          </Form.Group>
 
-            <Form.Group as={Col} md="3" controlId="jobContactType">
-              <Form.Label>Job Contact Type</Form.Label>
-              <Select
-                instanceId="job-contact-type-select"
-                options={jobContactTypes}
-                value={selectedJobContactType}
-                onChange={handleJobContactTypeChange}
-                placeholder="Select Contact Type"
-                isDisabled={!selectedCustomer}
-                isClearable
-                noOptionsMessage={() => "No contact types available"}
-                onError={(error) => {
-                  console.error("Select component error:", error);
-                  toast.error("Error loading contact types");
-                }}
-              />
-              {jobContactTypes.length === 0 && selectedCustomer && (
-                <small className="text-muted">
-                  No contact types available for this customer
-                </small>
-              )}
-            </Form.Group>
-
-          </Row>
-         
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="jobCategory">
-              <Form.Label>
-                Job Priority{' '}
-                <OverlayTrigger
-                  placement="right"
-                  overlay={
-                    <Tooltip id="priority-tooltip">
-                      <div className="text-start">
-                        <strong>Priority Levels:</strong><br/>
-                        • Low: Regular maintenance/non-urgent<br/>
-                        • Mid: Standard response time<br/>
-                        • High: Urgent attention required
-                      </div>
-                    </Tooltip>
-                  }
-                >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-                </OverlayTrigger>
-              </Form.Label>
-              <Form.Select
-                name="priority"
-                value={formData.priority}
-                onChange={handleInputChange}
-                aria-label="Select job category"
-              >
-                <option value="" disabled>
-                  Select Priority
-                </option>
-                <option value="Low">Low</option>
-                <option value="Mid">Mid</option>
-                <option value="High">High</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="jobCategory">
-              <Form.Label>Job Status</Form.Label>
-              <Form.Select
-                name="jobStatus"
-                value={formData.jobStatus}
-                onChange={handleInputChange}
-                aria-label="Select job status"
-              >
-                <option value="" disabled>
-                  Select Status
-                </option>
-                <option value="Created">Created</option>
-                <option value="InProgress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Scheduled">Scheduled</option>
-                <option value="Rescheduled">Rescheduled</option>
-                <option value="Cancelled">Cancelled</option>
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group as={Col} md="4" controlId="jobWorker">
-              <Form.Label>
-                Assigned Worker{' '}
-                <OverlayTrigger
-                  placement="right"
-                  overlay={
-                    <Tooltip id="worker-tooltip">
-                      <div className="text-start">
-                        <strong>Worker Assignment:</strong><br/>
-                        • Select multiple workers if needed<br/>
-                        • System checks schedule conflicts<br/>
-                        • At least one worker required
-                      </div>
-                    </Tooltip>
-                  }
-                >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-                </OverlayTrigger>
-              </Form.Label>
-              <Select
-                instanceId="worker-select"
-                isMulti
-                options={workers}
-                value={selectedWorkers}
-                onChange={handleWorkersChange}
-                placeholder="Search Worker"
-              />
-            </Form.Group>
-          </Row>
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="startDate">
-              <Form.Label>Start Date</Form.Label>
-              <Form.Control
-                type="date"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleInputChange}
-                placeholder="Enter start date"
-              />
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="endDate">
-              <Form.Label>End Date</Form.Label>
-              <Form.Control
-                type="date"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleInputChange}
-                placeholder="Enter end date"
-              />
-            </Form.Group>
-            <Form.Group as={Col} md="4" controlId="scheduleSession">
-              <Form.Label>
-                Schedule Session{' '}
-                <OverlayTrigger
-                  placement="right"
-                  overlay={
-                    <Tooltip id="schedule-tooltip">
-                      <div className="text-start">
-                        <strong>Schedule Information:</strong><br/>
-                        • Predefined time slots available<br/>
-                        • Custom scheduling option<br/>
-                        • Auto-calculates duration<br/>
-                        • Checks for scheduling conflicts
-                      </div>
-                    </Tooltip>
-                  }
-                >
-                  <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
-                </OverlayTrigger>
-              </Form.Label>
-              <Form.Select
-                name="scheduleSession"
-                value={formData.scheduleSession}
-                onChange={handleScheduleSessionChange}
-                aria-label="Select schedule session"
-              >
-                <option value="">Select a session</option>
-                <option value="">Custom</option>
-                {schedulingWindows.map((window) => (
-                  <option key={window.id} value={window.label}>
-                    {window.label} ({window.timeStart} to {window.timeEnd})
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Row>
-          <Row className="mb-3">
-            <Form.Group as={Col} md="4" controlId="startTime">
-              <Form.Label>Start Time</Form.Label>
-              <Form.Control
-                type="time"
-                name="startTime"
-                value={formData.startTime}
-                onChange={handleInputChange}
-                readOnly={formData.scheduleSession !== "custom"}
-              />
-            </Form.Group>
-
-            <Form.Group as={Col} md="4" controlId="endTime">
-              <Form.Label>End Time</Form.Label>
-              <Form.Control
-                type="time"
-                name="endTime"
-                value={formData.endTime}
-                onChange={handleInputChange}
-                readOnly={formData.scheduleSession !== "custom"}
-              />
-            </Form.Group>
-
-            <Form.Group as={Col} md="3" controlId="estimatedDuration">
-              <Form.Label>Estimated Duration</Form.Label>
-              <InputGroup>
-                <Form.Control
-                  type="number"
-                  name="estimatedDurationHours"
-                  value={formData.estimatedDurationHours}
-                  onChange={handleInputChange}
-                  placeholder="Hours"
-                  readOnly={formData.scheduleSession !== "custom"}
-                />
-                <InputGroup.Text>h</InputGroup.Text>
-                <Form.Control
-                  type="number"
-                  name="estimatedDurationMinutes"
-                  value={formData.estimatedDurationMinutes}
-                  onChange={handleInputChange}
-                  placeholder="Minutes"
-                  readOnly={formData.scheduleSession !== "custom"}
-                />
-                <InputGroup.Text>m</InputGroup.Text>
-              </InputGroup>
-            </Form.Group>
-          </Row>
-          <hr className="my-4" />
-          <Row className="mb-3">
-          <Form.Group as={Col} controlId="jobName" className="mb-3">
-              <Form.Label>Job Name</Form.Label>
-              <Form.Control
-                type="text"
-                name="jobName"
-                value={formData.jobName}
-                onChange={handleInputChange}
-                placeholder="Enter Job Name"
-              />
-            </Form.Group>
-            <Form.Group controlId="description" className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <ReactQuillEditor
-                initialValue={formData.jobDescription} // Pass the initial value
-                onDescriptionChange={handleDescriptionChange} // Handle changes
-              />
-            </Form.Group>
-          </Row>
-          {/* <p className="text-muted">Notification:</p>
-          <Row className="mt-3">
-            <Form.Group controlId="adminWorkerNotify">
-              <Form.Check
-                type="checkbox"
-                name="adminWorkerNotify"
-                checked={formData.adminWorkerNotify}
-                onChange={handleInputChange}
-                label="Admin/Worker: Notify when Job Status changed and new Job message Submitted"
-              />
-            </Form.Group>
-            <Form.Group controlId="customerNotify">
-              <Form.Check
-                type="checkbox"
-                name="customerNotify"
-                checked={formData.customerNotify}
-                onChange={handleInputChange}
-                label="Customer: Notify when Job Status changed and new Job message Submitted"
-              />
-            </Form.Group>
-          </Row> */}
-          {/* SUBMIT BUTTON! */}
+            <hr className="my-4" />
+            <h5
+              className="mb-1"
+              style={{ cursor: "pointer" }}
+              onClick={toggleEquipments}
+            >
+              Job Equipments {showEquipments ? "(-)" : "(+)"}
+            </h5>
+            {showEquipments && (
+              <>
+                <p className="text-muted">Details about the Equipments.</p>
+                <Row className="mb-3">
+                  <EquipmentsTable
+                    equipments={equipments}
+                    onSelectedRowsChange={handleSelectedEquipmentsChange}
+                  />
+                </Row>
+              </>
+            )}
+            <hr className="my-4" />
+          </Form>
           <Row className="align-items-center">
-            <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-4">
+            <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-1">
               <Button
                 variant="primary"
-                onClick={handleSubmitClick}
+                onClick={handleNextClick}
                 className="float-end"
               >
-                Submit
+                Next
               </Button>
             </Col>
           </Row>
-        </Form>
-      </Tab>
-    </Tabs>
+        </Tab>
+        <Tab eventKey="task" title="Job Task">
+          <JobTask
+            tasks={tasks}
+            addTask={addTask}
+            handleTaskChange={handleTaskChange}
+            handleCheckboxChange={handleCheckboxChange}
+            deleteTask={deleteTask}
+          />
+          <Row className="align-items-center">
+            <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-1">
+              <Button
+                variant="primary"
+                onClick={handleNextClick}
+                className="float-end"
+              >
+                Next
+              </Button>
+            </Col>
+          </Row>
+        </Tab>
+        <Tab eventKey="scheduling" title="Job Scheduling">
+          <Form>
+            <Row className="mb-3">
+              <Col xs="auto">
+                <Form.Group as={Col} controlId="jobNo">
+                  <Form.Label>Job No.</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={jobNo}
+                    readOnly
+                    style={{ width: "95px" }}
+                  />
+                </Form.Group>
+              </Col>
+              {/* <Form.Group as={Col} md="2" controlId="scheduleSession">
+                <Form.Label>Service Call</Form.Label>
+                <Form.Select
+                  name="scheduleSession"
+                  value={formData.scheduleSession}
+                  onChange={handleScheduleSessionChange}
+                  aria-label="Select schedule session"
+                >
+                  <option value="custom">Custom</option>
+                  <option value="morning">Morning (9:30am to 1:00pm)</option>
+                  <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
+                </Form.Select>
+              </Form.Group>
+              <Form.Group as={Col} md="2" controlId="scheduleSession">
+                <Form.Label>Sales Order</Form.Label>
+                <Form.Select
+                  name="scheduleSession"
+                  value={formData.scheduleSession}
+                  onChange={handleScheduleSessionChange}
+                  aria-label="Select schedule session"
+                >
+                  <option value="custom">Custom</option>
+                  <option value="morning">Morning (9:30am to 1:00pm)</option>
+                  <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
+                </Form.Select>
+              </Form.Group> */}
+             <Form.Group as={Col} md="3" controlId="serviceCall">
+              <RequiredFieldWithTooltip label="Service Call" />
+              <Select
+                instanceId="service-call-select"
+                options={serviceCalls}
+                value={selectedServiceCall}
+                onChange={handleSelectedServiceCallChange}
+                placeholder="Select Service Call"
+                isDisabled={!selectedCustomer}
+              />
+            </Form.Group>
+
+            <Form.Group as={Col} md="3" controlId="salesOrder">
+              <RequiredFieldWithTooltip label="Sales Order" />
+              <Select
+                instanceId="sales-order-select"
+                options={salesOrders}
+                value={selectedSalesOrder}
+                onChange={(selectedOption) => setSelectedSalesOrder(selectedOption)}
+                placeholder={selectedServiceCall ? "Select Sales Order" : "Select Service Call first"}
+                isDisabled={!selectedServiceCall || salesOrders.length === 0}
+                noOptionsMessage={() => selectedServiceCall 
+                  ? "No sales orders found for this service call"
+                  : "Please select a service call first"
+                }
+              />
+            </Form.Group>
+
+              <Form.Group as={Col} md="3" controlId="jobContactType">
+                <RequiredFieldWithTooltip label="Job Contact Type" />
+                <Select
+                  instanceId="job-contact-type-select"
+                  options={jobContactTypes}
+                  value={selectedJobContactType}
+                  onChange={handleJobContactTypeChange}
+                  placeholder="Select Contact Type"
+                  isDisabled={!selectedServiceCall || salesOrders.length === 0}
+                  isClearable
+                  noOptionsMessage={() => "No contact types available"}
+                />
+                {jobContactTypes.length === 0 && selectedCustomer && (
+                  <small className="text-muted">
+                    No contact types available
+                  </small>
+                )}
+              </Form.Group>
+
+            </Row>
+           
+            <Row className="mb-3">
+              <Form.Group as={Col} md="4" controlId="jobCategory">
+                <RequiredFieldWithTooltip label="Job Priority" />
+                <Form.Select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleInputChange}
+                  aria-label="Select job category"
+                >
+                  <option value="" disabled>
+                    Select Priority
+                  </option>
+                  <option value="Low">Low</option>
+                  <option value="Mid">Mid</option>
+                  <option value="High">High</option>
+                </Form.Select>
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="jobCategory">
+                <Form.Label>Job Status</Form.Label>
+                <Form.Select
+                  name="jobStatus"
+                  value={formData.jobStatus}
+                  onChange={handleInputChange}
+                  aria-label="Select job status"
+                >
+                  <option value="" disabled>
+                    Select Status
+                  </option>
+                  <option value="Created">Created</option>
+                  <option value="InProgress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Scheduled">Scheduled</option>
+                  <option value="Rescheduled">Rescheduled</option>
+                  <option value="Cancelled">Cancelled</option>
+                </Form.Select>
+              </Form.Group>
+
+              <Form.Group as={Col} md="4" controlId="jobWorker">
+                <RequiredFieldWithTooltip label="Assigned Worker" />
+                <Select
+                  instanceId="worker-select"
+                  isMulti
+                  options={workers}
+                  value={selectedWorkers}
+                  onChange={handleWorkersChange}
+                  placeholder="Search Worker"
+                />
+              </Form.Group>
+            </Row>
+            <Row className="mb-3">
+              <Form.Group as={Col} md="4" controlId="startDate">
+                <RequiredFieldWithTooltip label="Start Date" />
+                <Form.Control
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleInputChange}
+                  placeholder="Enter start date"
+                />
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="endDate">
+                <RequiredFieldWithTooltip label="End Date" />
+                <Form.Control
+                  type="date"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleInputChange}
+                  placeholder="Enter end date"
+                />
+              </Form.Group>
+              <Form.Group as={Col} md="4" controlId="scheduleSession">
+                <RequiredFieldWithTooltip label="Schedule Session" />
+                <Form.Select
+                  name="scheduleSession"
+                  value={formData.scheduleSession}
+                  onChange={handleScheduleSessionChange}
+                  aria-label="Select schedule session"
+                >
+                  <option value="">Select a session</option>
+                  <option value="">Custom</option>
+                  {schedulingWindows.map((window) => (
+                    <option key={window.id} value={window.label}>
+                      {window.label} ({window.timeStart} to {window.timeEnd})
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Row>
+            <Row className="mb-3">
+              <Form.Group as={Col} md="4" controlId="startTime">
+              <RequiredFieldWithTooltip label="Start Time" />
+                <Form.Control
+                  type="time"
+                  name="startTime"
+                  value={formData.startTime}
+                  onChange={handleInputChange}
+                  readOnly={formData.scheduleSession !== "custom"}
+                />
+              </Form.Group>
+
+              <Form.Group as={Col} md="4" controlId="endTime">
+              <RequiredFieldWithTooltip label="End Time" />
+                <Form.Control
+                  type="time"
+                  name="endTime"
+                  value={formData.endTime}
+                  onChange={handleInputChange}
+                  readOnly={formData.scheduleSession !== "custom"}
+                />
+              </Form.Group>
+
+              <Form.Group as={Col} md="3" controlId="estimatedDuration">
+                <RequiredFieldWithTooltip label="Estimated Duration" />
+                <InputGroup>
+                  <Form.Control
+                    type="number"
+                    name="estimatedDurationHours"
+                    value={formData.estimatedDurationHours}
+                    onChange={handleInputChange}
+                    placeholder="Hours"
+                    readOnly={formData.scheduleSession !== "custom" || (formData.startTime && formData.endTime)}
+                    required
+                  />
+                  <InputGroup.Text>h</InputGroup.Text>
+                  <Form.Control
+                    type="number"
+                    name="estimatedDurationMinutes"
+                    value={formData.estimatedDurationMinutes}
+                    onChange={handleInputChange}
+                    placeholder="Minutes"
+                    readOnly={formData.scheduleSession !== "custom" || (formData.startTime && formData.endTime)}
+                    required
+                  />
+                  <InputGroup.Text>m</InputGroup.Text>
+                </InputGroup>
+                {formData.startTime && formData.endTime && (
+                  <small className="text-muted">
+                    Duration auto-calculated from time range
+                  </small>
+                )}
+              </Form.Group>
+            </Row>
+            <hr className="my-4" />
+            <Row className="mb-3">
+            <Form.Group as={Col} controlId="jobName" className="mb-3">
+                <RequiredFieldWithTooltip label="Subject" />
+                <Form.Control
+                  type="text"
+                  name="jobName"
+                  value={formData.jobName}
+                  onChange={handleInputChange}
+                  placeholder="Enter Subject"
+                />
+              </Form.Group>
+              <Form.Group controlId="description" className="mb-3">
+                <RequiredFieldWithTooltip label="Description" />
+                <ReactQuillEditor
+                  initialValue={formData.jobDescription} // Pass the initial value
+                  onDescriptionChange={handleDescriptionChange} // Handle changes
+                />
+              </Form.Group>
+            </Row>
+            {/* <p className="text-muted">Notification:</p>
+            <Row className="mt-3">
+              <Form.Group controlId="adminWorkerNotify">
+                <Form.Check
+                  type="checkbox"
+                  name="adminWorkerNotify"
+                  checked={formData.adminWorkerNotify}
+                  onChange={handleInputChange}
+                  label="Admin/Worker: Notify when Job Status changed and new Job message Submitted"
+                />
+              </Form.Group>
+              <Form.Group controlId="customerNotify">
+                <Form.Check
+                  type="checkbox"
+                  name="customerNotify"
+                  checked={formData.customerNotify}
+                  onChange={handleInputChange}
+                  label="Customer: Notify when Job Status changed and new Job message Submitted"
+                />
+              </Form.Group>
+            </Row> */}
+            {/* SUBMIT BUTTON! */}
+            <Row className="align-items-center">
+              <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-4">
+                <Button
+                  variant="primary"
+                  onClick={handleSubmitClick}
+                  className="float-end"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Creating Job...
+                    </>
+                  ) : (
+                    'Submit'
+                  )}
+                </Button>
+              </Col>
+            </Row>
+          </Form>
+        </Tab>
+      </Tabs>
+      {isSubmitting && (
+        <div className={styles.loadingOverlay}>
+          <div className="text-center">
+            <div className="progress mb-3" style={{ width: '200px' }}>
+              <div 
+                className="progress-bar progress-bar-striped progress-bar-animated" 
+                role="progressbar" 
+                style={{ width: `${progress}%` }}
+                aria-valuenow={progress} 
+                aria-valuemin="0" 
+                aria-valuemax="100"
+              />
+            </div>
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <div className="mt-2">Creating Job...</div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

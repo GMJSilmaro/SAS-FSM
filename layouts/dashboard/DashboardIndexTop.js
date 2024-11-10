@@ -3,7 +3,7 @@
  */
 
 // import node module libraries
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
 	Container,
@@ -27,21 +27,11 @@ import NavbarTopRoutes from 'routes/dashboard/NavbarTopRoutes';
 
 // import utility function
 import { getCompanyDetails } from '../../utils/companyCache';
+import { useLogo } from '../../contexts/LogoContext';
 
 const DashboardIndexTop = (props) => {
+	const { logo } = useLogo();
 	const [expandedMenu, setExpandedMenu] = useState(false);
-	const [companyDetails, setCompanyDetails] = useState(null);
-
-	useEffect(() => {
-		const loadCompanyDetails = async () => {
-			const data = await getCompanyDetails();
-			if (data) {
-				setCompanyDetails(data);
-			}
-		};
-
-		loadCompanyDetails();
-	}, []);
 
 	return (
 		<div>
@@ -54,10 +44,10 @@ const DashboardIndexTop = (props) => {
 					{/* brand logo */}
 					<Navbar.Brand
 						as={Link}
-						href="/dashboard/overview/">
+						href="/">
 						<Image 
-							src={companyDetails?.logo} 
-							alt={companyDetails?.name || 'Company Logo'} 
+							src={logo} 
+							alt="Company Logo"
 							style={{ height: '100px' }} 
 						/>
 					</Navbar.Brand>

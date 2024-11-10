@@ -1,10 +1,15 @@
 /* eslint-disable react/display-name */
-import Link from "next/link";
+import Link from 'next/link';
 import React, { Fragment, useState, useEffect, useCallback } from "react";
 import { useMediaQuery } from "react-responsive";
-import { Row, Col, Image, Dropdown, ListGroup, Badge, Form, InputGroup, Button } from "react-bootstrap";
+import { ListGroup, Dropdown, Badge, Button, InputGroup, Form } from "react-bootstrap";
+import Image from "next/image";
 import SimpleBar from "simplebar-react";
-import "simplebar/dist/simplebar.min.css";
+import { FaBell, FaSearch, FaTimes, FaTasks, FaCalendarAlt, FaFilter } from "react-icons/fa";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { ToastContainer } from 'react-toastify';
+import { performGlobalSearch, performQuickSearch } from '../utils/searchUtils';
 import { GKTippy } from "widgets";
 import DarkLightMode from "layouts/DarkLightMode";
 import NotificationList from "data/Notification";
@@ -27,18 +32,16 @@ import {
 } from "firebase/firestore";
 import DotBadge from "components/bootstrap/DotBadge";
 import { format } from "date-fns";
-import { FaBell, FaBriefcase, FaCheckCircle, FaExclamationCircle, FaSearch } from "react-icons/fa";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { FaBriefcase, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 import Swal from 'sweetalert2';
 import { getNotifications, updateNotificationCache, invalidateNotificationCache, getUnreadCount } from '../utils/notificationCache';
 import { getCompanyDetails } from '../utils/companyCache';
+import { useSessionRenewal } from '../hooks/useSessionRenewal';
+import { initializeSessionRenewalCheck, handleSessionError } from '../utils/middlewareClient';
+import { useLogo } from '../contexts/LogoContext';
 
 const formatNotificationTime = (timestamp) => {
   try {
-    // Debug logging
-    //('Raw timestamp:', timestamp);
-    //console.log('Timestamp type:', typeof timestamp);
     
     // Safety check for null/undefined
     if (!timestamp) {
@@ -85,12 +88,57 @@ const formatNotificationTime = (timestamp) => {
   }
 };
 
-const SearchResults = React.memo(({ results, onClose }) => {
+const SearchResults = React.memo(({ results, onClose, router }) => {
   const groupedResults = {
+    customers: results.filter(r => r.type === 'customer'),
+    workers: results.filter(r => r.type === 'worker'),
     jobs: results.filter(r => r.type === 'job'),
     followUps: results.filter(r => r.type === 'followUp'),
-    workers: results.filter(r => r.type === 'worker'),
-    // Add more categories as needed
+  };
+
+  const renderHighlightedText = (text) => {
+    if (!text) return '';
+    
+    const parts = text.split(/\[\[HIGHLIGHT\]\]|\[\[\/HIGHLIGHT\]\]/);
+    
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        return (
+          <strong 
+            key={index}
+            className="bg-light-primary text-primary"
+            style={{ 
+              padding: '0.1rem 0.3rem',
+              borderRadius: '0.2rem',
+              fontWeight: '600'
+            }}
+          >
+            {part}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
+  const getCategoryIcon = (category) => {
+    switch(category) {
+      case 'customers':
+        return <i className="fe fe-users me-2"></i>;
+      case 'workers':
+        return <i className="fe fe-user-check me-2"></i>;
+      case 'jobs':
+        return <i className="fe fe-briefcase me-2"></i>;
+      case 'followUps':
+        return <i className="fe fe-bell me-2"></i>;
+      default:
+        return null;
+    }
+  };
+
+  const handleItemClick = (link) => {
+    router.push(link);
+    onClose();
   };
 
   return (
@@ -100,21 +148,42 @@ const SearchResults = React.memo(({ results, onClose }) => {
           items.length > 0 && (
             <div key={category}>
               <div className="p-2 bg-light">
-                <strong className="text-capitalize">{category.replace(/([A-Z])/g, ' $1')}</strong>
+                <strong className="text-capitalize d-flex align-items-center">
+                  {getCategoryIcon(category)}
+                  {category.replace(/([A-Z])/g, ' $1').trim()}
+                  <span className="ms-1 text-muted">({items.length})</span>
+                </strong>
               </div>
               {items.map((item) => (
                 <ListGroup.Item
                   key={item.id}
                   action
-                  onClick={() => {
-                    router.push(item.link);
-                    onClose();
-                  }}
-                  className="d-flex align-items-center py-2"
+                  onClick={() => handleItemClick(item.link)}
+                  className="py-2 px-3"
                 >
-                  <div className="ms-3">
-                    <h6 className="mb-0">{item.title}</h6>
-                    <small className="text-muted">{item.subtitle}</small>
+                  <div className="d-flex flex-column">
+                    <div className="fw-medium mb-1">
+                      {renderHighlightedText(item.title)}
+                    </div>
+                    {item.subtitle && (
+                      <small className="text-muted">
+                        {renderHighlightedText(item.subtitle)}
+                      </small>
+                    )}
+                    {item.type === 'worker' && (
+                      <div className="d-flex align-items-center mt-1">
+                        <small className="text-primary">
+                          <i className="fe fe-mail me-1"></i>
+                          {renderHighlightedText(item.workerID)}
+                        </small>
+                        {item.role && (
+                          <small className="text-muted ms-3">
+                            <i className="fe fe-tag me-1"></i>
+                            {item.role}
+                          </small>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </ListGroup.Item>
               ))}
@@ -122,8 +191,11 @@ const SearchResults = React.memo(({ results, onClose }) => {
           )
         ))}
         {results.length === 0 && (
-          <ListGroup.Item className="text-center py-3">
-            <p className="text-muted mb-0">No results found</p>
+          <ListGroup.Item className="text-center py-4">
+            <div className="text-muted">
+              <i className="fe fe-search h3 mb-2"></i>
+              <p className="mb-0">No results found</p>
+            </div>
           </ListGroup.Item>
         )}
       </ListGroup>
@@ -131,483 +203,701 @@ const SearchResults = React.memo(({ results, onClose }) => {
   );
 });
 
-const QuickMenu = () => {
+SearchResults.displayName = 'SearchResults';
+
+// Memoize the user avatar component
+const UserAvatar = React.memo(({ userDetails }) => {
+  return (
+    <div className="position-relative" style={{ 
+      width: '45px', 
+      height: '45px',
+      display: 'inline-block',
+      marginRight: '80px'
+    }}>
+      {userDetails?.profilePicture ? (
+        <div style={{ 
+          width: '45px', 
+          height: '45px', 
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Image
+            alt="avatar"
+            src={userDetails.profilePicture}
+            className="rounded-circle"
+            width={45}
+            height={45}
+            style={{
+              objectFit: 'cover',
+              border: '3px solid #e5e9f2',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+            priority // Add priority to load image faster
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '1px',
+              right: '1px',
+              width: '15px',
+              height: '15px',
+              backgroundColor: '#00d27a',
+              borderRadius: '50%',
+              border: '2px solid #fff'
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{ 
+          width: '45px', 
+          height: '45px', 
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Image
+            alt="default avatar"
+            src="/images/avatar/NoProfile.png"
+            className="rounded-circle"
+            width={45}
+            height={45}
+            style={{
+              objectFit: 'cover',
+              border: '3px solid #e5e9f2',
+              backgroundColor: '#f8f9fa',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+            priority // Add priority to load image faster
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '5px',
+              right: '5px',
+              width: '12px',
+              height: '12px',
+              backgroundColor: '#00d27a',
+              borderRadius: '50%',
+              border: '2px solid #fff'
+            }}
+          />
+        </div>
+      )}
+      {userDetails && (
+        <div 
+          style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: '-25px',
+            whiteSpace: 'nowrap',
+            textAlign: 'center',
+            width: '150px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+        >
+          <span className="text-dark small fw-bold">{userDetails.fullName}</span>
+        </div>
+      )}
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.userDetails?.profilePicture === nextProps.userDetails?.profilePicture &&
+         prevProps.userDetails?.fullName === nextProps.userDetails?.fullName;
+});
+
+const QuickMenu = ({ children }) => {
+  const router = useRouter();
   const hasMounted = useMounted();
   const isDesktop = useMediaQuery({ query: "(min-width: 1224px)" });
-  const router = useRouter();
   const [userDetails, setUserDetails] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [logo, setLogo] = useState('/images/SAS-LOGO.png'); // Default logo
+  const { logo, setLogo } = useLogo();
+  const isOverviewPage = router.pathname === '/dashboard' || router.pathname === '/';
 
-  // Fetch user details
+  // Remove duplicate session renewal hooks
   useEffect(() => {
-    const fetchUserDetails = async () => {
-      const email = Cookies.get("email");
-      const workerID = Cookies.get("workerID");
-
-      if (email) {
-        try {
-          const usersRef = collection(db, "users");
-          const q = query(usersRef, where("email", "==", email));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
-            setUserDetails(userDoc.data());
-          } else {
-            console.log("User not found");
-          }
-        } catch (error) {
-          console.error("Error fetching user details:", error.message);
-        }
-      } else {
-        router.push("/authentication/sign-in");
-      }
-    };
-
-    fetchUserDetails();
+    // Single source of session management
+    const cleanup = initializeSessionRenewalCheck(router);
+    return () => cleanup();
   }, [router]);
 
-  // // Sign out function
-  // const handleSignOut = async () => {
-  //   try {
-  //     const response = await fetch("/api/logout", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       credentials: 'include', // Important: include credentials
-  //     });
+  // Memoize userDetails fetch
+  const fetchUserDetails = useCallback(async () => {
+    const email = Cookies.get("email");
+    if (email) {
+      try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email));
+        const querySnapshot = await getDocs(q);
 
-  //     if (response.ok) {
-  //       // Clear client-side cookies using js-cookie
-  //       const cookiesToClear = [
-  //         'customToken',
-  //         'uid',
-  //         'isAdmin',
-  //         'email',
-  //         'workerId',
-  //         'LAST_ACTIVITY'
-  //       ];
-
-  //       cookiesToClear.forEach(cookie => {
-  //         Cookies.remove(cookie, { path: '/' });
-  //       });
-
-  //       // Force reload to clear any cached state
-  //       window.location.href = '/authentication/sign-in';
-  //     } else {
-  //       throw new Error("Logout failed");
-  //     }
-  //   } catch (error) {
-  //     console.error("Error logging out:", error.message);
-  //     toast.error("Failed to logout. Please try again.");
-  //   }
-  // };
-
-// Sign out function
-const handleSignOut = async () => {
-  try {
-    // Show loading alert
-    Swal.fire({
-      title: 'Signing out...',
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          setUserDetails(userDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching user details:", error.message);
       }
-    });
-
-    const response = await fetch("/api/logout", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: 'include',
-    });
-
-    if (response.ok) {
-      const cookiesToClear = [
-        'customToken',
-        'uid',
-        'isAdmin',
-        'email',
-        'workerId',
-        'LAST_ACTIVITY'
-      ];
-
-      cookiesToClear.forEach(cookie => {
-        Cookies.remove(cookie, { path: '/' });
-      });
-
-      // Show success alert
-      Swal.fire({
-        icon: 'success',
-        title: 'Successfully signed out!',
-        text: 'Redirecting to login page...',
-        timer: 1500,
-        showConfirmButton: false
-      }).then(() => {
-        window.location.href = '/authentication/sign-in';
-      });
     } else {
-      throw new Error("Logout failed");
+      router.push("/sign-in");
     }
-  } catch (error) {
-    console.error("Error logging out:", error.message);
-    Swal.fire({
-      icon: 'error',
-      title: 'Oops...',
-      text: 'Failed to logout. Please try again.'
-    });
-  }
-};
-  const Notifications = React.memo(({ setUnreadCount }) => {
-    const [notifications, setNotifications] = useState([]);
-    const workerID = Cookies.get("workerId");
+  }, [router]);
 
-    useEffect(() => {
-      if (!workerID) return;
+  // Optimize useEffect for userDetails
+  useEffect(() => {
+    fetchUserDetails();
+  }, [fetchUserDetails]);
 
-      const loadNotifications = async () => {
-        const notificationsData = await getNotifications(db, workerID, 20);
-        setNotifications(notificationsData);
-        
-        const unreadCount = notificationsData.filter(item => !item.read).length;
-        setUnreadCount(unreadCount);
-      };
+  // Sign out function
+  const handleSignOut = async () => {
+    try {
+      // Store current time as last login before signing out
+      localStorage.setItem('lastLoginTime', new Date().toISOString());
+      
+      // First show confirmation alert
+      const confirmResult = await Swal.fire({
+        title: '<span class="fw-bold text-danger">Sign Out?</span>',
+        html: `
+          <div class="d-flex flex-column align-items-center">
+            <div class="mb-3">
+              <i class="fe fe-log-out text-danger" style="font-size: 3rem;"></i>
+            </div>
+            <div class="text-muted fw-semibold">Are you sure you want to sign out?</div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Sign Out',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        reverseButtons: true,
+        background: '#ffffff',
+        customClass: {
+          popup: 'animated fadeInUp'
+        }
+      });
 
-      loadNotifications();
+      if (confirmResult.isConfirmed) {
+        // Show loading alert with styled spinner
+        const loadingAlert = Swal.fire({
+          title: '<span class="fw-bold text-primary">Signing Out...</span>',
+          html: `
+            <div class="d-flex flex-column align-items-center">
+              <div class="position-relative mb-3">
+                <div class="spinner-grow text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                <div class="spinner-grow text-primary position-absolute top-50 start-50 translate-middle" 
+                     style="width: 2rem; height: 2rem; opacity: 0.7;" role="status">
+                </div>
+              </div>
+              <div class="text-muted fw-semibold">Clearing session data...</div>
+              <div class="progress mt-3" style="width: 200px; height: 4px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 50%"></div>
+              </div>
+            </div>
+          `,
+          allowOutsideClick: false,
+          showConfirmButton: false,
+          background: '#ffffff',
+          customClass: {
+            popup: 'animated fadeInUp'
+          }
+        });
 
-      // Real-time updates for new notifications only
+        // Perform logout API call
+        const response = await fetch("/api/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          // Update loading message
+          await loadingAlert.update({
+            title: '<span class="fw-bold text-primary">Almost done...</span>',
+            html: `
+              <div class="d-flex flex-column align-items-center">
+                <div class="position-relative mb-3">
+                  <div class="spinner-grow text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                  <div class="spinner-grow text-primary position-absolute top-50 start-50 translate-middle" 
+                       style="width: 2rem; height: 2rem; opacity: 0.7;" role="status">
+                  </div>
+                </div>
+                <div class="text-muted fw-semibold">Finalizing sign out...</div>
+                <div class="progress mt-3" style="width: 200px; height: 4px;">
+                  <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 90%"></div>
+                </div>
+              </div>
+            `
+          });
+
+          // Clear cookies
+          const cookiesToClear = [
+            'customToken',
+            'uid',
+            'isAdmin',
+            'email',
+            'workerId',
+            'LAST_ACTIVITY'
+          ];
+
+          cookiesToClear.forEach(cookie => {
+            Cookies.remove(cookie, { path: '/' });
+          });
+
+          // Add a small delay for visual feedback
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Show success message
+          await Swal.fire({
+            icon: 'success',
+            title: '<span class="fw-bold text-success">Successfully Signed Out!</span>',
+            text: 'Redirecting to login page...',
+            timer: 1500,
+            showConfirmButton: false,
+            customClass: {
+              popup: 'animated fadeInUp'
+            }
+          });
+          localStorage.removeItem('welcomeShown');
+          // Redirect to login page
+          window.location.href = '/sign-in';
+        } else {
+          throw new Error("Logout failed");
+        }
+      }
+    } catch (error) {
+      console.error("Error logging out:", error.message);
+      
+      // Show error alert
+      await Swal.fire({
+        icon: 'error',
+        title: '<span class="fw-bold text-danger">Sign Out Failed</span>',
+        text: 'There was a problem signing you out. Please try again.',
+        confirmButtonColor: '#dc3545',
+        customClass: {
+          popup: 'animated fadeInUp'
+        }
+      });
+    }
+  };
+
+  // Add these states for notifications
+  const [notifications, setNotifications] = useState([]);
+  // Get workerId from cookies instead
+  const workerId = Cookies.get('workerId');
+
+  // Add notification loading function
+  const loadNotifications = async () => {
+    try {
+      if (!workerId) return; // Don't load if no worker ID
+      
       const notificationsRef = collection(db, "notifications");
       const q = query(
         notificationsRef,
-        where("workerId", "in", [workerID, "all"]),
+        where("workerId", "in", [workerId, "all"]),
+        where("hidden", "==", false),
         orderBy("timestamp", "desc"),
-        limit(1) // Only listen for the most recent notification
+        limit(10)
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === "added") {
-            // Invalidate cache when new notification arrives
-            invalidateNotificationCache();
-            loadNotifications(); // Reload all notifications
-          }
-        });
-      });
+      const querySnapshot = await getDocs(q);
+      const notificationsList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
-      return () => unsubscribe();
-    }, [workerID, setUnreadCount]);
-
-    const markAsRead = useCallback(
-      async (notificationId, workerID, notificationWorkerId) => {
-        try {
-          const notificationDocRef = doc(db, "notifications", notificationId);
-
-          if (notificationWorkerId === "all") {
-            await updateDoc(notificationDocRef, {
-              [`readBy.${workerID}`]: true,
-            });
-          } else {
-            await updateDoc(notificationDocRef, { read: true });
-          }
-
-          setNotifications((prevNotifications) => {
-            const updatedNotifications = prevNotifications.map((item) => {
-              if (item.id === notificationId) {
-                return notificationWorkerId === "all"
-                  ? { ...item, readBy: { ...item.readBy, [workerID]: true } }
-                  : { ...item, read: true };
-              }
-              return item;
-            });
-            return updatedNotifications;
-          });
-
-          setUnreadCount((prevCount) => prevCount - 1);
-
-          toast.success("Notification marked as read!", {
-            position: "top-right",
-          });
-        } catch (error) {
-          console.error("Error marking notification as read: ", error.message);
-          toast.error("Failed to mark as read. Please try again.", {
-            position: "top-right",
-          });
-        }
-      },
-      [setUnreadCount]
-    );
-
-    const markAllAsRead = useCallback(async () => {
-      try {
-        const batch = writeBatch(db);
-        notifications.forEach((notification) => {
-          if (!notification.read) {
-            const notificationDocRef = doc(
-              db,
-              "notifications",
-              notification.id
-            );
-            batch.update(notificationDocRef, { read: true });
-          }
-        });
-
-        await batch.commit();
-
-        setNotifications((prevNotifications) =>
-          prevNotifications.map((item) => ({ ...item, read: true }))
-        );
-        setUnreadCount(0);
-
-        toast.success("All notifications marked as read!", {
-          position: "top-right",
-        });
-      } catch (error) {
-        console.error(
-          "Error marking all notifications as read: ",
-          error.message
-        );
-        toast.error("Failed to mark all as read. Please try again.", {
-          position: "top-right",
-        });
-      }
-    }, [notifications, setUnreadCount]);
-
-    const hideNotification = useCallback(async (notificationId) => {
-      try {
-        // Update the notification in Firestore to mark it as hidden
-        await updateDoc(doc(db, "notifications", notificationId), { hidden: true });
-
-        // Update local state
-        setNotifications((prevNotifications) => 
-          prevNotifications.filter((item) => item.id !== notificationId)
-        );
-
-        // Update unread count if the hidden notification was unread
-        const hiddenNotification = notifications.find(n => n.id === notificationId);
-        if (hiddenNotification && !hiddenNotification.read) {
-          setUnreadCount((prevCount) => prevCount - 1);
-        }
-
-        toast.success("Notification hidden successfully!", {
-          position: "top-right",
-        });
-      } catch (error) {
-        console.error("Error hiding notification: ", error.message);
-        toast.error("Failed to hide notification. Please try again.", {
-          position: "top-right",
-        });
-      }
-    }, [notifications, setUnreadCount]);
-
-    return (
-      <>
-        <SimpleBar style={{ maxHeight: "400px" }}>
-          <ListGroup variant="flush">
-            {notifications.length === 0 ? (
-              <ListGroup.Item className="text-center py-5">
-                <FaBell size={48} color="#6c757d" className="mb-3" />
-                <p className="text-muted">No notifications</p>
-              </ListGroup.Item>
-            ) : (
-              notifications.map((item) => {
-                console.log('Notification item:', item); // Debug log
-                return (
-                  <ListGroup.Item
-                    key={item.id}
-                    className={`border-bottom px-0 align-items-center ${!item.read ? 'bg-light' : ''}`}
-                  >
-                    <div className="d-flex">
-                      <div className="me-3">
-                        {item.notificationType === "info" ? (
-                          <FaBell size={24} color="#007bff" />
-                        ) : item.notificationType === "warning" ? (
-                          <FaExclamationCircle size={24} color="#ffc107" />
-                        ) : (
-                          <FaCheckCircle size={24} color="#28a745" />
-                        )}
-                      </div>
-                      <div className="flex-grow-1">
-                        <h6 className="mb-1">{item.notificationType}  {!item.read && (
-                            <Badge bg="primary" pill className="ms-2">
-                              New
-                            </Badge>
-                          )}</h6>
-                        <p className="mb-1 text-muted">{item.message}</p>
-                        <div className="d-flex align-items-center text-muted">
-                          <FaBriefcase size={12} className="me-1" />
-                          <small>{item.jobID}</small>
-                        </div>
-                      </div>
-                      <div className="ms-auto">
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            hideNotification(item.id);
-                          }}
-                        >
-                          <i className="fe fe-eye-off"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="small text-muted">
-                      <span className="mx-2">•</span>
-                      <small>
-                        {formatNotificationTime(item.timestamp)}
-                      </small>
-                    </div>
-                  </ListGroup.Item>
-                );
-              })
-            )}
-          </ListGroup>
-        </SimpleBar>
-        {notifications.length > 0 && (
-          <div className="border-top p-3 text-center">
-            <button
-              className="btn btn-link text-primary"
-              onClick={markAllAsRead}
-            >
-              Mark all as read
-            </button>
-          </div>
-        )}
-      </>
-    );
-  });
-
-  const performGlobalSearch = useCallback(async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    console.log('Searching for:', searchTerm); // Debug log
-
-    try {
-      // Search in jobs collection
-      const jobsRef = collection(db, 'jobs');
-      // First, let's try a simpler query to match job titles
-      const jobsQuery = query(jobsRef, 
-        where('jobTitle', '>=', searchTerm.toLowerCase()),
-        where('jobTitle', '<=', searchTerm.toLowerCase() + '\uf8ff'),
-        limit(5)
-      );
-      
-      // Search in followUps collection
-      const followUpsRef = collection(db, 'followUps');
-      const followUpsQuery = query(followUpsRef,
-        where('title', '>=', searchTerm.toLowerCase()),
-        where('title', '<=', searchTerm.toLowerCase() + '\uf8ff'),
-        limit(5)
-      );
-
-      // Execute queries in parallel
-      const [jobsSnapshot, followUpsSnapshot] = await Promise.all([
-        getDocs(jobsQuery),
-        getDocs(followUpsQuery)
-      ]);
-
-      console.log('Jobs results:', jobsSnapshot.docs.length); // Debug log
-      console.log('FollowUps results:', followUpsSnapshot.docs.length); // Debug log
-
-      // Process job results
-      const jobResults = jobsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          type: 'job',
-          title: `Job: ${data.jobTitle || 'Untitled'}`,
-          subtitle: `Client: ${data.clientName || 'Unknown'}`,
-          link: `/dashboard/jobs/${doc.id}`,
-          timestamp: data.timestamp?.toDate() || new Date(),
-          ...data
-        };
-      });
-
-      // Process followUp results
-      const followUpResults = followUpsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          type: 'followUp',
-          title: `Follow-up: ${data.title || 'Untitled'}`,
-          subtitle: `Due: ${data.dueDate ? format(new Date(data.dueDate.toDate()), 'MMM d, yyyy') : 'No date'}`,
-          link: `/dashboard/follow-ups/${doc.id}`,
-          timestamp: data.timestamp?.toDate() || new Date(),
-          ...data
-        };
-      });
-
-      // Combine and sort results
-      const combinedResults = [...jobResults, ...followUpResults]
-        .sort((a, b) => {
-          const dateA = a.timestamp instanceof Date ? a.timestamp : new Date();
-          const dateB = b.timestamp instanceof Date ? b.timestamp : new Date();
-          return dateB - dateA;
-        });
-
-      //console.log('Combined results:', combinedResults); // Debug log
-      setSearchResults(combinedResults);
+      setNotifications(notificationsList);
+      const unreadCount = notificationsList.filter(n => !n.read).length;
+      setUnreadCount(unreadCount);
     } catch (error) {
-      console.error('Search error:', error);
-      toast.error('Search failed. Please try again.');
-    } finally {
-      setIsSearching(false);
+      console.error('Error loading notifications:', error);
+      setNotifications([]);
+      setUnreadCount(0);
     }
-  }, []);
+  };
 
-  // Add debounced search
+  // Add notification listener effect
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      performGlobalSearch(searchQuery);
-    }, 300);
+    if (!workerId) return; // Don't set up listener if no worker ID
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, performGlobalSearch]);
+    const notificationsRef = collection(db, "notifications");
+    const q = query(
+      notificationsRef,
+      where("workerId", "in", [workerId, "all"]),
+      where("hidden", "==", false),
+      orderBy("timestamp", "desc"),
+      limit(10)
+    );
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.search-container')) {
-        setShowSearchResults(false);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const changes = snapshot.docChanges();
+      if (changes.length > 0) {
+        loadNotifications();
       }
-    };
+    });
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    // Initial load
+    loadNotifications();
 
-    // In the QuickMenu component
-    const handleSearch = (e) => {
-      e.preventDefault();
-      if (searchQuery.trim()) {
-        router.push({
-          pathname: '/dashboard/search',
-          query: { q: searchQuery.trim() }
+    return () => unsubscribe();
+  }, [workerId]); // Add workerId as dependency
+
+  // Add mark all as read function
+  const markAllAsRead = async () => {
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach(notification => {
+        if (!notification.read) {
+          const notificationRef = doc(db, "notifications", notification.id);
+          batch.update(notificationRef, { read: true });
+        }
+      });
+      await batch.commit();
+      
+      // Update local state
+      setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
+  // Update the search handler in QuickMenu.js
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      // Clear the quick search results immediately
+      setShowSearchResults(false);
+      setSearchResults([]);
+      
+      // Show initial toast immediately
+      toast.info(
+        <div style={{ fontFamily: 'Inter, sans-serif' }}>
+          <div className="fw-semibold" style={{ fontSize: '14px' }}>
+            Searching...
+          </div>
+        </div>,
+        {
+          position: "top-right",
+          autoClose: 1000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: false,
+          draggable: true,
+          style: {
+            fontFamily: 'Inter, sans-serif',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          },
+          className: 'bg-white',
+          toastId: 'search-start'
+        }
+      );
+
+      // Navigate to search page immediately
+      router.push({
+        pathname: '/dashboard/search', 
+        query: { q: searchQuery.trim() }
+      });
+      
+      try {
+        // Perform the search asynchronously
+        performGlobalSearch(db, searchQuery.trim()).then(results => {
+          // Store the results in localStorage after they're ready
+          localStorage.setItem('searchResults', JSON.stringify(results));
+          localStorage.setItem('searchQuery', searchQuery.trim());
         });
+        
+        // Clear the search input
         setSearchQuery('');
+        
+      } catch (error) {
+        console.error('Search error:', error);
+        toast.error('An error occurred while searching. Please try again.');
       }
-    };
+    }
+  };
 
-  // Add useEffect to fetch company logo
+  // Update the search input change handler
+  const handleSearchInputChange = async (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    if (value.trim()) {
+      setIsSearching(true);
+      try {
+        const results = await performQuickSearch(db, value);
+        setSearchResults(results);
+        setShowSearchResults(true);
+      } catch (error) {
+        console.error('Search error:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      setShowSearchResults(false);
+      setSearchResults([]);
+    }
+  };
+
+  // Optimize company logo fetch
   useEffect(() => {
     const loadCompanyDetails = async () => {
-      const companyData = await getCompanyDetails();
-      if (companyData?.logo) {
-        setLogo(companyData.logo);
+      if (logo === '/images/SAS-LOGO.png') {
+        const cachedLogo = localStorage.getItem('companyLogo');
+        if (cachedLogo) {
+          setLogo(cachedLogo);
+        } else {
+          const companyData = await getCompanyDetails();
+          if (companyData?.logo) {
+            setLogo(companyData.logo);
+            localStorage.setItem('companyLogo', companyData.logo);
+          }
+        }
       }
     };
 
     loadCompanyDetails();
-  }, []);
+  }, [logo, setLogo]);
+
+  // Add this effect to clear search when route changes
+  useEffect(() => {
+    // Clear search when route changes
+    setSearchQuery('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+  }, [router.pathname]);
+
+  // Add clearSearch handler
+  const clearSearch = () => {
+    setSearchQuery('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+  };
+
+  // Add necessary states
+  const [showTaskDropdown, setShowTaskDropdown] = useState(false);
+  const [taskCategories, setTaskCategories] = useState({
+    followUps: [],
+    appointments: [],
+    reminders: []
+  });
+  const [taskCount, setTaskCount] = useState(0);
+
+  // Modified task fetching logic
+  useEffect(() => {
+    const fetchJobTasks = async () => {
+      if (!workerId) return;
+      
+      try {
+        const jobsRef = collection(db, "jobs");
+        // Modified query to match your data structure
+        const q = query(
+          jobsRef,
+          where("assignedWorkers", "array-contains", {
+            workerId: workerId,
+            workerName: userDetails?.fullName || ''
+          }),
+          where("jobStatus", "in", ["Created", "In Progress"])
+        );
+
+        const querySnapshot = await getDocs(q);
+        let tasks = {
+          followUps: [],
+          appointments: [],
+          reminders: []
+        };
+
+        querySnapshot.docs.forEach(doc => {
+          const jobData = doc.data();
+          console.log('Job Data:', jobData); // Debug log
+          
+          // Process taskList if it exists
+          if (jobData.taskList && Array.isArray(jobData.taskList)) {
+            jobData.taskList.forEach(task => {
+              // Check if task is not done
+              if (!task.isDone) {
+                const taskWithContext = {
+                  ...task,
+                  jobID: jobData.jobID,
+                  jobName: jobData.jobName,
+                  customerName: jobData.customerName,
+                  startDate: jobData.startDate,
+                  endDate: jobData.endDate,
+                  priority: jobData.priority || 'Low'
+                };
+
+                // Categorize tasks based on type or default to reminders
+                if (task.type === 'follow-up') {
+                  tasks.followUps.push(taskWithContext);
+                } else if (task.type === 'appointment') {
+                  tasks.appointments.push(taskWithContext);
+                } else {
+                  tasks.reminders.push(taskWithContext);
+                }
+              }
+            });
+          }
+        });
+
+        console.log('Processed Tasks:', tasks); // Debug log
+
+        setTaskCategories(tasks);
+        const totalTasks = Object.values(tasks).reduce((acc, arr) => acc + arr.length, 0);
+        setTaskCount(totalTasks);
+      } catch (error) {
+        console.error('Error loading tasks:', error);
+        toast.error('Error loading tasks');
+      }
+    };
+
+    if (workerId) {
+      fetchJobTasks();
+    }
+  }, [workerId, userDetails?.fullName]); // Add userDetails.fullName as dependency
+
+  // Add these states
+  const [followUpFilters, setFollowUpFilters] = useState({
+    status: 'all',
+    type: 'all',
+    dateRange: {
+      start: null,
+      end: null
+    }
+  });
+  const [followUpCount, setFollowUpCount] = useState(0);
+  const [followUps, setFollowUps] = useState([]);
+
+  // Modified filter implementation
+  const [filters, setFilters] = useState({
+    status: 'all',
+    type: 'all',
+    dateRange: {
+      start: null,
+      end: null
+    }
+  });
+
+  useEffect(() => {
+    if (!workerId) return;
+
+    const fetchFollowUps = async () => {
+      try {
+        // Query jobs with follow-ups
+        const jobsRef = collection(db, "jobs");
+        const q = query(
+          jobsRef,
+          where("followUpCount", ">", 0),
+          orderBy("lastFollowUp", "desc")
+        );
+
+        console.log('Starting follow-ups fetch...'); // Debug log 1
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          console.log('Jobs snapshot received:', snapshot.size, 'documents'); // Debug log 2
+          
+          let allFollowUps = [];
+
+          snapshot.docs.forEach(doc => {
+            const jobData = doc.data();
+            console.log('Processing job:', jobData.jobID); // Debug log 3
+            console.log('Job followUps:', jobData.followUps); // Debug log 4
+            
+            // Check if job has followUps
+            if (jobData.followUps) {
+              // Convert followUps object to array and add job context
+              Object.entries(jobData.followUps).forEach(([followUpId, followUp]) => {
+                console.log('Processing followUp:', followUpId, followUp); // Debug log 5
+
+                // Apply filters
+                const statusMatch = filters.status === 'all' || followUp.status === filters.status;
+                const typeMatch = filters.type === 'all' || followUp.type === filters.type;
+                
+                let dateMatch = true;
+                if (filters.dateRange.start && filters.dateRange.end) {
+                  const followUpDate = new Date(followUp.createdAt);
+                  const startDate = new Date(filters.dateRange.start);
+                  const endDate = new Date(filters.dateRange.end);
+                  dateMatch = followUpDate >= startDate && followUpDate <= endDate;
+                }
+
+                console.log('Filter matches:', { // Debug log 6
+                  statusMatch,
+                  typeMatch,
+                  dateMatch,
+                  currentFilters: filters,
+                  followUpStatus: followUp.status,
+                  followUpType: followUp.type,
+                  followUpDate: followUp.createdAt
+                });
+
+                if (statusMatch && typeMatch && dateMatch) {
+                  allFollowUps.push({
+                    id: followUpId,
+                    ...followUp,
+                    jobID: jobData.jobID,
+                    jobName: jobData.jobName,
+                    customerName: jobData.customerName,
+                    customerID: jobData.customerID
+                  });
+                }
+              });
+            }
+          });
+
+          console.log('Final filtered follow-ups:', allFollowUps); // Debug log 7
+          setFollowUps(allFollowUps);
+          setFollowUpCount(allFollowUps.length);
+        });
+
+        return () => unsubscribe();
+      } catch (error) {
+        console.error("Error fetching follow-ups:", error);
+        toast.error("Error loading follow-ups");
+      }
+    };
+
+    fetchFollowUps();
+  }, [workerId, filters]); // Add filters as dependency
+
+  // Add this debug log in your render to check filter state changes
+  useEffect(() => {
+    console.log('Current Filters:', filters);
+  }, [filters]);
+
+ 
+
+  // Add this effect to monitor filters changes
+  useEffect(() => {
+    console.log('Filters changed:', {
+      status: filters.status,
+      type: filters.type,
+      dateRange: filters.dateRange
+    });
+  }, [filters]);
+
+  // Update the filter change handler with logging
+  const handleFilterChange = (type, value) => {
+    console.log('Filter change:', { type, value });
+    setFilters(prev => {
+      const newFilters = {
+        ...prev,
+        [type]: value
+      };
+      console.log('New filters state:', newFilters);
+      return newFilters;
+    });
+  };
 
   return (
     <Fragment>
@@ -616,38 +906,159 @@ const handleSignOut = async () => {
         bsPrefix="navbar-nav"
         className="navbar-right-wrap ms-2 d-flex nav-top-wrap align-items-center"
       >
-   
+        {/* Search Form - Only show if not on overview page */}
+        {!isOverviewPage && (
+          <li className="me-4">
+            <div className="position-relative">
+              <form onSubmit={handleSearchSubmit}>
+                <div className="d-flex align-items-center">
+                  <div className="position-relative" style={{ width: '300px' }}>
+                    <InputGroup>
+                      <Form.Control
+                        type="text"
+                        placeholder="Search jobs, status, etc..."
+                        value={searchQuery}
+                        onChange={handleSearchInputChange}
+                        className="border-end-0"
+                        style={{
+                          backgroundColor: '#f8f9fa',
+                       
+                          borderRadius: '8px 0 0 8px',
+                          padding: '0.6rem 1rem',
+                          fontSize: '0.875rem',
+                        }}
+                      />
+                      <Button 
+                        type="submit"
+                        variant="primary"
+                        className="d-flex align-items-center justify-content-center"
+                        disabled={!searchQuery.trim()}
+                        style={{
+                          borderRadius: '0 8px 8px 0',
+                          padding: '0.6rem 1.2rem',
+                          border: 'none',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <FaSearch size={14} />
+                      </Button>
+                    </InputGroup>
+                    {searchQuery && (
+                      <Button 
+                        variant="link"
+                        className="position-absolute top-50 end-0 translate-middle-y text-muted pe-5"
+                        onClick={clearSearch}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none',
+                          zIndex: 5
+                        }}
+                      >
+                        <FaTimes size={12} />
+                      </Button>
+                    )}
+                  </div>
 
-        {/* Search Form */}
-        <li className="me-2" style={{ minWidth: '250px' }}>
-          <form onSubmit={handleSearch} className="search-container">
-            <InputGroup size="sm">
-              <InputGroup.Text>
-                <FaSearch size={16} className="text-secondary" />
-              </InputGroup.Text>
-              <Form.Control
-                type="search"
-                placeholder="Search jobs, status, etc..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="form-control"
-                style={{ fontSize: '15px' }}
-                // style={{ fontSize: '0.875rem' }}
-              />
-              <Button 
-                type="submit" 
-                variant="primary" 
-                size="sm"
-                disabled={!searchQuery.trim()}
-              >
-                Search
-              </Button>
-            </InputGroup>
-          </form>
-        </li>
+                  {/* Add Follow-up Filter here */}
+                  <div className="ms-3">
+                    <Dropdown>
+                      <Dropdown.Toggle variant="light" className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill">
+                        <FaFilter size={12} />
+                        <span>Follow-ups</span>
+                        {filters.status !== 'all' && <Badge bg="primary" className="ms-2">{followUpCount}</Badge>}
+                      </Dropdown.Toggle>
+
+                      <Dropdown.Menu align="end" className="mt-1 p-3" style={{ width: '300px' }}>
+                        <div className="mb-3">
+                          <small className="text-muted d-block mb-2">Status</small>
+                          <div className="d-flex gap-2 flex-wrap">
+                            {['all', 'Logged', 'In Progress', 'Closed', 'Cancelled'].map(status => (
+                              <Badge
+                                key={status}
+                                bg={filters.status === status ? 'primary' : 'light'}
+                                text={filters.status === status ? 'white' : 'dark'}
+                                className="px-3 py-2 cursor-pointer"
+                                onClick={() => handleFilterChange('status', status)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {status === 'all' ? 'All Status' : status}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <small className="text-muted d-block mb-2">Type</small>
+                          <div className="d-flex gap-2 flex-wrap">
+                            {['all', 'Appointment', 'Repair', 'Contract', 'VerifyCustomer'].map(type => (
+                              <Badge
+                                key={type}
+                                bg={filters.type === type ? 'primary' : 'light'}
+                                text={filters.type === type ? 'white' : 'dark'}
+                                className="px-3 py-2 cursor-pointer"
+                                onClick={() => handleFilterChange('type', type)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {type === 'all' ? 'All Types' : type}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <small className="text-muted d-block mb-2">Date Range</small>
+                          <Form.Group>
+                            <Form.Control
+                              type="date"
+                              size="sm"
+                              className="mb-2"
+                              value={filters.dateRange.start || ''}
+                              onChange={e => handleFilterChange('dateRange', {
+                                ...filters.dateRange,
+                                start: e.target.value
+                              })}
+                            />
+                            <Form.Control
+                              type="date"
+                              size="sm"
+                              value={filters.dateRange.end || ''}
+                              onChange={e => handleFilterChange('dateRange', {
+                                ...filters.dateRange,
+                                end: e.target.value
+                              })}
+                            />
+                          </Form.Group>
+                        </div>
+
+                        <div className="border-top mt-3 pt-3">
+                          <Button
+                            variant="primary"
+                            className="w-100"
+                            onClick={() => router.push({
+                              pathname: '/dashboard/follow-ups',
+                              query: {
+                                status: filters.status,
+                                type: filters.type,
+                                startDate: filters.dateRange.start,
+                                endDate: filters.dateRange.end
+                              }
+                            })}
+                          >
+                            View All Follow-ups ({followUpCount})
+                          </Button>
+                        </div>
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </li>
+        )}
+
 
         {/* Notification Dropdown */}
-        <Dropdown as="li">
+        {/* <Dropdown as="li">
           <Dropdown.Toggle
             as="a"
             bsPrefix=" "
@@ -678,173 +1089,98 @@ const handleSignOut = async () => {
             <Dropdown.Item className="mt-3" bsPrefix=" " as="div">
               <div className="border-bottom px-3 pt-0 pb-3 d-flex justify-content-between align-items-end">
                 <span className="h4 mb-0">Notifications</span>
-                <Link
-                  href="/dashboard/settings#notifications"
-                  className="text-muted"
-                >
-                  <span className="align-middle">
-                    <i className="fe fe-settings me-1"></i>
-                  </span>
+                <Link href="/dashboard/settings#notifications" className="text-muted">
+                  <i className="fe fe-settings me-1"></i>
                 </Link>
               </div>
-              <Notifications setUnreadCount={setUnreadCount} />
-              <div className="border-top px-3 pt-3 pb-3">
-                <Link
-                  href="/dashboard/notification-history"
-                  className="text-link fw-semi-bold"
-                >
-                  See all Notifications
-                </Link>
-              </div>
+              <SimpleBar style={{ maxHeight: "300px" }}>
+                <ListGroup variant="flush">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="mb-0 text-muted">No notifications</p>
+                    </div>
+                  ) : (
+                    notifications.map(notification => (
+                      <NotificationItem 
+                        key={notification.id} 
+                        notification={notification}
+                        onRead={() => markNotificationAsRead(notification.id)}
+                      />
+                    ))
+                  )}
+                </ListGroup>
+              </SimpleBar>
+              {notifications.length > 0 && (
+                <div className="border-top p-3 text-center">
+                  <button
+                    className="btn btn-link text-primary"
+                    onClick={markAllAsRead}
+                  >
+                    Mark all as read
+                  </button>
+                </div>
+              )}
             </Dropdown.Item>
           </Dropdown.Menu>
-        </Dropdown>
-     {/* User Dropdown with larger avatar */}
-     <Dropdown as="li" className="ms-2">
+        </Dropdown> */}
+
+        {/* User Dropdown */}
+        <Dropdown as="li" className="ms-2">
           <Dropdown.Toggle
             as="a"
             bsPrefix=" "
             className="rounded-circle"
             id="dropdownUser"
           >
-            <div className="position-relative" style={{ 
-              width: '45px', 
-              height: '45px',
-              display: 'inline-block'
-            }}>
-              {userDetails && userDetails.profilePicture ? (
-                <div style={{ 
-                  width: '45px', 
-                  height: '45px', 
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Image
-                    alt="avatar"
-                    src={userDetails.profilePicture}
-                    className="rounded-circle"
-                    width={45}
-                    height={45}
-                    style={{
-                      objectFit: 'cover',
-                      border: '3px solid #e5e9f2',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                  {/* Online indicator */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '1px',
-                      right: '1px',
-                      width: '15px',
-                      height: '15px',
-                      backgroundColor: '#00d27a',
-                      borderRadius: '50%',
-                      border: '2px solid #fff'
-                    }}
-                  />
-                </div>
-              ) : (
-                <div style={{ 
-                  width: '75px', 
-                  height: '75px', 
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Image
-                    alt="default avatar"
-                    src="/images/avatar/NoProfile.png"
-                    className="rounded-circle"
-                    width={65}
-                    height={65}
-                    style={{
-                      objectFit: 'cover',
-                      border: '3px solid #e5e9f2',
-                      backgroundColor: '#f8f9fa',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                  {/* Online indicator */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '5px',
-                      right: '5px',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#00d27a',
-                      borderRadius: '50%',
-                      border: '2px solid #fff'
-                    }}
-                  />
-                </div>
-              )}
-              {userDetails && (
-                <div 
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    bottom: '-25px',
-                    whiteSpace: 'nowrap',
-                    textAlign: 'center',
-                    width: 'auto'
-                  }}
-                >
-                  <span className="text-dark small fw-bold">{userDetails.fullName}</span>
-                </div>
-              )}
-            </div>
+            <UserAvatar userDetails={userDetails} />
           </Dropdown.Toggle>
-  <Dropdown.Menu
-    className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
-    align="end"
-    aria-labelledby="dropdownUser"
-    show={hasMounted && isDesktop ? true : false}
-  >
-    <Dropdown.Item className="mt-3">
-      <div className="d-flex">
-        {userDetails && (
-          <div>
-            <h5 className="mb-1">{userDetails.fullName}</h5>
-            <p className="mb-0 text-muted">{userDetails.email}</p>
-          </div>
-        )}
-      </div>
-    </Dropdown.Item>
-    <Dropdown.Divider />
-    <Dropdown.Item
-      eventKey="2"
-      onClick={() => router.push("/dashboard/profile/myprofile")}
-    >
-      <i className="fe fe-user me-2"></i> Profile
-    </Dropdown.Item>
-    <Dropdown.Item
-      eventKey="3"
-      onClick={() => router.push("/dashboard/settings")}
-    >
-      <i className="fe fe-settings me-2"></i> Settings
-    </Dropdown.Item>
-    <Dropdown.Divider />
-    <Dropdown.Item
-      eventKey="4"
-      onClick={() => window.open("https://pixelcareconsulting.myfreshworks.com/login", "_blank")}
-    >
-      <i className="fe fe-help-circle me-2"></i> Help
-    </Dropdown.Item>
-    <Dropdown.Item className="mb-3" onClick={handleSignOut}>
-      <i className="fe fe-power me-2"></i> Sign Out
-    </Dropdown.Item>
-  </Dropdown.Menu>
-</Dropdown>
+          <Dropdown.Menu
+            className="dashboard-dropdown dropdown-menu-end mt-4 py-0"
+            align="end"
+            aria-labelledby="dropdownUser"
+            show={hasMounted && isDesktop ? true : false}
+          >
+            <Dropdown.Item className="mt-3">
+              <div className="d-flex">
+                {userDetails && (
+                  <div>
+                    <h5 className="mb-1">{userDetails.fullName}</h5>
+                    <p className="mb-0 text-muted">{userDetails.email}</p>
+                  </div>
+                )}
+              </div>
+            </Dropdown.Item>
+            <Dropdown.Divider />
+            <Dropdown.Item
+              as={Link}
+              href="/dashboard/profile/myprofile"
+            >
+              <i className="fe fe-user me-2"></i> Profile
+            </Dropdown.Item>
+            <Dropdown.Item
+              as={Link}
+              href="/dashboard/settings"
+            >
+              <i className="fe fe-settings me-2"></i> Settings
+            </Dropdown.Item>
+            <Dropdown.Divider />
+            <Dropdown.Item
+              onClick={() => window.open("https://pixelcareconsulting.myfreshworks.com/login", "_blank")}
+            >
+              <i className="fe fe-help-circle me-2"></i> Help
+            </Dropdown.Item>
+            <Dropdown.Item className="mb-3" onClick={handleSignOut}>
+              <i className="fe fe-power me-2"></i> Sign Out
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown>
+
+      
       </ListGroup>
+
     </Fragment>
   );
 };
 
-export default QuickMenu;
+// Memoize the entire QuickMenu component
+export default React.memo(QuickMenu);

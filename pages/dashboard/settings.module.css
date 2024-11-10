@@ -1,0 +1,232 @@
+.companyLogoContainer {
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #dee2e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.placeholderLogo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+}
+
+.companyInfoTable th {
+  font-weight: 600;
+  padding: 12px 8px;
+  vertical-align: top;
+}
+
+.companyInfoTable td {
+  padding: 12px 8px;
+}
+
+.companyInfoTable tr:not(:last-child) {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.card {
+  border: none;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+.cardHeader {
+  border-bottom: none;
+  padding: 1rem 1.25rem;
+}
+
+.cardBody {
+  padding: 1.5rem;
+}
+
+.settingsCategory {
+  border-bottom: 1px solid #eee;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.settingsItem {
+  transition: all 0.2s;
+}
+
+.settingsItem:hover {
+  background-color: #f8f9fa;
+}
+
+.settingsItem.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+} 
+
+.breadcrumbContainer {
+  background: transparent;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+.breadcrumbContainer :global(.breadcrumb) {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.breadcrumbContainer :global(.breadcrumb-item + .breadcrumb-item::before) {
+  color: #6c757d;
+}
+
+.breadcrumbContainer :global(.breadcrumb-item.active) {
+  color: #495057;
+}
+
+.breadcrumbContainer a {
+  color: #0d6efd;
+  text-decoration: none;
+}
+
+.breadcrumbContainer a:hover {
+  text-decoration: underline;
+}
+
+.followUpContainer {
+  margin-top: 1rem;
+}
+
+.taskCard {
+  composes: card;
+  height: 100%;
+}
+
+.addTypeForm, .addStatusForm {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.colorPicker {
+  width: 60px !important;
+}
+
+.typesList, .statusList, .windowsList, .workHoursList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.typeItem, .statusItem, .windowItem, .workHourItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.typeItem:hover, .statusItem:hover, .windowItem:hover, .workHourItem:hover {
+  background-color: #f0f0f0;
+}
+
+.colorBox {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.typeName, .statusName, .windowItem h6, .workHourItem h6 {
+  font-weight: 500;
+}
+
+.statusInfo, .windowInfo, .workHourInfo {
+  flex-grow: 1;
+}
+
+.statusHeader, .windowActions, .workHourActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.statusName, .windowItem small, .workHourItem small {
+  color: #1F2937;
+}
+
+.statusItem, .windowItem, .workHourItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.statusItem:hover, .windowItem:hover, .workHourItem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.statusInfo, .windowInfo, .workHourInfo {
+  flex-grow: 1;
+}
+
+.statusHeader, .windowActions, .workHourActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.statusName, .windowItem h6, .workHourItem h6 {
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.windowItem small, .workHourItem small {
+  color: #6B7280;
+}
+
+.typeItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.colorBox {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.colorPicker {
+  width: 40px !important;
+  padding: 2px !important;
+  height: 30px;
+}
+
+.nameInput {
+  width: auto !important;
+  min-width: 150px;
+  height: 30px;
+  padding: 0.25rem 0.5rem !important;
+}
+
+.typeName {
+  font-weight: 500;
+}
+
+.typeActions {
+  display: flex;
+  gap: 0.5rem;
+}

@@ -10,7 +10,12 @@ import { registerLicense } from "@syncfusion/ej2-base";
 import ActivityTracker from '../components/ActivityTracker';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { SettingsProvider } from '../contexts/SettingsContext';
+import { Toaster } from 'react-hot-toast';
+import { LogoProvider } from '../contexts/LogoContext';
+import { AuthProvider } from '../contexts/AuthContext';
 //import SessionDebug from '../components/SessionDebug';
+import { useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 // Layouts
 import DefaultMarketingLayout from "layouts/marketing/DefaultLayout";
@@ -20,7 +25,7 @@ import MainLayout from "@/layouts/MainLayout";
 // Styles
 import "../styles/theme.scss";
 import FooterWithSocialIcons from "@/layouts/marketing/footers/FooterWithSocialIcons";
-import 'react-toastify/dist/ReactToastify.css';
+
 
 registerLicense(process.env.SYNCFUSION_LICENSE_KEY);
 
@@ -68,39 +73,67 @@ function MyApp({ Component, pageProps }) {
     };
   }, []);
 
+  const searchParams = useSearchParams();
+  
+  useEffect(() => {
+    const toastMessage = searchParams.get('toast');
+    if (toastMessage) {
+      toast.error(toastMessage, {
+        duration: 5000, // 5 seconds
+        style: {
+          background: '#fff',
+          color: 'red',
+          padding: '16px',
+          borderLeft: '6px solid red',
+          borderRadius: '4px'
+        }
+      });
+    }
+  }, [searchParams]);
+
   return (
-    <SettingsProvider>
-      <Fragment>
-        <Head>
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <meta name="keywords" content={keywords} />
-          <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
-        </Head>
-        <NextSeo
-          title={title}
-          description={description}
-          canonical={pageURL}
-          openGraph={{
-            url: pageURL,
-            title: title,
-            description: description,
-            site_name: process.env.siteName,
-          }}
-        />
-        <Provider store={store}>
-          <QueryClientProvider client={queryClient}>
-            <MainLayout showFooter={!isSignInPage}>
-              <Layout>
-                <Component {...pageProps} setIsLoading={setIsLoading} />
-                {!router.pathname.startsWith('/authentication/') && <ActivityTracker />}
-                <LoadingOverlay isLoading={isLoading} />
-                {process.env.NODE_ENV !== 'production'}
-              </Layout>
-            </MainLayout>
-          </QueryClientProvider>
-        </Provider>
-      </Fragment>
-    </SettingsProvider>
+    <AuthProvider>
+      <LogoProvider>
+        <SettingsProvider>
+          <Fragment>
+            <Head>
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <meta name="keywords" content={keywords} />
+              <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+            </Head>
+            <NextSeo
+              title={title}
+              description={description}
+              canonical={pageURL}
+              openGraph={{
+                url: pageURL,
+                title: title,
+                description: description,
+                site_name: process.env.siteName,
+              }}
+            />
+            <Provider store={store}>
+              <QueryClientProvider client={queryClient}>
+                <MainLayout showFooter={!isSignInPage}>
+                  <Layout>
+                    <Component {...pageProps} setIsLoading={setIsLoading} />
+                    {!router.pathname.startsWith('/authentication/') && <ActivityTracker />}
+                    <LoadingOverlay isLoading={isLoading} />
+                    {process.env.NODE_ENV !== 'production'}
+                  </Layout>
+                </MainLayout>
+              </QueryClientProvider>
+            </Provider>
+            <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+        }}
+      />
+          </Fragment>
+        </SettingsProvider>
+      </LogoProvider>
+    </AuthProvider>
   );
 }
 

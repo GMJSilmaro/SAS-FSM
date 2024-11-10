@@ -10,10 +10,11 @@ import {
   Button,
   Modal,
   Table,
+  Badge,
 } from "react-bootstrap";
 import { useRouter } from "next/router";
 import Cookies from "js-cookie";
-import { FaCog, FaUser, FaTools } from "react-icons/fa";
+import { FaCog, FaUser, FaTools, FaTasks, FaEdit, FaTrash, FaBuilding, FaInfo, FaMobile, FaBriefcase, FaClock, FaCalendar, FaEnvelope, FaBell, FaPlus, FaCamera, FaUpload, FaTimes, FaPhone, FaGlobe, FaMapMarkerAlt, FaCheck, FaAddressCard } from "react-icons/fa";
 import Image from "next/image";
 import {
   setDoc,
@@ -30,15 +31,17 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
 import { db } from "../../firebase";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast from 'react-hot-toast';
+import Link from "next/link";
+import styles from "./settings.module.css";
 
 const Settings = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("company-info");
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
 
   const [showFieldWorkerSettingsModal, setShowFieldWorkerSettingsModal] =
     useState(false); // New state for Field Worker Settings modal
@@ -59,10 +62,17 @@ const Settings = () => {
   const [schedulingWindows, setSchedulingWindows] = useState([]);
 
   const formatTimeTo12Hour = (time) => {
-    const [hours, minutes] = time.split(":");
-    const formattedHours = hours % 12 || 12; // Convert to 12-hour format
-    const ampm = hours >= 12 ? "PM" : "AM"; // Determine AM/PM
-    return `${formattedHours}:${minutes} ${ampm}`; // Return formatted time
+    if (!time) return '';
+    
+    try {
+      const [hours, minutes] = time.split(":");
+      const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+      const ampm = hours >= 12 ? "PM" : "AM"; // Determine AM/PM
+      return `${formattedHours}:${minutes} ${ampm}`; // Return formatted time
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return ''; // Return empty string if there's an error
+    }
   };
 
   // Function to add a scheduling window to the Firestore collection
@@ -117,20 +127,18 @@ const Settings = () => {
   };
 
   const handleSaveClick = async (index) => {
-    const updatedWindow = { ...tempWindow };
-    const windowId = schedulingWindows[index].id; // Get the ID of the window being edited
-
-    // Call the update function
-    await updateSchedulingWindowInFirestore(windowId, updatedWindow);
-
-    // Update local state
-    setSchedulingWindows((prev) =>
-      prev.map((window, i) =>
-        i === index ? { id: windowId, ...updatedWindow } : window
-      )
-    );
-
-    setEditIndex(null); // Reset edit index
+    try {
+      const windowId = schedulingWindows[index].id;
+      await updateSchedulingWindowInFirestore(windowId, tempWindow);
+      
+      // Refresh the windows after update
+      await fetchSchedulingWindows();
+      setEditIndex(null);
+      toast.success("Window updated successfully");
+    } catch (error) {
+      console.error("Error updating window:", error);
+      toast.error("Failed to update window");
+    }
   };
 
   const handleEditClick = (index) => {
@@ -151,91 +159,81 @@ const Settings = () => {
     }
   };
 
-  const [fieldWorkerSettings, setFieldWorkerSettings] = useState({
-    notifyForNewJobs: false,
-    sendDailyReports: false,
-    // Add more settings as needed
-  });
+  const fetchCompanyInfo = async () => {
+    try {
+      const docRef = doc(db, "companyDetails", "companyInfo");
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCompanyInfo(data);
+        setLogoPreview(data.logo || ''); // Reset logo preview to current logo
+      } else {
+        console.log("No company information found!");
+        setCompanyInfo({
+          logo: "",
+          name: "",
+          address: "",
+          email: "",
+          phone: "",
+          website: "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching company information:", error);
+      toast.error('Failed to fetch company information');
+    }
+  };
+
+
 
   // Function to fetch scheduling windows from Firestore
   const fetchSchedulingWindows = async () => {
     try {
-      // Reference to the "schedulingWindows" collection
       const schedulingWindowsRef = collection(db, "schedulingWindows");
-
-      // Fetch documents from the collection
       const querySnapshot = await getDocs(schedulingWindowsRef);
 
-      // Helper function to format time to 12-hour format
-      const formatTimeTo12Hour = (time) => {
-        const [hours, minutes] = time.split(":").map(Number);
-        const period = hours >= 12 ? "PM" : "AM";
-        const formattedHours = hours % 12 || 12; // Convert 0 to 12 for midnight
-        return `${formattedHours}:${minutes
-          .toString()
-          .padStart(2, "0")} ${period}`;
-      };
-
-      // Map through the documents and extract data
-      const windows = querySnapshot.docs.map((doc) => ({
-        id: doc.id, // Include the document ID for future reference (e.g., for editing or deleting)
-        label: doc.data().label,
-        timeStart: doc.data().timeStart, // Keep time in 24-hour format for sorting
-        timeEnd: doc.data().timeEnd, // Keep time in 24-hour format for sorting
-        isPublic: doc.data().isPublic,
-      }));
-
-      // Sort windows by timeStart in ascending order
-      windows.sort((a, b) => {
-        const [aHours, aMinutes] = a.timeStart.split(":").map(Number);
-        const [bHours, bMinutes] = b.timeStart.split(":").map(Number);
-        return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+      const windows = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          label: data.label || '',
+          timeStart: data.timeStart || '',
+          timeEnd: data.timeEnd || '',
+          isPublic: data.isPublic ?? true,
+          displayTimeStart: data.timeStart ? formatTimeTo12Hour(data.timeStart) : '',
+          displayTimeEnd: data.timeEnd ? formatTimeTo12Hour(data.timeEnd) : ''
+        };
       });
 
-      // Format times to 12-hour format after sorting
-      const formattedWindows = windows.map((window) => ({
-        id: window.id,
-        label: window.label,
-        timeStart: formatTimeTo12Hour(window.timeStart), // Convert timeStart to 12-hour format
-        timeEnd: formatTimeTo12Hour(window.timeEnd), // Convert timeEnd to 12-hour format
-        isPublic: window.isPublic,
-      }));
-
-      // Update the local state with fetched and formatted data
-      setSchedulingWindows(formattedWindows);
-      console.log(
-        "Scheduling windows retrieved successfully:",
-        formattedWindows
-      );
+      setSchedulingWindows(windows);
     } catch (error) {
       console.error("Error fetching scheduling windows:", error);
+      toast.error("Failed to fetch scheduling windows");
     }
   };
 
-  useEffect(() => {
-    const fetchUserDetails = async () => {
-      const uid = Cookies.get("workerId");
-      if (uid) {
-        try {
-          const userRef = doc(db, `users/${uid}`);
-          const userDoc = await getDoc(userRef);
-          if (userDoc.exists()) {
-            setUserDetails(userDoc.data());
-          } else {
-            console.log("User not found");
-          }
-        } catch (error) {
-          console.error("Error fetching user details:", error.message);
-        }
+  // Add this to your useEffect or wherever you fetch the settings
+useEffect(() => {
+  const fetchSettings = async () => {
+    try {
+      const settingsRef = doc(db, "settings", "followUps");
+      const settingsDoc = await getDoc(settingsRef);
+      
+      console.log('Fetched follow-up settings:', settingsDoc.data());
+      
+      if (settingsDoc.exists()) {
+        setFollowUpSettings(settingsDoc.data());
       } else {
-        // Redirect to sign-in if UID is not available
-        router.push("/authentication/sign-in");
+        console.log('No settings document found');
       }
-    };
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  };
 
-    fetchUserDetails();
-    fetchSchedulingWindows();
-  }, []);
+  fetchSettings();
+}, []); // Empty dependency array means this runs once when component mounts
 
   const handleFieldWorkerSettingsModalShow = () =>
     setShowFieldWorkerSettingsModal(true); // Show modal for Field Worker App Settings
@@ -246,8 +244,10 @@ const Settings = () => {
     setActiveTab(tab);
   };
 
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const handleShowScheduleModal = () => setShowScheduleModal(true);
   const handleCloseScheduleModal = () => setShowScheduleModal(false);
+
   const handleImageChange = (event) => {
     const selectedFile = event.target.files[0];
     
@@ -294,12 +294,6 @@ const Settings = () => {
     }));
   };
 
-  const handleFieldWorkerSettingChange = (setting) => {
-    setFieldWorkerSettings((prev) => ({
-      ...prev,
-      [setting]: !prev[setting],
-    }));
-  };
 
   useEffect(() => {
     const fetchCompanyInfo = async () => {
@@ -383,8 +377,6 @@ const Settings = () => {
   };
 
   const [showCompSchedule, setShowCompSchedule] = useState(false);
-
-  // State for managing business hours
   const [businessHours, setBusinessHours] = useState([
     { day: "Monday", startTime: "08:00", endTime: "20:00", closed: false },
     { day: "Tuesday", startTime: "08:00", endTime: "20:00", closed: false },
@@ -395,7 +387,6 @@ const Settings = () => {
     { day: "Sunday", startTime: "", endTime: "", closed: true },
   ]);
 
-  // State for managing ScheduleAssist settings
   const [scheduleAssist, setScheduleAssist] = useState({
     limitResults: 45,
     enforceBreak: false,
@@ -405,18 +396,15 @@ const Settings = () => {
     activityType: "",
   });
 
-  // Functions to show/hide the modal
   const handleShowCompSchedule = () => setShowCompSchedule(true);
   const handleHideCompSchedule = () => setShowCompSchedule(false);
 
-  // Function to handle changes in the business hours
   const handleBusinessHoursChange = (index, field, value) => {
     const updatedHours = [...businessHours];
     updatedHours[index][field] = value;
     setBusinessHours(updatedHours);
   };
 
-  // Function to handle changes in the ScheduleAssist settings
   const handleScheduleAssistChange = (field, value) => {
     setScheduleAssist({
       ...scheduleAssist,
@@ -424,10 +412,8 @@ const Settings = () => {
     });
   };
 
-  // Function to save changes (implement saving to the database as needed)
   const handleSave = async () => {
     try {
-      // Add your save logic here
       console.log("Business Hours:", businessHours);
       console.log("ScheduleAssist Settings:", scheduleAssist);
       
@@ -443,74 +429,236 @@ const Settings = () => {
     switch (activeTab) {
       case "company-info":
         return (
-          <Card className="shadow-sm">
-            <Card.Body>
-              <h5>Company Information</h5>
-              <Row>
-                <Col xs={4} className="fw-bold">
-                  Logo:
-                </Col>
-                <Col xs={8}>
-                  {/* <Image
-                    src={companyInfo.logo} // Use fetched logo
-                    alt="Company Logo"
-                    width={200}
-                    height={150}
-                  /> */}
-
+          <div className="company-info-container">
+            {/* Header Card */}
+            <Card className="shadow-sm border-0 mb-4 header-card">
+              <Card.Body className="d-flex justify-content-between align-items-center p-4">
+                <div>
                   <Image
-                    src={companyInfo.logo || "/images/NoImage.png"}
-                    className="rounded-circle"
+                    src={logoPreview || companyInfo.logo || "/images/NoImage.png"}
                     alt="Company Logo"
-                    width={120}
-                    height={120}
+                    width={80}
+                    height={80}
+                    className="rounded-circle company-logo"
                   />
-                </Col>
-              </Row>
-              <Row>
-                <Col xs={4} className="fw-bold">
-                  Company Name:
-                </Col>
-                <Col xs={8}>{companyInfo.name}</Col>{" "}
-                {/* Display fetched name */}
-              </Row>
-              <Row>
-                <Col xs={4} className="fw-bold">
-                  Address:
-                </Col>
-                <Col xs={8}>{companyInfo.address}</Col>{" "}
-                {/* Display fetched address */}
-              </Row>
-              <Row>
-                <Col xs={4} className="fw-bold">
-                  Email:
-                </Col>
-                <Col xs={8}>{companyInfo.email}</Col>{" "}
-                {/* Display fetched email */}
-              </Row>
-              <Row>
-                <Col xs={4} className="fw-bold">
-                  Phone:
-                </Col>
-                <Col xs={8}>{companyInfo.phone}</Col>{" "}
-                {/* Display fetched phone */}
-              </Row>
-              <Row>
-                <Col xs={4} className="fw-bold">
-                  Website:
-                </Col>
-                <Col xs={8}>
-                  <a
-                    href={companyInfo.website} // Use fetched website
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {companyInfo.website}
-                  </a>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
+                  <div className="ms-4">
+                    <h4 className="mb-1">{companyInfo.name || 'Your Company Name'}</h4>
+                    <p className="text-muted mb-0">
+                      <FaMapMarkerAlt className="me-2" />
+                      {companyInfo.address || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="primary" 
+                  className="edit-button"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <FaEdit className="me-2" />
+                  Edit Profile
+                </Button>
+              </Card.Body>
+            </Card>
+
+            {/* Details Cards */}
+            <div className="row g-4">
+              {/* Contact Information */}
+              <div className="col-md-6">
+                <Card className="shadow-sm border-0 h-100">
+                  <Card.Body className="p-4">
+                    <h5 className="card-title mb-4">
+                      <FaAddressCard className="me-2 text-primary" />
+                      Contact Information
+                    </h5>
+                    
+                    <div className="info-item mb-4">
+                      <label className="text-muted small mb-1">Email Address</label>
+                      <div className="d-flex align-items-center">
+                        <FaEnvelope className="text-primary me-2" />
+                        <span className="fw-medium">
+                          {companyInfo.email || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="info-item mb-4">
+                      <label className="text-muted small mb-1">Phone Number</label>
+                      <div className="d-flex align-items-center">
+                        <FaPhone className="text-primary me-2" />
+                        <span className="fw-medium">
+                          {companyInfo.phone || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="info-item">
+                      <label className="text-muted small mb-1">Website</label>
+                      <div className="d-flex align-items-center">
+                        <FaGlobe className="text-primary me-2" />
+                        <span className="fw-medium">
+                          {companyInfo.website ? (
+                            <a href={companyInfo.website} target="_blank" rel="noreferrer" className="text-decoration-none">
+                              {companyInfo.website}
+                            </a>
+                          ) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </div>
+
+              {/* Company Details */}
+              <div className="col-md-6">
+                <Card className="shadow-sm border-0 h-100">
+                  <Card.Body className="p-4">
+                    <h5 className="card-title mb-4">
+                      <FaBuilding className="me-2 text-primary" />
+                      Company Details
+                    </h5>
+
+                    <div className="info-item mb-4">
+                      <label className="text-muted small mb-1">Company Name</label>
+                      <div className="d-flex align-items-center">
+                        <span className="fw-medium">
+                          {companyInfo.name || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="info-item">
+                      <label className="text-muted small mb-1">Business Address</label>
+                      <div className="d-flex align-items-center">
+                        <FaMapMarkerAlt className="text-primary me-2" />
+                        <span className="fw-medium">
+                          {companyInfo.address || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </div>
+            </div>
+
+            {/* Edit Modal */}
+            <Modal show={isEditing} onHide={() => setIsEditing(false)} size="lg">
+              <Modal.Header closeButton>
+                <Modal.Title>Edit Company Information</Modal.Title>
+              </Modal.Header>
+              <Modal.Body className="p-4">
+                <div className="text-center mb-4">
+                  <div className="position-relative d-inline-block">
+                    <Image
+                      src={logoPreview || companyInfo.logo || "/images/NoImage.png"}
+                      alt="Company Logo"
+                      width={120}
+                      height={120}
+                      className="rounded-circle border"
+                    />
+                    <Button 
+                      variant="primary" 
+                      size="sm" 
+                      className="position-absolute bottom-0 end-0 rounded-circle p-2"
+                      onClick={() => fileInputRef.current.click()}
+                    >
+                      <FaCamera />
+                    </Button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="d-none"
+                      onChange={handleImageChange}
+                      accept="image/*"
+                    />
+                  </div>
+                </div>
+
+                <Form>
+                  <Row className="g-4">
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Company Name</Form.Label>
+                        <Form.Control
+                          type="text"
+                          name="name"
+                          value={companyInfo.name}
+                          onChange={handleCompanyInfoChange}
+                          placeholder="Enter company name"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Email Address</Form.Label>
+                        <Form.Control
+                          type="email"
+                          name="email"
+                          value={companyInfo.email}
+                          onChange={handleCompanyInfoChange}
+                          placeholder="Enter email address"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Phone Number</Form.Label>
+                        <Form.Control
+                          type="text"
+                          name="phone"
+                          value={companyInfo.phone}
+                          onChange={handleCompanyInfoChange}
+                          placeholder="Enter phone number"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Website</Form.Label>
+                        <Form.Control
+                          type="text"
+                          name="website"
+                          value={companyInfo.website}
+                          onChange={handleCompanyInfoChange}
+                          placeholder="Enter website URL"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Group>
+                        <Form.Label>Business Address</Form.Label>
+                        <Form.Control
+                          type="text"
+                          name="address"
+                          value={companyInfo.address}
+                          onChange={handleCompanyInfoChange}
+                          placeholder="Enter business address"
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                </Form>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="light" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={handleCompanyInfoSave}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
+              </Modal.Footer>
+            </Modal>
+          </div>
         );
       case "options":
         return (
@@ -588,14 +736,141 @@ const Settings = () => {
         return (
           <Card className="shadow-sm">
             <Card.Body>
-              <h5>Scheduling Window</h5>
-              <p>
-                Set default scheduling windows for jobs (Morning, Afternoon,
-                etc.).
-              </p>
-              <Button onClick={handleShowScheduleModal}>
-                Set Scheduling Window/s
-              </Button>
+              <h5>Scheduling Windows</h5>
+              <p>Set default scheduling windows for jobs (Morning, Afternoon, etc.).</p>
+              
+              <Table striped bordered hover className="mt-4">
+                <thead>
+                  <tr>
+                    <th>Label</th>
+                    <th>Time Start</th>
+                    <th>Time End</th>
+                    <th>Public</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedulingWindows.map((window, index) => (
+                    <tr key={window.id || `window-${index}`}>
+                      <td>
+                        {editIndex === index ? (
+                          <Form.Control
+                            type="text"
+                            value={tempWindow.label}
+                            onChange={(e) => setTempWindow({...tempWindow, label: e.target.value})}
+                          />
+                        ) : (
+                          window.label
+                        )}
+                      </td>
+                      <td>
+                        {editIndex === index ? (
+                          <Form.Control
+                            type="time"
+                            value={tempWindow.timeStart}
+                            onChange={(e) => setTempWindow({...tempWindow, timeStart: e.target.value})}
+                          />
+                        ) : (
+                          window.timeStart
+                        )}
+                      </td>
+                      <td>
+                        {editIndex === index ? (
+                          <Form.Control
+                            type="time"
+                            value={tempWindow.timeEnd}
+                            onChange={(e) => setTempWindow({...tempWindow, timeEnd: e.target.value})}
+                          />
+                        ) : (
+                          window.timeEnd
+                        )}
+                      </td>
+                      <td>
+                        {editIndex === index ? (
+                          <Form.Select
+                            value={tempWindow.isPublic ? "yes" : "no"}
+                            onChange={(e) => setTempWindow({...tempWindow, isPublic: e.target.value === "yes"})}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </Form.Select>
+                        ) : (
+                          window.isPublic ? "Yes" : "No"
+                        )}
+                      </td>
+                      <td>
+                        {editIndex === index ? (
+                          <>
+                            <Button variant="success" size="sm" onClick={() => handleSaveClick(index)} className="me-2">
+                              Save
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={() => setEditIndex(null)}>
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button variant="link" onClick={() => handleEditClick(index)} className="p-0 me-2">
+                              <i className="fas fa-edit"></i>
+                            </Button>
+                            <Button variant="link" onClick={() => handleRemoveClick(index)} className="p-0 text-danger">
+                              <i className="fas fa-trash-alt"></i>
+                            </Button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr key="new-window-row">
+                    <td>
+                      <Form.Control type="text" placeholder="Label" id="label" />
+                    </td>
+                    <td>
+                      <Form.Control type="time" id="timeStart" />
+                    </td>
+                    <td>
+                      <Form.Control type="time" id="timeEnd" />
+                    </td>
+                    <td>
+                      <Form.Select id="isPublic">
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </Form.Select>
+                    </td>
+                    <td>
+                      <Button
+                        variant="primary"
+                        onClick={async () => {
+                          const newWindow = {
+                            label: document.getElementById("label").value,
+                            timeStart: document.getElementById("timeStart").value,
+                            timeEnd: document.getElementById("timeEnd").value,
+                            isPublic: document.getElementById("isPublic").value === "yes",
+                            userId: Cookies.get("workerId"),
+                          };
+
+                          try {
+                            await addSchedulingWindowToFirestore(newWindow);
+                            setSchedulingWindows((prev) => [...prev, newWindow]);
+                            toast.success('Scheduling window added successfully');
+
+                            // Clear inputs
+                            document.getElementById("label").value = "";
+                            document.getElementById("timeStart").value = "";
+                            document.getElementById("timeEnd").value = "";
+                            document.getElementById("isPublic").value = "yes";
+                          } catch (error) {
+                            console.error("Error adding window:", error);
+                            toast.error('Failed to add scheduling window');
+                          }
+                        }}
+                      >
+                        Add Window
+                      </Button>
+                    </td>
+                  </tr>
+                </tbody>
+              </Table>
             </Card.Body>
           </Card>
         );
@@ -603,683 +878,1031 @@ const Settings = () => {
         return (
           <Card className="shadow-sm">
             <Card.Body>
-              <h5>Scheduling</h5>
-              <p>Set Work Hours and Scheduling Hours.</p>
-              <Button onClick={handleShowCompSchedule}>Set Work Hour/s</Button>
+              <h5>Work Hours</h5>
+              <p>Set business hours and scheduling preferences.</p>
+
+              {/* Business Hours Section */}
+              <h6 className="mt-4 mb-3">Business Hours</h6>
+              <Table bordered hover>
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Closed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {businessHours.map((hours, index) => (
+                    <tr key={index}>
+                      <td>{hours.day}</td>
+                      <td>
+                        <Form.Control
+                          type="time"
+                          value={hours.startTime}
+                          disabled={hours.closed}
+                          onChange={(e) => handleBusinessHoursChange(index, "startTime", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <Form.Control
+                          type="time"
+                          value={hours.endTime}
+                          disabled={hours.closed}
+                          onChange={(e) => handleBusinessHoursChange(index, "endTime", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <Form.Check
+                          type="checkbox"
+                          checked={hours.closed}
+                          onChange={(e) => handleBusinessHoursChange(index, "closed", e.target.checked)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+
+              {/* Schedule Assist Section */}
+              <h6 className="mt-5 mb-3">Schedule Assist</h6>
+              <Form>
+                <Form.Group className="mb-3">
+                  <Form.Label>Limit ScheduleAssist results to (minutes)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={scheduleAssist.limitResults}
+                    onChange={(e) => handleScheduleAssistChange("limitResults", e.target.value)}
+                  />
+                </Form.Group>
+
+                <Form.Group className="mb-3">
+                  <Form.Check
+                    type="checkbox"
+                    label="Enforce break window when optimizing"
+                    checked={scheduleAssist.enforceBreak}
+                    onChange={(e) => handleScheduleAssistChange("enforceBreak", e.target.checked)}
+                  />
+                </Form.Group>
+
+                <Row className="mb-3">
+                  <Col>
+                    <Form.Label>Break Duration (minutes)</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={scheduleAssist.breakDuration}
+                      onChange={(e) => handleScheduleAssistChange("breakDuration", e.target.value)}
+                    />
+                  </Col>
+                  <Col>
+                    <Form.Label>Break Start</Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={scheduleAssist.breakStart}
+                      onChange={(e) => handleScheduleAssistChange("breakStart", e.target.value)}
+                    />
+                  </Col>
+                  <Col>
+                    <Form.Label>Break End</Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={scheduleAssist.breakEnd}
+                      onChange={(e) => handleScheduleAssistChange("breakEnd", e.target.value)}
+                    />
+                  </Col>
+                </Row>
+
+                <Form.Group className="mb-4">
+                  <Form.Label>Activity Type</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={scheduleAssist.activityType}
+                    onChange={(e) => handleScheduleAssistChange("activityType", e.target.value)}
+                  />
+                  <Form.Text className="text-muted">
+                    When an activity of this type is already scheduled, break window
+                    creation will be bypassed.
+                  </Form.Text>
+                </Form.Group>
+
+                <div className="d-flex justify-content-end">
+                  <Button variant="primary" onClick={handleSave}>
+                    Save Changes
+                  </Button>
+                </div>
+              </Form>
             </Card.Body>
           </Card>
+        );
+      case "followuptasks":
+        return (
+          <div className={styles.followUpContainer}>
+            <Row>
+              {/* Follow-Up Types Section */}
+              <Col  className="mb-4">
+                <Card className={styles.taskCard}>
+                  <Card.Header className={styles.cardHeader}>
+                    <h6 className="mb-0">Follow-Up Types</h6>
+                    <small className="text-muted">Manage different types of follow-up tasks</small>
+                  </Card.Header>
+                  <Card.Body className={styles.cardBody}>
+                    {/* Add New Type Form */}
+                    <div className={styles.addTypeForm}>
+                      <Form.Group className="mb-3">
+                        <Form.Control
+                          type="text"
+                          placeholder="Enter new follow-up type name"
+                          value={newType.name}
+                          onChange={(e) => setNewType({...newType, name: e.target.value})}
+                        />
+                      </Form.Group>
+                      <div className="d-flex gap-2 mb-4">
+                        <Form.Control
+                          type="color"
+                          value={newType.color}
+                          onChange={(e) => setNewType({...newType, color: e.target.value})}
+                          title="Choose type color"
+                          className={styles.colorPicker}
+                        />
+                        <Button 
+                          variant="primary" 
+                          onClick={handleAddType}
+                          disabled={isSaving}
+                          style={{
+                            backgroundColor: "#3b82f6",
+                            border: "none",
+                            borderRadius: "12px",
+                            color: "white",
+                            padding: "10px 20px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            transition: "all 0.2s ease",
+                            fontWeight: "500",
+                            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                            width: "100%",
+                            justifyContent: "center"
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 6px 8px rgba(0, 0, 0, 0.15)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+                          }}
+                        >
+                          <FaPlus size={16} /> Add Type
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Types List */}
+                    <div className={styles.typesList}>
+                      {Object.entries(followUpSettings?.types || {}).map(([typeId, type]) => (
+                        <div key={typeId} className={styles.typeItem}>
+                          {editingType?.id === typeId ? (
+                            // Edit mode
+                            <div className="d-flex align-items-center gap-2 w-100">
+                              <Form.Control
+                                type="text"
+                                value={editingType.name}
+                                onChange={(e) => setEditingType(prev => ({
+                                  ...prev,
+                                  name: e.target.value
+                                }))}
+                                placeholder="Enter type name"
+                                className="flex-grow-1"
+                              />
+                              <Form.Control
+                                type="color"
+                                value={editingType.color}
+                                onChange={(e) => setEditingType(prev => ({
+                                  ...prev,
+                                  color: e.target.value
+                                }))}
+                                title="Choose type color"
+                                style={{ width: '50px' }}
+                              />
+                              <Button
+                                variant="success"
+                                size="sm"
+                                onClick={() => handleUpdateType(typeId)}
+                                className="px-3"
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setEditingType(null)}
+                                className="px-3"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            // View mode
+                            <>
+                              <div className="d-flex align-items-center gap-2">
+                                <div 
+                                  className={styles.colorBox} 
+                                  style={{ backgroundColor: type.color }}
+                                />
+                                <span className={styles.typeName}>{type.name}</span>
+                              </div>
+                              <div className={styles.typeActions}>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 me-2"
+                                  onClick={() => handleEditType(typeId)}
+                                >
+                                  <FaEdit />
+                                </Button>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  onClick={() => handleDeleteType(typeId)}
+                                >
+                                  <FaTrash />
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+
+            </Row>
+          </div>
         );
       default:
         return null;
     }
   };
 
+  // Add new state for follow-up settings
+  const [followUpSettings, setFollowUpSettings] = useState({
+    types: {},
+    statuses: []
+  });
+
+  // Add function to fetch follow-up settings
+  const fetchFollowUpSettings = async () => {
+    try {
+      const settingsRef = doc(db, "settings", "followUps");
+      const settingsDoc = await getDoc(settingsRef);
+      
+      console.log('Fetched follow-up settings:', settingsDoc.data());
+      
+      if (settingsDoc.exists()) {
+        setFollowUpSettings(settingsDoc.data());
+      } else {
+        // Set default settings if none exist
+        const defaultSettings = {
+          types: [],
+          statuses: [
+            { id: '1', name: 'Logged', color: 'secondary', type: 'initial', isDefault: true },
+            { id: '2', name: 'In Progress', color: 'primary', type: 'active' },
+            { id: '3', name: 'Closed', color: 'success', type: 'complete', isDefault: true },
+            { id: '4', name: 'Cancelled', color: 'danger', type: 'terminal', isDefault: true }
+          ]
+        };
+        setFollowUpSettings(defaultSettings);
+      }
+    } catch (error) {
+      console.error('Error fetching follow-up settings:', error);
+      toast.error('Error loading follow-up settings');
+    }
+  };
+
+  // Add these states at the top with other states
+  const [workHours, setWorkHours] = useState([]);
+  const [isLoadingWorkHours, setIsLoadingWorkHours] = useState(false);
+
+  // Add this function to fetch work hours
+  const fetchWorkHours = async () => {
+    try {
+      setIsLoadingWorkHours(true);
+      const workHoursRef = collection(db, "workHours");
+      const querySnapshot = await getDocs(workHoursRef);
+      
+      const hours = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setWorkHours(hours);
+    } catch (error) {
+      console.error("Error fetching work hours:", error);
+      toast.error("Failed to fetch work hours");
+    } finally {
+      setIsLoadingWorkHours(false);
+    }
+  };
+
+  // Add this function to save work hours
+  const handleSaveWorkHours = async () => {
+    try {
+      const batch = writeBatch(db);
+      
+      // Delete existing work hours
+      const workHoursRef = collection(db, "workHours");
+      const existingHours = await getDocs(workHoursRef);
+      existingHours.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      // Add new work hours
+      businessHours.forEach(hour => {
+        if (!hour.closed) {
+          const newHourRef = doc(collection(db, "workHours"));
+          batch.set(newHourRef, {
+            day: hour.day,
+            startTime: hour.startTime,
+            endTime: hour.endTime,
+            createdAt: serverTimestamp()
+          });
+        }
+      });
+      
+      await batch.commit();
+      toast.success("Work hours saved successfully");
+      handleHideCompSchedule();
+      await fetchWorkHours();
+    } catch (error) {
+      console.error("Error saving work hours:", error);
+      toast.error("Failed to save work hours");
+    }
+  };
+
+  // Update your useEffect to fetch work hours
+  useEffect(() => {
+    fetchSchedulingWindows();
+    fetchWorkHours();
+  }, []);
+
+  // First, let's organize the settings into clear categories
+  const settingsCategories = [
+    {
+      title: "Company Settings",
+      icon: <FaBuilding className="me-2" />,
+      items: [
+        {
+          name: "Company Information",
+          description: "Manage your company profile, logo, and contact details",
+          icon: <FaInfo className="me-2" />,
+          action: "company-info"
+        },
+        {
+          name: "Field Worker App Settings",
+          description: "Configure settings for field worker applications",
+          icon: <FaMobile className="me-2" />,
+          action: "fieldworker"
+        }
+      ]
+    },
+    {
+      title: "Job Management",
+      icon: <FaBriefcase className="me-2" />,
+      items: [
+        {
+          name: "Scheduling Windows",
+          description: "Set default time slots for job scheduling (Morning, Afternoon, etc.)",
+          icon: <FaClock className="me-2" />,
+          action: "schedulingwindows"
+        },
+        {
+          name: "Work Hours",
+          description: "Configure company work hours and scheduling availability",
+          icon: <FaCalendar className="me-2" />,
+          action: "scheduling"
+        },
+        {
+          name: "Follow-Up Tasks",
+          description: "Manage follow-up types and status workflows",
+          icon: <FaTasks className="me-2" />,
+          action: "followuptasks"
+        }
+      ]
+    },
+    {
+      title: "Communications",
+      icon: <FaEnvelope className="me-2" />,
+      items: [
+        {
+          name: "Notifications",
+          description: "Configure SMS and push notification settings",
+          icon: <FaBell className="me-2" />,
+          action: "notifications",
+          disabled: true
+        },
+        {
+          name: "Email Settings",
+          description: "Set up automated email notifications",
+          icon: <FaEnvelope className="me-2" />,
+          action: "email",
+          disabled: true
+        }
+      ]
+    }
+  ];
+
+  // Add this function inside your Settings component
+  const getCurrentPageTitle = () => {
+    switch (activeTab) {
+      case "company-info":
+        return "Company Information";
+      case "fieldworker":
+        return "Field Worker App Settings";
+      case "schedulingwindows":
+        return "Scheduling Windows";
+      case "scheduling":
+        return "Work Hours";
+      case "followuptasks":
+        return "Follow-Up Tasks";
+      case "notifications":
+        return "Notifications";
+      case "email":
+        return "Email Settings";
+      default:
+        return "Settings";
+    }
+  };
+
+  // Add this helper function for descriptions
+  const getPageDescription = () => {
+    switch (activeTab) {
+      case "company-info":
+        return "Manage your company's profile information, logo, and contact details.";
+      case "fieldworker":
+        return "Configure settings for the field worker mobile application.";
+      case "schedulingwindows":
+        return "Set up and manage time slots for job scheduling.";
+      case "scheduling":
+        return "Configure your company's working hours and availability.";
+      case "followuptasks":
+        return "Manage follow-up task types and their status workflows.";
+      case "notifications":
+        return "Configure SMS and push notification settings.";
+      case "email":
+        return "Set up and manage automated email notifications.";
+      default:
+        return "Configure your system settings.";
+    }
+  };
+
+  // Add these state declarations near the top with your other states
+  const [showAddWindowModal, setShowAddWindowModal] = useState(false);
+  const [newWindow, setNewWindow] = useState({
+    label: '',
+    timeStart: '',
+    timeEnd: '',
+    isPublic: true
+  });
+
+  // Add these handler functions
+  const handleAddWindow = () => {
+    setShowAddWindowModal(true);
+  };
+
+  const handleCloseAddWindowModal = () => {
+    setShowAddWindowModal(false);
+    setNewWindow({
+      label: '',
+      timeStart: '',
+      endTime: '',
+      isPublic: true
+    });
+  };
+
+  const handleSaveNewWindow = async () => {
+    try {
+      if (!newWindow.label || !newWindow.timeStart || !newWindow.timeEnd) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      await addSchedulingWindowToFirestore(newWindow);
+      await fetchSchedulingWindows();
+      handleCloseAddWindowModal();
+      toast.success('Scheduling window added successfully');
+    } catch (error) {
+      console.error('Error adding scheduling window:', error);
+      toast.error('Failed to add scheduling window');
+    }
+  };
+
+  // Add this modal component
+  const AddWindowModal = () => (
+    <Modal show={showAddWindowModal} onHide={handleCloseAddWindowModal}>
+      <Modal.Header closeButton>
+        <Modal.Title>Add Scheduling Window</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Form>
+          <Form.Group className="mb-3">
+            <Form.Label>Window Label</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="e.g., Morning, Afternoon"
+              value={newWindow.label}
+              onChange={(e) => setNewWindow({ ...newWindow, label: e.target.value })}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Start Time</Form.Label>
+            <Form.Control
+              type="time"
+              value={newWindow.timeStart}
+              onChange={(e) => setNewWindow({ ...newWindow, timeStart: e.target.value })}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>End Time</Form.Label>
+            <Form.Control
+              type="time"
+              value={newWindow.timeEnd}
+              onChange={(e) => setNewWindow({ ...newWindow, timeEnd: e.target.value })}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Public</Form.Label>
+            <Form.Select
+              value={newWindow.isPublic ? "yes" : "no"}
+              onChange={(e) => setNewWindow({ ...newWindow, isPublic: e.target.value === "yes" })}
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </Form.Select>
+          </Form.Group>
+        </Form>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={handleCloseAddWindowModal}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={handleSaveNewWindow}>
+          Add Window
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+
+  // Add these state declarations at the top with your other states
+  const [showAddWorkHoursModal, setShowAddWorkHoursModal] = useState(false);
+  const [newWorkHours, setNewWorkHours] = useState({
+    day: 'Monday',
+    startTime: '',
+    endTime: '',
+    isOpen: true
+  });
+
+  // Add these functions before the return statement
+  const handleAddWorkHours = () => {
+    setShowAddWorkHoursModal(true);
+  };
+
+  const handleCloseWorkHoursModal = () => {
+    setShowAddWorkHoursModal(false);
+    setNewWorkHours({
+      day: 'Monday',
+      startTime: '',
+      endTime: '',
+      isOpen: true
+    });
+  };
+
+  // For saving individual work hours
+  const handleSaveNewWorkHours = async () => {
+    try {
+      // Validate inputs
+      if (!newWorkHours.day || !newWorkHours.startTime || !newWorkHours.endTime) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      const workHoursRef = collection(db, "workHours");
+      await addDoc(workHoursRef, {
+        day: newWorkHours.day,
+        startTime: newWorkHours.startTime,
+        endTime: newWorkHours.endTime,
+        isOpen: newWorkHours.isOpen,
+        createdAt: serverTimestamp()
+      });
+
+      // Refresh work hours
+      await fetchWorkHours();
+      handleCloseWorkHoursModal();
+      toast.success('Work hours added successfully');
+    } catch (error) {
+      console.error('Error adding work hours:', error);
+      toast.error('Failed to add work hours');
+    }
+  };
+
+  // For saving all business hours and schedule assist settings
+  const handleSaveAllSettings = async () => {
+    try {
+      const batch = writeBatch(db);
+      
+      // Save business hours
+      const workHoursRef = collection(db, "workHours");
+      const existingHours = await getDocs(workHoursRef);
+      existingHours.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      businessHours.forEach(hour => {
+        if (!hour.closed) {
+          const newHourRef = doc(collection(db, "workHours"));
+          batch.set(newHourRef, {
+            day: hour.day,
+            startTime: hour.startTime,
+            endTime: hour.endTime,
+            createdAt: serverTimestamp()
+          });
+        }
+      });
+      
+      // Save schedule assist settings
+      const scheduleAssistRef = doc(db, "settings", "scheduleAssist");
+      batch.set(scheduleAssistRef, scheduleAssist, { merge: true });
+      
+      await batch.commit();
+      toast.success('Schedule settings saved successfully!');
+      handleHideCompSchedule();
+    } catch (error) {
+      console.error("Error saving schedule settings:", error);
+      toast.error('Failed to save schedule settings');
+    }
+  };
+
+  // Add this modal component before the return statement
+  const AddWorkHoursModal = () => (
+    <Modal show={showAddWorkHoursModal} onHide={handleCloseWorkHoursModal} size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Configure Work Hours</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Table bordered hover>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Closed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {businessHours.map((hours, index) => (
+              <tr key={index}>
+                <td>{hours.day}</td>
+                <td>
+                  <Form.Control
+                    type="time"
+                    value={hours.startTime}
+                    disabled={hours.closed}
+                    onChange={(e) => handleBusinessHoursChange(index, "startTime", e.target.value)}
+                  />
+                </td>
+                <td>
+                  <Form.Control
+                    type="time"
+                    value={hours.endTime}
+                    disabled={hours.closed}
+                    onChange={(e) => handleBusinessHoursChange(index, "endTime", e.target.value)}
+                  />
+                </td>
+                <td>
+                  <Form.Check
+                    type="checkbox"
+                    checked={hours.closed}
+                    onChange={(e) => handleBusinessHoursChange(index, "closed", e.target.checked)}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={handleCloseWorkHoursModal}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={handleSaveWorkHours}>
+          Save Changes
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+
+  // Add these state declarations at the top with your other states
+  const [newType, setNewType] = useState({
+    name: '',
+    color: '#3b82f6'
+  });
+
+  // Add these functions to handle follow-up types
+  const handleAddType = async () => {
+    try {
+      setIsSaving(true);
+      
+      if (!newType.name.trim()) {
+        toast.error('Please enter a type name');
+        return;
+      }
+
+      const loadingToast = toast.loading('Adding type...');
+      
+      const settingsRef = doc(db, 'settings', 'followUps');
+      
+      const updatedTypes = {
+        ...followUpSettings.types,
+        [Date.now()]: {
+          name: newType.name.trim(),
+          color: newType.color,
+          createdAt: serverTimestamp()
+        }
+      };
+
+      await setDoc(settingsRef, {
+        ...followUpSettings,
+        types: updatedTypes
+      }, { merge: true });
+
+      setFollowUpSettings(prev => ({
+        ...prev,
+        types: updatedTypes
+      }));
+
+      setNewType({
+        name: '',
+        color: '#3b82f6'
+      });
+
+      toast.dismiss(loadingToast);
+      toast.success('Follow-up type added successfully');
+    } catch (error) {
+      console.error('Error adding follow-up type:', error);
+      toast.error(`Failed to add follow-up type: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteType = async (typeId) => {
+    try {
+      const loadingToast = toast.loading('Deleting type...');
+      
+      if (!followUpSettings?.types?.[typeId]) {
+        toast.dismiss(loadingToast);
+        toast.error('Type not found');
+        return;
+      }
+
+      const updatedTypes = { ...followUpSettings.types };
+      delete updatedTypes[typeId];
+
+      const settingsRef = doc(db, 'settings', 'followUps');
+
+      await setDoc(settingsRef, {
+        ...followUpSettings,
+        types: updatedTypes
+      }, { merge: true });
+
+      setFollowUpSettings(prev => ({
+        ...prev,
+        types: updatedTypes
+      }));
+
+      toast.dismiss(loadingToast);
+      toast.success('Type deleted successfully');
+    } catch (error) {
+      console.error('Error deleting type:', error);
+      toast.error(`Failed to delete type: ${error.message}`);
+    }
+  };
+
+  // Add this useEffect to fetch follow-up settings
+  useEffect(() => {
+    const fetchFollowUpSettings = async () => {
+      try {
+        const settingsDoc = await getDoc(doc(db, 'settings', 'followUps'));
+        if (settingsDoc.exists()) {
+          setFollowUpSettings(settingsDoc.data());
+        }
+      } catch (error) {
+        console.error('Error fetching follow-up settings:', error);
+        toast.error('Failed to fetch follow-up settings');
+      }
+    };
+
+    fetchFollowUpSettings();
+  }, []);
+
+  // Add these state declarations at the top with your other states
+  const [statusFlow, setStatusFlow] = useState({
+    name: '',
+    color: '#3b82f6',
+    order: 0,
+    isDefault: false
+  });
+
+ 
+  // Add these state declarations at the top with your other states
+  const [newStatus, setNewStatus] = useState({
+    name: '',
+    description: '',
+    isDefault: false
+  });
+
+  // Add this function to handle adding new statuses
+  const handleAddStatus = async () => {
+    try {
+      setIsSaving(true);
+
+      if (!newStatus.name.trim()) {
+        toast.error('Please enter a status name');
+        return;
+      }
+
+      const loadingToast = toast.loading('Adding status...');
+
+      const currentStatuses = followUpSettings.statuses || [];
+      const updatedStatuses = [...currentStatuses, {
+        name: newStatus.name.trim(),
+        description: newStatus.description.trim(),
+        isDefault: newStatus.isDefault,
+        order: currentStatuses.length,
+        createdAt: serverTimestamp()
+      }];
+
+      await setDoc(doc(db, 'settings', 'followUp'), {
+        ...followUpSettings,
+        statuses: updatedStatuses
+      }, { merge: true });
+
+      setFollowUpSettings(prev => ({
+        ...prev,
+        statuses: updatedStatuses
+      }));
+
+      setNewStatus({
+        name: '',
+        description: '',
+        isDefault: false
+      });
+
+      toast.dismiss(loadingToast);
+      toast.success('Status added successfully');
+    } catch (error) {
+      console.error('Error adding status:', error);
+      toast.error('Failed to add status');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add these state declarations at the top with your other states
+  const [editingType, setEditingType] = useState(null);
+
+  // Add these functions to handle editing follow-up types
+  const handleEditType = (typeId) => {
+    const typeToEdit = followUpSettings.types[typeId];
+    if (typeToEdit) {
+      setEditingType({
+        id: typeId,
+        ...typeToEdit
+      });
+    }
+  };
+
+  const handleUpdateType = async (typeId) => {
+    try {
+      const loadingToast = toast.loading('Updating type...');
+
+      if (!editingType.name?.trim()) {
+        toast.error('Please enter a type name');
+        return;
+      }
+
+      // Create updated types object
+      const updatedTypes = {
+        ...followUpSettings.types,
+        [typeId]: {
+          ...followUpSettings.types[typeId],
+          name: editingType.name,
+          color: editingType.color,
+          updatedAt: serverTimestamp()
+        }
+      };
+
+      // Update Firestore
+      const settingsRef = doc(db, 'settings', 'followUps');
+      await setDoc(settingsRef, {
+        ...followUpSettings,
+        types: updatedTypes
+      }, { merge: true });
+
+      // Update local state
+      setFollowUpSettings(prev => ({
+        ...prev,
+        types: updatedTypes
+      }));
+
+      // Exit edit mode
+      setEditingType(null);
+
+      toast.dismiss(loadingToast);
+      toast.success('Follow-up type updated successfully');
+    } catch (error) {
+      console.error('Error updating follow-up type:', error);
+      toast.error(`Failed to update type: ${error.message}`);
+    }
+  };
+
+  // Add these state declarations at the top with your other states
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Update the main render function
   return (
-    <Container fluid className="py-1">
-      {/* Dynamic Breadcrumb */}
-      <Row className="mb-4">
-        <Col>
-          <Breadcrumb>
-            <Breadcrumb.Item href="/">Dashboard</Breadcrumb.Item>
-            <Breadcrumb.Item active>Settings</Breadcrumb.Item>
-          </Breadcrumb>
-        </Col>
-      </Row>
-
-      {/* Main Content */}
+    <Container fluid className="py-4">
       <Row>
-        {/* Sidebar */}
-        <Col lg={3} md={4} sm={12} className="mb-4">
-          <Card className="shadow-sm">
+        {/* Left Column */}
+        <Col lg={3}>
+          {/* Breadcrumbs moved here */}
+          <nav aria-label="breadcrumb" className={styles.breadcrumbContainer}>
+            <ol className="breadcrumb mb-3">
+              <li className="breadcrumb-item">
+                <Link href="/dashboard">Dashboard</Link>
+              </li>
+              <li className="breadcrumb-item">
+                <Link href="/dashboard/settings">Settings</Link>
+              </li>
+              <li className="breadcrumb-item active">
+                {getCurrentPageTitle()}
+              </li>
+            </ol>
+          </nav>
+
+          {/* Settings Categories Card */}
+          <Card className="shadow-sm mb-4">
             <Card.Header className="bg-primary text-white">
-              Settings
+              <h6 className="mb-0">Settings</h6>
             </Card.Header>
-            <ListGroup variant="flush">
-              <ListGroup.Item
-                action
-                onClick={() => handleNavigation("company-info")}
-              >
-                <FaUser className="me-2" /> Company Information
-              </ListGroup.Item>
-              <ListGroup.Item
-                action
-                onClick={() => handleNavigation("options")}
-              >
-                <FaCog className="me-2" /> Options
-              </ListGroup.Item>
-              <ListGroup.Item
-                action
-                onClick={
-                  !isDisabled ? () => handleNavigation("notifications") : null
-                }
-                className={isDisabled ? "disabled-item" : ""}
-              >
-                <FaUser className="me-2" /> Notifications (Not Available)
-              </ListGroup.Item>
-
-              <ListGroup.Item
-                action
-                onClick={!isDisabled ? () => handleNavigation("email") : null}
-                className={isDisabled ? "disabled-item" : ""}
-              >
-                <FaUser className="me-2" /> Email (Not Available)
-              </ListGroup.Item>
-
-              <Card.Header className="bg-primary text-white">
-                Jobs and Projects
-              </Card.Header>
-              <ListGroup.Item
-                action
-                onClick={() => handleNavigation("schedulingwindows")}
-              >
-                <FaTools className="me-2" /> Scheduling Windows
-              </ListGroup.Item>
-              <ListGroup.Item
-                action
-                onClick={() => handleNavigation("scheduling")}
-              >
-                <FaTools className="me-2" /> Scheduling
-              </ListGroup.Item>
-            </ListGroup>
+            <Card.Body className="p-0">
+              <ListGroup variant="flush">
+                {settingsCategories.map((category, idx) => (
+                  <div key={idx} className={styles.settingsCategory}>
+                    <ListGroup.Item className="bg-light">
+                      <h6 className="mb-0 d-flex align-items-center">
+                        {category.icon} {category.title}
+                      </h6>
+                    </ListGroup.Item>
+                    {category.items.map((item, itemIdx) => (
+                      <ListGroup.Item
+                        key={itemIdx}
+                        action
+                        onClick={() => !item.disabled && handleNavigation(item.action)}
+                        className={`${styles.settingsItem} ${item.disabled ? styles.disabled : ''}`}
+                      >
+                        <div className="d-flex align-items-center">
+                          {item.icon}
+                          <div>
+                            <div className="fw-medium">{item.name}</div>
+                            <small className="text-muted">{item.description}</small>
+                            {item.disabled && (
+                              <Badge bg="secondary" className="ms-2">Coming Soon</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </ListGroup.Item>
+                    ))}
+                  </div>
+                ))}
+              </ListGroup>
+            </Card.Body>
           </Card>
         </Col>
 
-        <Modal
-          show={showEditModal}
-          onHide={handleEditModalClose}
-          centered
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Company Information</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Col xs={12} className="mb-3 d-flex align-items-center">
-                <div className="me-3">
-                  <Image
-                    src={logoPreview || "/images/NoImage.png"}
-                    className="rounded-circle"
-                    alt="Company Logo"
-                    width={120}
-                    height={120}
-                  />
-                </div>
-                <div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    style={{ display: "none" }}
-                    ref={fileInputRef}
-                    id="upload-input"
-                  />
-                  <Button
-                    className="me-2"
-                    onClick={() =>
-                      document.getElementById("upload-input").click()
-                    }
-                  >
-                    Change Logo
-                  </Button>
-                  <Button onClick={handleRemoveImage}>Remove Logo</Button>
-                </div>
-              </Col>
+        {/* Right Content Area */}
+        <Col lg={9}>
+          {/* Page Title and Description */}
+          <h4 className="mb-3">{getCurrentPageTitle()}</h4>
+          <p className="text-muted mb-4">
+            {getPageDescription()}
+          </p>
 
-              <Row>
-                <Col xs={12} md={6}>
-                  <Form.Group controlId="formCompanyName">
-                    <Form.Label>Company Name</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="name"
-                      value={companyInfo.name}
-                      onChange={handleCompanyInfoChange}
-                    />
-                  </Form.Group>
-
-                  <Form.Group controlId="formCompanyAddress" className="mt-3">
-                    <Form.Label>Address</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="address"
-                      value={companyInfo.address}
-                      onChange={handleCompanyInfoChange}
-                    />
-                  </Form.Group>
-
-                  <Form.Group controlId="formCompanyEmail" className="mt-3">
-                    <Form.Label>Email</Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="email"
-                      value={companyInfo.email}
-                      onChange={handleCompanyInfoChange}
-                    />
-                  </Form.Group>
-                </Col>
-
-                <Col xs={12} md={6}>
-                  <Form.Group controlId="formCompanyPhone">
-                    <Form.Label>Phone</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="phone"
-                      value={companyInfo.phone}
-                      onChange={handleCompanyInfoChange}
-                    />
-                  </Form.Group>
-
-                  <Form.Group controlId="formCompanyWebsite" className="mt-3">
-                    <Form.Label>Website</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="website"
-                      value={companyInfo.website}
-                      onChange={handleCompanyInfoChange}
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleEditModalClose}>
-              Close
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={handleCompanyInfoSave}
-              disabled={isUploading}
-            >
-              {isUploading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        <Modal
-          show={showFieldWorkerSettingsModal}
-          onHide={handleFieldWorkerSettingsModalClose}
-          centered
-          size="xl"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Field Worker App Settings</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="d-flex">
-              <div className="col-6 pe-3">
-                {/* General Settings Section */}
-                <h5>General Settings</h5>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="fieldAccessToPricing"
-                    label="Field Access to Pricing"
-                    checked={fieldWorkerSettings.fieldAccessToPricing}
-                    onChange={() =>
-                      handleFieldWorkerSettingChange("fieldAccessToPricing")
-                    }
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="customerInfo"
-                    label="Access to Customer Info"
-                    checked={fieldWorkerSettings.customerInfo}
-                    onChange={() =>
-                      handleFieldWorkerSettingChange("customerInfo")
-                    }
-                  />
-                </Form.Group>
-
-                {/* Profile Page Settings Section */}
-                <h5 className="mt-4">Profile Page Settings</h5>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="averageStarRating"
-                    label="Average Star Rating"
-                    checked={fieldWorkerSettings.averageStarRating}
-                    onChange={() =>
-                      handleFieldWorkerSettingChange("averageStarRating")
-                    }
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="customerRatingByJob"
-                    label="Customer Rating by Job"
-                    checked={fieldWorkerSettings.customerRatingByJob}
-                    onChange={() =>
-                      handleFieldWorkerSettingChange("customerRatingByJob")
-                    }
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="clockIn"
-                    label="Clock In"
-                    checked={fieldWorkerSettings.clockIn}
-                    onChange={() => handleFieldWorkerSettingChange("clockIn")}
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="availability"
-                    label="Availability"
-                    checked={fieldWorkerSettings.availability}
-                    onChange={() =>
-                      handleFieldWorkerSettingChange("availability")
-                    }
-                  />
-                </Form.Group>
-              </div>
-              <div
-                className="vr"
-                style={{ backgroundColor: "rgba(169, 169, 169, 0.5)" }}
-              ></div>{" "}
-              {/* Vertical line */}
-              <div className="col-4 ps-3">
-                <h5 className="">Job Detail Fields</h5>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="location"
-                    label="Location"
-                    checked={fieldWorkerSettings.location}
-                    onChange={() => handleFieldWorkerSettingChange("location")}
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Check
-                    type="switch"
-                    id="signature"
-                    label="Signature"
-                    checked={fieldWorkerSettings.signature}
-                    onChange={() => handleFieldWorkerSettingChange("signature")}
-                  />
-                </Form.Group>
-              </div>
-            </div>
-          </Modal.Body>
-
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={handleFieldWorkerSettingsModalClose}
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleFieldWorkerSettingsModalClose}
-            >
-              Save Settings
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        {/* Scheduling Modal */}
-        <Modal
-          show={showScheduleModal}
-          onHide={handleCloseScheduleModal}
-          centered
-          size="xl"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Add Scheduling Window</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Table striped bordered hover>
-              <thead>
-                <tr>
-                  <th>Label</th>
-                  <th>Time Start</th>
-                  <th>Time End</th>
-                  <th>Public</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedulingWindows.map((window, index) => (
-                  <tr key={window.id}>
-                    <td>
-                      {editIndex === index ? (
-                        <Form.Control
-                          type="text"
-                          value={tempWindow.label}
-                          onChange={(e) =>
-                            setTempWindow({
-                              ...tempWindow,
-                              label: e.target.value,
-                            })
-                          }
-                        />
-                      ) : (
-                        window.label
-                      )}
-                    </td>
-                    <td>
-                      {editIndex === index ? (
-                        <Form.Control
-                          type="time"
-                          value={tempWindow.timeStart}
-                          onChange={(e) =>
-                            setTempWindow({
-                              ...tempWindow,
-                              timeStart: e.target.value,
-                            })
-                          }
-                        />
-                      ) : (
-                        window.timeStart
-                      )}
-                    </td>
-                    <td>
-                      {editIndex === index ? (
-                        <Form.Control
-                          type="time"
-                          value={tempWindow.timeEnd}
-                          onChange={(e) =>
-                            setTempWindow({
-                              ...tempWindow,
-                              timeEnd: e.target.value,
-                            })
-                          }
-                        />
-                      ) : (
-                        window.timeEnd
-                      )}
-                    </td>
-                    <td>
-                      {editIndex === index ? (
-                        <Form.Select
-                          value={tempWindow.isPublic ? "yes" : "no"}
-                          onChange={(e) =>
-                            setTempWindow({
-                              ...tempWindow,
-                              isPublic: e.target.value === "yes",
-                            })
-                          }
-                        >
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </Form.Select>
-                      ) : window.isPublic ? (
-                        "Yes"
-                      ) : (
-                        "No"
-                      )}
-                    </td>
-                    <td>
-                      {editIndex === index ? (
-                        <>
-                          <Button
-                            variant="success"
-                            size="sm"
-                            onClick={() => handleSaveClick(index)}
-                            className="me-2"
-                          >
-                            Save
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setEditIndex(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            variant="link"
-                            onClick={() => handleEditClick(index)}
-                            className="p-0 me-2"
-                          >
-                            <i className="fas fa-edit"></i>
-                          </Button>
-                          <Button
-                            variant="link"
-                            onClick={() => handleRemoveClick(index)}
-                            className="p-0"
-                          >
-                            <i className="fas fa-trash-alt"></i>
-                          </Button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {/* Additional row for adding new scheduling window */}
-                <tr>
-                  <td>
-                    <Form.Control type="text" placeholder="Label" id="label" />
-                  </td>
-                  <td>
-                    <Form.Control type="time" id="timeStart" />
-                  </td>
-                  <td>
-                    <Form.Control type="time" id="timeEnd" />
-                  </td>
-                  <td>
-                    <Form.Select id="isPublic">
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </Form.Select>
-                  </td>
-                </tr>
-              </tbody>
-            </Table>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseScheduleModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                const newWindow = {
-                  label: document.getElementById("label").value,
-                  timeStart: document.getElementById("timeStart").value,
-                  timeEnd: document.getElementById("timeEnd").value,
-                  isPublic: document.getElementById("isPublic").value === "yes",
-                  userId: Cookies.get("workerId"), // Associate the new scheduling window with the user ID
-                };
-
-                // Add the scheduling window to Firestore
-                await addSchedulingWindowToFirestore(newWindow);
-
-                // Update the local state with the new window
-                setSchedulingWindows((prev) => [...prev, newWindow]);
-
-                // Clear the input fields after adding a new window
-                document.getElementById("label").value = "";
-                document.getElementById("timeStart").value = "";
-                document.getElementById("timeEnd").value = "";
-                document.getElementById("isPublic").value = "yes"; // Reset to default option
-              }}
-            >
-              Add Scheduling Window
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        <Modal
-          show={showCompSchedule}
-          onHide={handleHideCompSchedule}
-          size="xl"
-          centered
-          scrollable
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Company Schedule</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <h5>Business Hours</h5>
-            <Table bordered hover>
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Start Time</th>
-                  <th>End Time</th>
-                  <th>Closed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {businessHours.map((hours, index) => (
-                  <tr key={index}>
-                    <td>{hours.day}</td>
-                    <td>
-                      <Form.Control
-                        type="time"
-                        value={hours.startTime}
-                        disabled={hours.closed}
-                        onChange={(e) =>
-                          handleBusinessHoursChange(
-                            index,
-                            "startTime",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <Form.Control
-                        type="time"
-                        value={hours.endTime}
-                        disabled={hours.closed}
-                        onChange={(e) =>
-                          handleBusinessHoursChange(
-                            index,
-                            "endTime",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <Form.Check
-                        type="checkbox"
-                        checked={hours.closed}
-                        onChange={(e) =>
-                          handleBusinessHoursChange(
-                            index,
-                            "closed",
-                            e.target.checked
-                          )
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-
-            <h5>Schedule Assist</h5>
-            <Form.Group className="mb-3">
-              <Form.Label>Limit ScheduleAssist results to (minutes)</Form.Label>
-              <Form.Control
-                type="number"
-                value={scheduleAssist.limitResults}
-                onChange={(e) =>
-                  handleScheduleAssistChange("limitResults", e.target.value)
-                }
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="checkbox"
-                label="Enforce break window when optimizing"
-                checked={scheduleAssist.enforceBreak}
-                onChange={(e) =>
-                  handleScheduleAssistChange("enforceBreak", e.target.checked)
-                }
-              />
-            </Form.Group>
-
-            <Row className="mb-3">
-              <Col>
-                <Form.Label>Break Duration (minutes)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={scheduleAssist.breakDuration}
-                  onChange={(e) =>
-                    handleScheduleAssistChange("breakDuration", e.target.value)
-                  }
-                />
-              </Col>
-              <Col>
-                <Form.Label>Break Start</Form.Label>
-                <Form.Control
-                  type="time"
-                  value={scheduleAssist.breakStart}
-                  onChange={(e) =>
-                    handleScheduleAssistChange("breakStart", e.target.value)
-                  }
-                />
-              </Col>
-              <Col>
-                <Form.Label>Break End</Form.Label>
-                <Form.Control
-                  type="time"
-                  value={scheduleAssist.breakEnd}
-                  onChange={(e) =>
-                    handleScheduleAssistChange("breakEnd", e.target.value)
-                  }
-                />
-              </Col>
-            </Row>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Activity Type</Form.Label>
-              <Form.Control
-                type="text"
-                value={scheduleAssist.activityType}
-                onChange={(e) =>
-                  handleScheduleAssistChange("activityType", e.target.value)
-                }
-              />
-              <Form.Text className="text-muted">
-                When an activity of this type is already scheduled, break window
-                creation will be bypassed.
-              </Form.Text>
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleHideCompSchedule}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSave}>
-              Save Changes
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        {/* Main Settings Sections */}
-        <Col lg={9} md={8} sm={12}>
+          {/* Content Area */}
           {renderContent()}
         </Col>
       </Row>
-
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
     </Container>
   );
 };

@@ -33,7 +33,7 @@ export const DashboardMenu = [
 		title: 'Dashboard',
 		icon: 'home',
 		children: [
-			{ id: uuid(), link: '/dashboard/overview', name: 'Overview' },
+			{ id: uuid(), link: '/', name: 'Overview' },
 			// { id: uuid(), link: '/dashboard/analytics', name: 'Analytics' }
 		]
 	},
@@ -122,7 +122,7 @@ export const DashboardMenu = [
 		title: 'Authentication',
 		icon: 'lock',
 		children: [
-			{ id: uuid(), link: '/authentication/sign-in', name: 'Sign In' },
+			{ id: uuid(), link: '/sign-in', name: 'Sign In' },
 			{ id: uuid(), link: '/authentication/sign-up', name: 'Sign Up' },
 			{
 				id: uuid(),

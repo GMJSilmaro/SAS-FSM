@@ -23,7 +23,7 @@ const HeroHeader = () => {
 							<Link href="/marketing/courses/course-filter-page/" className="btn btn-dark">
 								 Browse Courses
 							</Link>{' '}
-							<Link href="/authentication/sign-in/" className="btn btn-white">
+							<Link href="/sign-in" className="btn btn-white">
 								Are You Instructor?
 							</Link>
 						</div>

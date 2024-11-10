@@ -156,7 +156,7 @@ const SignIn = () => {
           confirmButtonText: 'OK',
         }).then(() => {
           // Redirect to dashboard page after closing the alert
-          router.push('/dashboard/overview');
+          router.push('/');
         });
       } else {
         throw new Error('Login failed. Please check your credentials.');

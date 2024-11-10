@@ -26,7 +26,7 @@ const SignUp = () => {
 								<h1 className="mb-1 fw-bold">Sign up</h1>
 								<span>
 									Already have an account?{' '}
-									<Link href="/authentication/sign-in" className="ms-1">
+									<Link href="/sign-in" className="ms-1">
 										Sign in
 									</Link>
 								</span>

@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from "firebase/auth";
 
@@ -25,6 +25,32 @@ if (typeof window !== "undefined") {
 const db = getFirestore(app); 
 const storage = getStorage(app);
 const auth = getAuth(app);
+
+// Add a test function to verify connection and permissions
+export async function testFirebaseConnection() {
+  try {
+    const workersRef = collection(db, 'workers');
+    const snapshot = await getDocs(workersRef);
+    
+    console.log('Firebase connection test:', {
+      success: true,
+      documentsFound: snapshot.size,
+      firstDoc: snapshot.docs[0]?.data()
+    });
+    
+    return {
+      success: true,
+      documentsFound: snapshot.size,
+      firstDoc: snapshot.docs[0]?.data()
+    };
+  } catch (error) {
+    console.error('Firebase connection test failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
 
 // Export firebaseConfig if needed elsewhere
 export { firebaseConfig, app, db, storage, analytics, auth };

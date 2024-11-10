@@ -1,39 +1,77 @@
-import React, { useState, useEffect, useMemo, Fragment } from "react";
+import React, {
+  Fragment,
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import {
-  Row,
   Col,
+  Row,
   Card,
-  Badge,
   Button,
-  Breadcrumb,
   OverlayTrigger,
   Tooltip,
+  Badge,
+  Breadcrumb,
+  Placeholder,
   Spinner,
   Form,
+  Collapse,
+  Modal,
 } from "react-bootstrap";
-import { FaUser } from "react-icons/fa";
 import { useRouter } from "next/router";
+import {
+  Eye,
+  EnvelopeFill,
+  TelephoneFill,
+  GeoAltFill,
+  CurrencyExchange,
+  HouseFill,
+  CalendarRange,
+  CheckCircleFill,
+  XLg,
+  ChevronLeft,
+  ChevronRight,
+  FilterCircle,
+  Calendar,
+  ListUl,
+} from "react-bootstrap-icons";
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  X as FeatherX,
+} from "react-feather";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper,
+} from "@tanstack/react-table";
+import { GeeksSEO, PageHeading } from "widgets";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
-import DataTable from "react-data-table-component";
-import Swal from "sweetalert2";
-import { GeeksSEO } from "widgets";
-import JobStats from "sub-components/dashboard/projects/single/task/JobStats";
-import { Search, X, ChevronDown, ChevronUp, Filter } from 'react-feather';
-import { 
-  BsBriefcase, 
-  BsCalendar, 
-  BsClock, 
-  BsArrowRepeat 
-} from "react-icons/bs";
-import Link from 'next/link';
+import { Users, Activity, Clock, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { FaUser, FaPlus } from "react-icons/fa";
 
-const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
+const FilterPanel = ({
+  filters,
+  setFilters,
+  onClear,
+  loading,
+  handleSearch,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !loading) {
-      loadData();
+    if (e.key === "Enter" && !loading) {
+      handleSearch();
     }
   };
 
@@ -44,28 +82,36 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
           <div className="d-flex align-items-center flex-grow-1">
             <OverlayTrigger
               placement="right"
-              overlay={<Tooltip>Click to {isExpanded ? 'collapse' : 'expand'} filters</Tooltip>}
+              overlay={
+                <Tooltip>
+                  Click to {isExpanded ? "collapse" : "expand"} filters
+                </Tooltip>
+              }
             >
-              <div 
-                className="d-flex align-items-center" 
-                style={{ cursor: 'pointer' }}
+              <div
+                className="d-flex align-items-center"
+                style={{ cursor: "pointer" }}
                 onClick={() => setIsExpanded(!isExpanded)}
               >
                 <Filter size={16} className="me-2 text-primary" />
-                <h6 className="mb-0 me-2" style={{ fontSize: '1rem' }}>
+                <h6 className="mb-0 me-2" style={{ fontSize: "1rem" }}>
                   Filter
-                  {Object.values(filters).filter(value => value !== '').length > 0 && (
-                    <Badge 
-                      bg="primary" 
-                      className="ms-2" 
-                      style={{ 
-                        fontSize: '0.75rem', 
-                        verticalAlign: 'middle',
-                        borderRadius: '12px',
-                        padding: '0.25em 0.6em'
+                  {Object.values(filters).filter((value) => value !== "")
+                    .length > 0 && (
+                    <Badge
+                      bg="primary"
+                      className="ms-2"
+                      style={{
+                        fontSize: "0.75rem",
+                        verticalAlign: "middle",
+                        borderRadius: "12px",
+                        padding: "0.25em 0.6em",
                       }}
                     >
-                      {Object.values(filters).filter(value => value !== '').length}
+                      {
+                        Object.values(filters).filter((value) => value !== "")
+                          .length
+                      }
                     </Badge>
                   )}
                 </h6>
@@ -78,14 +124,16 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
             </OverlayTrigger>
 
             {!isExpanded && (
-              <div className="ms-4 flex-grow-1" style={{ maxWidth: '300px' }}>
+              <div className="ms-4 flex-grow-1" style={{ maxWidth: "300px" }}>
                 <Form.Control
                   size="sm"
                   type="text"
                   value={filters.search}
-                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, search: e.target.value }))
+                  }
                   placeholder="Quick search..."
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                   onKeyPress={handleKeyPress}
                 />
               </div>
@@ -93,36 +141,45 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
           </div>
 
           <div>
-            <Button 
-              variant="outline-danger" 
+            <Button
+              variant="soft-danger"
               size="sm"
               onClick={onClear}
-              className="me-2"
+              className="me-2 btn-icon-text"
               disabled={loading}
-              style={{ fontSize: '0.9rem' }}
             >
-              <X size={14} className="me-1" />
+              <FeatherX size={14} className="icon-left" />
               Clear
             </Button>
-            
-            <Button 
-              variant="primary" 
+
+            <Button
+              variant="primary"
               size="sm"
-              onClick={() => loadData()}
+              onClick={handleSearch}
               disabled={loading}
+              className="btn-icon-text"
             >
-              <Search size={14} className="me-1" />
-              Search
+              <Search size={14} className="icon-left" />
+              {loading ? (
+                <>
+                  <Spinner size="sm" className="me-1" />
+                  Searching...
+                </>
+              ) : (
+                "Search"
+              )}
             </Button>
           </div>
         </div>
 
-        <div style={{ 
-          maxHeight: isExpanded ? '1000px' : '0',
-          overflow: 'hidden',
-          transition: 'all 0.3s ease-in-out',
-          opacity: isExpanded ? 1 : 0
-        }}>
+        <div
+          style={{
+            maxHeight: isExpanded ? "1000px" : "0",
+            overflow: "hidden",
+            transition: "all 0.3s ease-in-out",
+            opacity: isExpanded ? 1 : 0,
+          }}
+        >
           <Row>
             <Col md={6}>
               <Form.Group className="mb-2">
@@ -131,10 +188,12 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
                   size="sm"
                   type="text"
                   value={filters.jobNo}
-                  onChange={(e) => setFilters(prev => ({ ...prev, jobNo: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, jobNo: e.target.value }))
+                  }
                   placeholder="Enter job number..."
                   onKeyPress={handleKeyPress}
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 />
               </Form.Group>
 
@@ -144,10 +203,12 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
                   size="sm"
                   type="text"
                   value={filters.jobName}
-                  onChange={(e) => setFilters(prev => ({ ...prev, jobName: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, jobName: e.target.value }))
+                  }
                   placeholder="Search by job name..."
                   onKeyPress={handleKeyPress}
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 />
               </Form.Group>
 
@@ -157,10 +218,15 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
                   size="sm"
                   type="text"
                   value={filters.customerName}
-                  onChange={(e) => setFilters(prev => ({ ...prev, customerName: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      customerName: e.target.value,
+                    }))
+                  }
                   placeholder="Search by customer name..."
                   onKeyPress={handleKeyPress}
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 />
               </Form.Group>
             </Col>
@@ -171,14 +237,19 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
                 <Form.Select
                   size="sm"
                   value={filters.jobStatus}
-                  onChange={(e) => setFilters(prev => ({ ...prev, jobStatus: e.target.value }))}
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      jobStatus: e.target.value,
+                    }))
+                  }
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 >
                   <option value="">All Status</option>
                   <option value="Created">Created</option>
                   <option value="Confirmed">Confirmed</option>
                   <option value="Cancelled">Cancelled</option>
-                  <option value="Job Started">Job Started</option>
+                  <option value="InProgress">InProgress</option>
                   <option value="Job Complete">Job Complete</option>
                   <option value="Validate">Validate</option>
                   <option value="Scheduled">Scheduled</option>
@@ -190,8 +261,13 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
                 <Form.Select
                   size="sm"
                   value={filters.priority}
-                  onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      priority: e.target.value,
+                    }))
+                  }
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 >
                   <option value="">All Priority</option>
                   <option value="Low">Low</option>
@@ -205,8 +281,10 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
                 <Form.Select
                   size="sm"
                   value={filters.jobType}
-                  onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
-                  style={{ fontSize: '0.9rem', padding: '0.5rem 0.75rem' }}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, jobType: e.target.value }))
+                  }
+                  style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 >
                   <option value="">All Types</option>
                   <option value="recurring">Recurring</option>
@@ -231,16 +309,32 @@ const ViewJobs = () => {
   const [lastFetchTime, setLastFetchTime] = useState(null);
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   const [editLoading, setEditLoading] = useState(false); // New state for edit loading
-  const [jobTypeFilter, setJobTypeFilter] = useState('all'); // 'all', 'recurring', 'one-time'
+  const [jobTypeFilter, setJobTypeFilter] = useState("all"); // 'all', 'recurring', 'one-time'
   const [filters, setFilters] = useState({
-    search: '',
-    jobNo: '',
-    jobName: '',
-    customerName: '',
-    jobStatus: '',
-    priority: '',
-    jobType: ''
+    search: "",
+    jobNo: "",
+    jobName: "",
+    customerName: "",
+    jobStatus: "",
+    priority: "",
+    jobType: "",
   });
+  const [stats, setStats] = useState({
+    totalJobs: 0,
+    activeJobs: 0,
+    pendingJobs: 0,
+    completedJobs: 0,
+  });
+  const [workerStats, setWorkerStats] = useState({
+    totalWorkers: 0,
+    activeWorkers: 0,
+    inactiveWorkers: 0,
+    fieldWorkers: 0,
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [totalRows, setTotalRows] = useState(0);
+  const [error, setError] = useState(null);
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -277,8 +371,8 @@ const ViewJobs = () => {
         return <span style={getStyle("#4169E1")}>Confirmed</span>; // Royal Blue
       case "Cancelled":
         return <span style={getStyle("#FF0000")}>Cancelled</span>; // Red
-      case "Job Started":
-        return <span style={getStyle("#FFA500")}>Job Started</span>; // Orange
+      case "InProgress":
+        return <span style={getStyle("#FFA500")}>InProgress</span>; // Orange
       case "Job Complete":
         return <span style={getStyle("#008000")}>Job Complete</span>; // Green
       case "Validate":
@@ -293,11 +387,10 @@ const ViewJobs = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const formatTime = (time) => {
@@ -305,171 +398,138 @@ const ViewJobs = () => {
     const [hours, minutes] = time.split(":");
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12;
+    const formattedHour = (hour % 12 || 12).toString().padStart(2, '0');
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
   const customStyles = {
     table: {
       style: {
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        width: '100%',
-        tableLayout: 'fixed'
-      }
+        backgroundColor: "#ffffff",
+        borderRadius: "8px",
+        width: "100%",
+        tableLayout: "fixed",
+      },
     },
     headRow: {
       style: {
-        backgroundColor: '#f8fafc',
-        borderTopLeftRadius: '8px',
-        borderTopRightRadius: '8px',
-        borderBottom: '1px solid #e2e8f0',
-        minHeight: '52px'
-      }
+        backgroundColor: "#f8fafc",
+        borderTopLeftRadius: "8px",
+        borderTopRightRadius: "8px",
+        borderBottom: "1px solid #e2e8f0",
+        minHeight: "52px",
+      },
     },
     headCells: {
       style: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#475569',
-        paddingLeft: '16px',
-        paddingRight: '16px'
-      }
+        fontSize: "13px",
+        fontWeight: "600",
+        color: "#475569",
+        paddingLeft: "16px",
+        paddingRight: "16px",
+      },
     },
     cells: {
       style: {
-        fontSize: '14px',
-        color: '#64748b',
-        paddingLeft: '16px',
-        paddingRight: '16px',
-        paddingTop: '12px',
-        paddingBottom: '12px'
-      }
+        fontSize: "14px",
+        color: "#64748b",
+        paddingLeft: "16px",
+        paddingRight: "16px",
+        paddingTop: "12px",
+        paddingBottom: "12px",
+      },
     },
     rows: {
       style: {
-        minHeight: '60px',
-        '&:hover': {
-          backgroundColor: '#f1f5f9',
-          cursor: 'pointer',
-          transition: 'all 0.2s'
-        }
-      }
+        minHeight: "60px",
+        "&:hover": {
+          backgroundColor: "#f1f5f9",
+          cursor: "pointer",
+          transition: "all 0.2s",
+        },
+      },
     },
     expandableRowsStyle: {
-      backgroundColor: '#f8fafc'
+      backgroundColor: "#f8fafc",
     },
     pagination: {
       style: {
-        borderTop: '1px solid #e2e8f0',
-        minHeight: '56px'
+        borderTop: "1px solid #e2e8f0",
+        minHeight: "56px",
       },
       pageButtonsStyle: {
-        borderRadius: '4px',
-        height: '32px',
-        padding: '4px 8px',
-        margin: '0 4px'
-      }
-    }
+        borderRadius: "4px",
+        height: "32px",
+        padding: "4px 8px",
+        margin: "0 4px",
+      },
+    },
   };
 
-  const AssignedWorkerCell = ({ workers }) => {
-    const displayName = workers[0]?.workerId || "Unassigned";
-    const remainingCount = workers.length - 1;
-
+  const AssignedWorkerCell = ({ value }) => {
     return (
-      <OverlayTrigger
-        placement="top"
-        overlay={
-          <Tooltip id={`tooltip-${displayName}`}>
-            {workers.map(w => w.workerId).join(", ")}
-          </Tooltip>
-        }
-      >
-        <div className="d-flex align-items-center">
-          <FaUser className="me-2" />
-          <span className="text-truncate" style={{ maxWidth: "120px" }}>
-            {displayName}
-          </span>
-          {remainingCount > 0 && (
-            <Badge bg="secondary" className="ms-2">
-              +{remainingCount}
-            </Badge>
-          )}
-        </div>
-      </OverlayTrigger>
+      <div className="d-flex align-items-center">
+        <FaUser className="me-2" />
+        <span>{value?.name || "Unassigned"}</span>
+      </div>
     );
   };
 
+  const columnHelper = createColumnHelper();
+
   const columns = [
-    {
-      name: "#",
-      selector: (row, index) => index + 1,
-      sortable: false,
-      width: "60px",
-      cell: (row, index) => <span className="text-muted">{index + 1}</span>
-    },
-    {
-      name: "Job No.",
-      selector: (row) => row.jobNo,
-      sortable: true,
-      width: "100px",
-      cell: row => (
-       
-          <Link href={`/dashboard/jobs/${row.id}`} passHref>
-            <span 
-              className="badge bg-light text-primary cursor-pointer"
-              onClick={(e) => e.stopPropagation()} // Prevents row click event
-            >
-              {row.jobNo}
-            </span>
-          </Link>
-     
-      )
-    },
-    {
-      name: "Job Name",
-      selector: (row) => row.jobName,
-      sortable: true,
-      width: "150px",
-      cell: (row) => (
+    columnHelper.accessor("jobNo", {
+      header: "Job No.",
+      size: 150,
+      cell: (info) => (
+        <div className="d-flex align-items-center">
+          <span className="fw-semibold">{info.getValue()}</span>
+        </div>
+      ),
+    }),
+    columnHelper.accessor("jobName", {
+      header: "Job Name",
+      size: 150,
+      cell: (info) => (
         <OverlayTrigger
           placement="top"
           overlay={
             <Tooltip>
               <div>Click to view details for:</div>
-              <div><strong>{row.jobName}</strong></div>
+              <div>
+                <strong>{info.getValue()}</strong>
+              </div>
             </Tooltip>
           }
         >
-          <Link href={`/dashboard/jobs/${row.id}`} passHref>
-            <div 
-              className="fw-semibold text-primary text-truncate cursor-pointer" 
+          <Link href={`/jobs/view/${info.row.original.id}`} passHref>
+            <div
+              className="fw-semibold text-primary text-truncate cursor-pointer"
               style={{ maxWidth: "130px" }}
-              onClick={(e) => e.stopPropagation()} // Prevents row click event
+              onClick={(e) => e.stopPropagation()}
             >
-              {row.jobName}
+              {info.getValue()}
             </div>
           </Link>
         </OverlayTrigger>
       ),
-    },
-    {
-      name: "Customer",
-      selector: (row) => row.customerName,
-      sortable: true,
-      width: "200px",
-      cell: (row) => {
-        const customerName = row.customerName.replace(/^C\d+ - /, '');
-        const cardCodeMatch = row.customerName.match(/^C(\d+)/);
-        const cardCode = cardCodeMatch ? `C${cardCodeMatch[1].padStart(6, '0')}` : null;
+    }),
+    columnHelper.accessor("customerName", {
+      header: "Customer",
+      size: 200,
+      cell: (info) => {
+        const customerName = info.getValue().replace(/^C\d+ - /, "");
+        const cardCodeMatch = info.getValue().match(/^C(\d+)/);
+        const cardCode = cardCodeMatch
+          ? `C${cardCodeMatch[1].padStart(6, "0")}`
+          : null;
         return (
           <OverlayTrigger
             placement="top"
             overlay={<Tooltip>View Customer Details</Tooltip>}
           >
             {cardCode ? (
-              <Link href={`/dashboard/customers/${cardCode}`} passHref>
+              <Link href={`/customers/${cardCode}`} passHref>
                 <span className="text-primary cursor-pointer">
                   {customerName}
                 </span>
@@ -480,240 +540,324 @@ const ViewJobs = () => {
           </OverlayTrigger>
         );
       },
-    },
-    {
-      name: "Address",
-      selector: (row) => row.location?.locationName,
-      sortable: true,
-      width: "200px",
-      cell: (row) => (
-        <OverlayTrigger
-          placement="top"
-          overlay={<Tooltip>{row.location?.address?.streetAddress || 'No address available'}</Tooltip>}
-        >
-          <div className="text-truncate" style={{ maxWidth: "180px" }}>
-            {row.location?.locationName || 'No location'}
-          </div>
-        </OverlayTrigger>
-      ),
-    },
-    {
-      name: "Status",
-      selector: (row) => row.jobStatus,
-      sortable: true,
-      width: "120px",
-      cell: (row) => getStatusBadge(row.jobStatus),
-    },
-    {
-      name: "Priority",
-      selector: (row) => row.priority,
-      sortable: true,
-      width: "100px",
-      cell: (row) => getPriorityBadge(row.priority),
-    },
-    {
-      name: "Assigned Workers",
-      selector: (row) => row.assignedWorkers,
-      sortable: true,
-      width: "130px",
-      cell: (row) => (
-        <AssignedWorkerCell workers={row.assignedWorkers} />
-      ),
-    },
-    {
-      name: "Date & Time",
-      selector: (row) => row.startDate,
-      sortable: true,
-      width: "150px",
-      cell: (row) => (
+    }),
+    columnHelper.accessor("location.locationName", {
+      header: "Location",
+      size: 200,
+      cell: (info) => info.getValue() || "No location",
+    }),
+    columnHelper.accessor("jobStatus", {
+      header: "Status",
+      size: 120,
+      cell: (info) => getStatusBadge(info.getValue()),
+    }),
+    columnHelper.accessor("priority", {
+      header: "Priority",
+      size: 100,
+      cell: (info) => getPriorityBadge(info.getValue()),
+    }),
+    columnHelper.accessor("assignedWorkers", {
+      header: "Assigned Workers",
+      size: 130,
+      cell: (info) => {
+        const workers = info.getValue() || [];
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <Tooltip>
+                {workers.map((w) => w.workerName).join(", ") ||
+                  "No workers assigned"}
+              </Tooltip>
+            }
+          >
+            <div className="text-truncate" style={{ maxWidth: "130px" }}>
+              {workers.length > 0 ? `${workers.length} worker(s)` : "None"}
+            </div>
+          </OverlayTrigger>
+        );
+      },
+    }),
+    columnHelper.accessor("startDate", {
+      header: "Date & Time",
+      size: 150,
+      cell: (info) => (
         <div className="d-flex flex-column">
-          <span>{formatDate(row.startDate)}</span>
-          <small className="text-muted">{formatTime(row.startTime)} - {formatTime(row.endTime)}</small>
+          <span>{formatDate(info.getValue())}</span>
+          <small className="text-muted">
+            {formatTime(info.row.original.startTime)} -{" "}
+            {formatTime(info.row.original.endTime)}
+          </small>
         </div>
       ),
-    },
-    // {
-    //   name: "Est. Duration",
-    //   selector: (row) => row.estimatedDurationHours,
-    //   sortable: true,
-    //   width: "120px",
-    //   cell: (row) => (
-    //     <span>{`${row.estimatedDurationHours}h ${row.estimatedDurationMinutes}m`}</span>
-    //   ),
-    // },
-    {
-      name: "Equipment",
-      selector: (row) => row.equipments,
-      sortable: true,
-      width: "100px",
-      cell: (row) => (
+    }),
+    columnHelper.accessor("equipments", {
+      header: "Equipment",
+      size: 100,
+      cell: (info) => {
+        const equipments = info.getValue() || [];
+        
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <Tooltip>
+                {equipments.length > 0 
+                  ? equipments
+                      .map((eq) => `${eq.equipmentType || 'N/A'} - ${eq.modelSeries || 'N/A'}`)
+                      .join(", ")
+                  : "No equipment details available"
+                }
+              </Tooltip>
+            }
+          >
+            <div className="text-truncate" style={{ maxWidth: "180px" }}>
+              {equipments.length > 0
+                ? `${equipments.length} item(s)`
+                : "No equipment"}
+            </div>
+          </OverlayTrigger>
+        );
+      },
+    }),
+    columnHelper.accessor("createdBy", {
+      header: "Created By",
+      size: 100,
+      cell: (info) => (
         <OverlayTrigger
           placement="top"
-          overlay={
-            <Tooltip>
-              {row.equipments.map(eq => `${eq.equipmentType} - ${eq.modelSeries}`).join(', ')}
-            </Tooltip>
-          }
+          overlay={<Tooltip>{info.getValue()?.fullName || "N/A"}</Tooltip>}
         >
           <div className="text-truncate" style={{ maxWidth: "180px" }}>
-            {row.equipments.length > 0 ? `${row.equipments.length} item(s)` : "No equipment"}
+            {info.getValue()?.fullName || "N/A"}
           </div>
         </OverlayTrigger>
       ),
-    },
-    {
-      name: "Type",
-      selector: (row) => row.isRepeating ? "Recurring" : "One-time",
-      sortable: true,
-      width: "120px",
-      cell: (row) => (
-        <div>
-          {row.isRepeating ? (
-            <OverlayTrigger
-              placement="top"
-              overlay={
-                <Tooltip>
-                  {row.repeatDetails ? (
-                    <>
-                      Recurring job ({row.repeatDetails.frequency || 'N/A'}) - 
-                      Occurrence {row.repeatDetails.occurrence || '0'} of {row.repeatDetails.totalOccurrences || '0'}
-                      {row.repeatDetails.originalJobNo && 
-                        <div>Original Job: #{row.repeatDetails.originalJobNo}</div>
-                      }
-                    </>
-                  ) : (
-                    'Recurring job'
-                  )}
-                </Tooltip>
-              }
+    }),
+    columnHelper.accessor(() => null, {
+      id: "actions",
+      header: "Actions",
+      size: 130,
+      cell: (info) => (
+        <div className="d-flex gap-2">
+          <OverlayTrigger
+            placement="left"
+            overlay={
+              <Tooltip>
+                View complete details for job #{info.row.original.jobNo}
+              </Tooltip>
+            }
+          >
+            <Link
+              href={`/jobs/view/${info.row.original.id}`}
+              className="btn btn-primary btn-icon-text btn-sm"
+              style={{ textDecoration: "none" }}
             >
-              <Badge bg="info" className="d-flex align-items-center gap-1">
-                <BsArrowRepeat />
-                Recurring
-              </Badge>
-            </OverlayTrigger>
-          ) : (
-            <Badge bg="secondary">One-time</Badge>
-          )}
+              <Eye size={14} className="icon-left" />
+              View
+            </Link>
+          </OverlayTrigger>
         </div>
       ),
-    },
+    }),
   ];
 
-  const fetchData = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-
-      // Check if we have recent users data
-      const shouldFetchUsers = !lastFetchTime || (Date.now() - lastFetchTime) > CACHE_DURATION;
-
-      let users = usersData;
-      if (shouldFetchUsers) {
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        users = usersSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setUsersData(users);
-        setLastFetchTime(Date.now());
-      }
-
-      // Always fetch jobs as they might change more frequently
-      const jobsSnapshot = await getDocs(collection(db, "jobs"));
-      const jobsData = jobsSnapshot.docs.map((doc) => ({
+      const jobsRef = collection(db, "jobs");
+      const jobsSnapshot = await getDocs(jobsRef);
+      const jobsList = jobsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      const sortedJobsData = jobsData.sort((a, b) => b.timestamp - a.timestamp);
-
-      const mergedData = sortedJobsData.map((job) => {
-        const workerNames = job.assignedWorkers
-          .map((workerObj) => {
-            const workerId = workerObj.workerId;
-            const worker = users.find((user) => user.workerId === workerId);
-            return worker
-              ? `${worker.fullName}`
-              : `Unknown Worker (ID: ${workerId})`;
-          })
-          .join(", ");
-
-        return {
-          ...job,
-          workerFullName: workerNames || "No workers assigned",
-          locationName: job.location?.locationName || "No location name",
-        };
-      });
-
-      setJobs(mergedData);
-      setFilteredJobs(mergedData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
+      setJobs(jobsList);
+      setFilteredJobs(jobsList);
+      setTotalRows(jobsList.length);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading jobs:", err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const debounceTimeout = setTimeout(() => {
-      let filtered = jobs;
+    loadData();
+  }, []);
 
-      // Apply filters
-      if (filters.jobNo) {
-        filtered = filtered.filter(job => 
-          job.jobNo.toLowerCase().includes(filters.jobNo.toLowerCase())
-        );
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const table = useReactTable({
+    data: filteredJobs,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+      pagination: {
+        pageIndex: currentPage - 1,
+        pageSize: perPage,
+      },
+    },
+    manualPagination: true,
+    pageCount: Math.ceil(totalRows / perPage),
+    onPaginationChange: (updater) => {
+      if (typeof updater === "function") {
+        const newPageIndex = updater({
+          pageIndex: currentPage - 1,
+          pageSize: perPage,
+        }).pageIndex;
+        handlePageChange(newPageIndex + 1);
       }
+    },
+  });
 
-      if (filters.jobName) {
-        filtered = filtered.filter(job => 
-          job.jobName.toLowerCase().includes(filters.jobName.toLowerCase())
-        );
-      }
+  const paginationDisplay = (
+    <div className="d-flex justify-content-between align-items-center mt-4">
+      <div>
+        <span className="text-muted">
+          Showing {(currentPage - 1) * perPage + 1} to{" "}
+          {Math.min(currentPage * perPage, totalRows)} of {totalRows} entries
+        </span>
+      </div>
+      <div>
+        <Button
+          variant="outline-primary"
+          className="me-2"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="outline-primary"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage >= Math.ceil(totalRows / perPage)}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
 
-      if (filters.customerName) {
-        filtered = filtered.filter(job => 
-          job.customerName.toLowerCase().includes(filters.customerName.toLowerCase())
-        );
-      }
+  const fetchJobStats = async () => {
+    try {
+      const jobsRef = collection(db, "jobs");
+      const jobsSnapshot = await getDocs(jobsRef);
+      const jobsList = jobsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      if (filters.jobStatus) {
-        filtered = filtered.filter(job => job.jobStatus === filters.jobStatus);
-      }
+      const totalJobs = jobsList.length;
+      const activeJobs = jobsList.filter(
+        (job) => job.jobStatus === "InProgress"
+      ).length;
+      const pendingJobs = jobsList.filter(
+        (job) => job.jobStatus === "Created" || job.jobStatus === "Scheduled"
+      ).length;
+      const completedJobs = jobsList.filter(
+        (job) => job.jobStatus === "Job Complete"
+      ).length;
 
-      if (filters.priority) {
-        filtered = filtered.filter(job => job.priority === filters.priority);
-      }
+      setStats({
+        totalJobs,
+        activeJobs,
+        pendingJobs,
+        completedJobs,
+      });
+    } catch (error) {
+      console.error("Error fetching job stats:", error);
+    }
+  };
 
-      if (filters.jobType) {
-        filtered = filtered.filter(job => 
-          filters.jobType === 'recurring' ? job.isRepeating : !job.isRepeating
-        );
-      }
+  const fetchWorkerStats = async () => {
+    try {
+      const usersCollection = collection(db, "users");
+      const usersSnapshot = await getDocs(usersCollection);
+      const usersList = usersSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      // Quick search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filtered = filtered.filter(job => {
-          return (
-            job.jobNo.toLowerCase().includes(searchLower) ||
-            job.jobName.toLowerCase().includes(searchLower) ||
-            job.customerName.toLowerCase().includes(searchLower) ||
-            job.jobStatus.toLowerCase().includes(searchLower) ||
-            job.priority.toLowerCase().includes(searchLower)
-          );
-        });
-      }
+      const stats = {
+        totalWorkers: usersList.length,
+        activeWorkers: usersList.filter((user) => user.activeUser).length,
+        inactiveWorkers: usersList.filter((user) => !user.activeUser).length,
+        fieldWorkers: usersList.filter((user) => user.isFieldWorker).length,
+      };
 
-      setFilteredJobs(filtered);
-    }, 300);
-
-    return () => clearTimeout(debounceTimeout);
-  }, [filters, jobs]);
+      setWorkerStats(stats);
+    } catch (error) {
+      console.error("Error fetching worker stats:", error);
+    }
+  };
 
   useEffect(() => {
-    fetchData();
+    fetchJobStats();
+    fetchWorkerStats();
   }, []);
+
+  const handleSearch = () => {
+    let filtered = jobs;
+
+    // Apply filters
+    if (filters.jobNo) {
+      filtered = filtered.filter((job) =>
+        job.jobNo.toLowerCase().includes(filters.jobNo.toLowerCase())
+      );
+    }
+
+    if (filters.jobName) {
+      filtered = filtered.filter((job) =>
+        job.jobName.toLowerCase().includes(filters.jobName.toLowerCase())
+      );
+    }
+
+    if (filters.customerName) {
+      filtered = filtered.filter((job) =>
+        job.customerName
+          .toLowerCase()
+          .includes(filters.customerName.toLowerCase())
+      );
+    }
+
+    if (filters.jobStatus) {
+      filtered = filtered.filter((job) => job.jobStatus === filters.jobStatus);
+    }
+
+    if (filters.priority) {
+      filtered = filtered.filter((job) => job.priority === filters.priority);
+    }
+
+    if (filters.jobType) {
+      filtered = filtered.filter((job) =>
+        filters.jobType === "recurring" ? job.isRepeating : !job.isRepeating
+      );
+    }
+
+    // Quick search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter((job) => {
+        return (
+          job.jobNo.toLowerCase().includes(searchLower) ||
+          job.jobName.toLowerCase().includes(searchLower) ||
+          job.customerName.toLowerCase().includes(searchLower) ||
+          job.jobStatus.toLowerCase().includes(searchLower) ||
+          job.priority.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    setFilteredJobs(filtered);
+    setTotalRows(filtered.length);
+  };
 
   const handleRowClick = (row) => {
     Swal.fire({
@@ -744,7 +888,7 @@ const ViewJobs = () => {
                   <strong>Location:</strong>
                 </div>
                 <div class="ms-4">
-                  ${row.location?.locationName || 'No location'}
+                  ${row.location?.locationName || "No location"}
                 </div>
               </div>
   
@@ -754,7 +898,10 @@ const ViewJobs = () => {
                   <strong>Assigned Workers:</strong>
                 </div>
                 <div class="ms-4">
-                  ${row.assignedWorkers?.map(w => w.workerId).join(', ') || 'None'}
+                  ${
+                    row.assignedWorkers?.map((w) => w.workerId).join(", ") ||
+                    "None"
+                  }
                 </div>
               </div>
             </div>
@@ -809,91 +956,130 @@ const ViewJobs = () => {
       `,
       showConfirmButton: false,
       showCloseButton: true,
-      width: '600px', // Made wider to accommodate two columns
+      width: "600px", // Made wider to accommodate two columns
       customClass: {
-        container: 'job-action-modal',
-        closeButton: 'position-absolute top-0 end-0 mt-2 me-2',
+        container: "job-action-modal",
+        closeButton: "position-absolute top-0 end-0 mt-2 me-2",
       },
       didOpen: () => {
-        document.getElementById('viewBtn').addEventListener('click', () => {
+        document.getElementById("viewBtn").addEventListener("click", () => {
           setEditLoading(true); // Set loading state
           Swal.close();
-          router.push(`/dashboard/jobs/${row.id}`).finally(() => {
+          router.push(`/jobs/view/${row.id}`).finally(() => {
             setEditLoading(false); // Reset loading state after navigation
           });
         });
-  
-        document.getElementById('editBtn').addEventListener('click', () => {
-          setEditLoading(true); // Set loading state
+
+        document.getElementById("editBtn").addEventListener("click", () => {
+          setEditLoading(true);
           Swal.close();
-          router.push(`./update-jobs/${row.id}`).finally(() => {
-            setEditLoading(false); // Reset loading state after navigation
+          router.push(`/jobs/edit-jobs/${row.id}`).finally(() => {
+            setEditLoading(false);
           });
         });
-  
-        document.getElementById('removeBtn').addEventListener('click', async () => {
-          Swal.close();
-          const deleteResult = await Swal.fire({
-            title: "Are you sure?",
-            text: "This action cannot be undone.",
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonColor: "#d33",
-            cancelButtonColor: "#3085d6",
-            confirmButtonText: "Yes, remove it!"
-          });
-  
-          if (deleteResult.isConfirmed) {
-            try {
-              const jobRef = doc(db, "jobs", row.id);
-              await deleteDoc(jobRef);
-              Swal.fire("Deleted!", "The job has been removed.", "success");
-              const updatedJobs = jobs.filter((job) => job.id !== row.id);
-              setJobs(updatedJobs);
-              setFilteredJobs(prevFiltered => 
-                prevFiltered.filter((job) => job.id !== row.id)
-              );
-            } catch (error) {
-              console.error("Delete error:", error);
-              Swal.fire(
-                "Error!",
-                "There was a problem removing the job.",
-                "error"
-              );
+
+        document
+          .getElementById("removeBtn")
+          .addEventListener("click", async () => {
+            Swal.close();
+            const deleteResult = await Swal.fire({
+              title: "Are you sure?",
+              text: "This action cannot be undone.",
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#d33",
+              cancelButtonColor: "#3085d6",
+              confirmButtonText: "Yes, remove it!",
+            });
+
+            if (deleteResult.isConfirmed) {
+              try {
+                const jobRef = doc(db, "jobs", row.id);
+                await deleteDoc(jobRef);
+                Swal.fire("Deleted!", "The job has been removed.", "success");
+                const updatedJobs = jobs.filter((job) => job.id !== row.id);
+                setJobs(updatedJobs);
+                setFilteredJobs((prevFiltered) =>
+                  prevFiltered.filter((job) => job.id !== row.id)
+                );
+              } catch (error) {
+                console.error("Delete error:", error);
+                Swal.fire(
+                  "Error!",
+                  "There was a problem removing the job.",
+                  "error"
+                );
+              }
             }
-          }
-        });
-      }
+          });
+      },
     });
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Created": return "#D3D3D3";  // Light Gray
-      case "Confirmed": return "#4169E1"; // Royal Blue
-      case "Cancelled": return "#FF0000"; // Red
-      case "Job Started": return "#FFA500"; // Orange
-      case "Job Complete": return "#008000"; // Green
-      case "Validate": return "#00FFFF"; // Cyan
-      case "Scheduled": return "#808080"; // Gray
-      default: return "#D3D3D3"; // Default to light gray
+      case "Created":
+        return "#D3D3D3"; // Light Gray
+      case "Confirmed":
+        return "#4169E1"; // Royal Blue
+      case "Cancelled":
+        return "#FF0000"; // Red
+      case "InProgress":
+        return "#FFA500"; // Orange
+      case "Job Complete":
+        return "#008000"; // Green
+      case "Validate":
+        return "#00FFFF"; // Cyan
+      case "Scheduled":
+        return "#808080"; // Gray
+      default:
+        return "#D3D3D3"; // Default to light gray
     }
   };
 
   const handleClearFilters = () => {
     setFilters({
-      search: '',
-      jobNo: '',
-      jobName: '',
-      customerName: '',
-      jobStatus: '',
-      priority: '',
-      jobType: ''
+      search: "",
+      jobNo: "",
+      jobName: "",
+      customerName: "",
+      jobStatus: "",
+      priority: "",
+      jobType: "",
     });
-    // Reset to default view
-    setFilteredJobs(jobs);
+    setFilteredJobs(jobs); // Reset to show all jobs
   };
-  
+
+  const statCards = [
+    {
+      title: "Total Jobs",
+      value: stats.totalJobs,
+      icon: <Users className="text-primary" />,
+      badge: { text: "Total", variant: "primary" },
+      background: "#e7f1ff",
+    },
+    {
+      title: "Active Jobs",
+      value: stats.activeJobs,
+      icon: <Activity className="text-success" />,
+      badge: { text: "In Progress", variant: "success" },
+      background: "#e6f8f0",
+    },
+    {
+      title: "Pending Jobs",
+      value: stats.pendingJobs,
+      icon: <Clock className="text-warning" />,
+      badge: { text: "Pending", variant: "warning" },
+      background: "#fff8ec",
+    },
+    {
+      title: "Completed Jobs",
+      value: stats.completedJobs,
+      icon: <CheckCircle className="text-info" />,
+      badge: { text: "Done", variant: "info" },
+      background: "#e7f6f8",
+    },
+  ];
 
   return (
     <Fragment>
@@ -906,70 +1092,272 @@ const ViewJobs = () => {
       <GeeksSEO title="Job Lists | SAS&ME - SAP B1 | Portal" />
 
       <Row>
-        <Col lg={12}>
-          <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-            <div className="mb-3">
-              <h1 className="mb-1 h2 fw-bold">Job Lists</h1>
-              <Breadcrumb>
-                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item active>List</Breadcrumb.Item>
-              </Breadcrumb>
-            </div>
-            <div>
-              <Button variant="primary" href="/dashboard/jobs/create-jobs">
-                Add New Job
-              </Button>
+        <Col lg={12} md={12} sm={12}>
+          <div
+            style={{
+              background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
+              padding: "1.5rem 2rem",
+              borderRadius: "0 0 24px 24px",
+              marginTop: "-39px",
+              marginLeft: "10px",
+              marginRight: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-start">
+              <div className="d-flex flex-column">
+                <div className="mb-3">
+                  <h1
+                    className="mb-2"
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: "600",
+                      color: "#FFFFFF",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    Jobs List
+                  </h1>
+                  <p
+                    className="mb-2"
+                    style={{
+                      fontSize: "16px",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      fontWeight: "400",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    Create, manage and track all your jobs and assignments in
+                    one centralized dashboard
+                  </p>
+                  <div
+                    className="d-flex align-items-center gap-2"
+                    style={{
+                      fontSize: "14px",
+                      color: "rgba(255, 255, 255, 0.9)",
+                      background: "rgba(255, 255, 255, 0.1)",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <i className="fe fe-info" style={{ fontSize: "16px" }}></i>
+                    <span>
+                      Manage job assignments, schedules, and track progress
+                      updates
+                    </span>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-2 mb-4">
+                  <span
+                    className="badge"
+                    style={{
+                      background: "#FFFFFF",
+                      color: "#4171F5",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Job Management
+                  </span>
+                  <span
+                    className="badge"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.2)",
+                      color: "#FFFFFF",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <i className="fe fe-calendar me-1"></i>
+                    Scheduling
+                  </span>
+                </div>
+
+                <nav
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                >
+                  <div className="d-flex align-items-center">
+                    <i
+                      className="fe fe-home"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    ></i>
+                    <Link
+                      href="/"
+                      className="text-decoration-none ms-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      Dashboard
+                    </Link>
+                    <span
+                      className="mx-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      /
+                    </span>
+                    <i
+                      className="fe fe-briefcase"
+                      style={{ color: "#FFFFFF" }}
+                    ></i>
+                    <span className="ms-2" style={{ color: "#FFFFFF" }}>
+                      Jobs
+                    </span>
+                  </div>
+                </nav>
+              </div>
+
+              <div>
+                <OverlayTrigger
+                  placement="left"
+                  overlay={<Tooltip>Create a new job assignment</Tooltip>}
+                >
+                  <Link href="/jobs/create" passHref>
+                    <Button
+                      variant="light"
+                      className="create-job-button"
+                      style={{
+                        border: "none",
+                        borderRadius: "12px",
+                        padding: "10px 20px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        transition: "all 0.2s ease",
+                        fontWeight: "500",
+                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                      }}
+                    >
+                      <FaPlus className="plus-icon" size={16} />
+                      <span>Add New Job</span>
+                    </Button>
+                  </Link>
+                </OverlayTrigger>
+              </div>
             </div>
           </div>
         </Col>
       </Row>
-      <JobStats />
+      <Row className="g-4 mb-4">
+        {statCards.map((card, index) => (
+          <Col key={index} lg={3} sm={6}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 className="text-muted mb-1">{card.title}</h6>
+                    <h3 className="mb-0">{card.value}</h3>
+                    <Badge bg={card.badge.variant} className="mt-2">
+                      {card.badge.text}
+                    </Badge>
+                  </div>
+                  <div
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "12px",
+                      background: card.background,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {card.icon}
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
+      </Row>
       <Row>
         <Col md={12} xs={12} className="mb-5">
           <Card className="border-0 shadow-sm">
             <Card.Body className="p-4">
-              <FilterPanel 
+              {error && <div className="alert alert-danger mb-4">{error}</div>}
+              <FilterPanel
                 filters={filters}
                 setFilters={setFilters}
                 onClear={handleClearFilters}
                 loading={loading}
-                loadData={fetchData}
+                handleSearch={handleSearch}
               />
-              {loading ? (
-                <div className="text-center py-5">
-                  <Spinner animation="border" variant="primary" className="me-2" />
-                  <span className="text-muted">Loading jobs...</span>
-                </div>
-              ) : filteredJobs.length > 0 ? (
-                <DataTable
-                  columns={columns}
-                  data={filteredJobs}
-                  pagination
-                 // highlightOnHover
-                 // pointerOnHover
-                  onRowClicked={(row) => handleRowClick(row)}
-                  customStyles={customStyles}
-                  fixedHeader
-                        fixedHeaderScrollHeight="calc(100vh - 300px)"
-                        dense
-                        persistTableHead
-                        paginationComponentOptions={{
-                          noRowsPerPage: true // Hide rows per page selector
-                        }}
-                        progressPending={loading}
-                  noDataComponent={
-                    <div className="text-center py-5">
-                      <div className="text-muted mb-2">No jobs found</div>
-                      <small>Try adjusting your search terms</small>
-                    </div>
-                  }
-                />
-              ) : (
-                <div className="text-center py-5">
-                  <div className="text-muted mb-2">No jobs found</div>
-                  <small>Try adjusting your search terms or add new jobs</small>
-                </div>
-              )}
+
+              <div className="table-responsive">
+                <table className="table table-hover">
+                  <thead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <tr key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <th
+                            key={header.id}
+                            style={{
+                              width: header.getSize(),
+                              cursor: header.column.getCanSort()
+                                ? "pointer"
+                                : "default",
+                            }}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={columns.length}
+                          className="text-center py-5"
+                        >
+                          <Spinner
+                            animation="border"
+                            variant="primary"
+                            className="me-2"
+                          />
+                          <span className="text-muted">Loading jobs...</span>
+                        </td>
+                      </tr>
+                    ) : table.getRowModel().rows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={columns.length}
+                          className="text-center py-5"
+                        >
+                          <div className="text-muted mb-2">No jobs found</div>
+                          <small>Try adjusting your search terms</small>
+                        </td>
+                      </tr>
+                    ) : (
+                      table.getRowModel().rows.map((row) => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map((cell) => (
+                            <td key={cell.id}>
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {paginationDisplay}
             </Card.Body>
           </Card>
         </Col>
@@ -986,6 +1374,141 @@ const ViewJobs = () => {
           justify-content: center;
           align-items: center;
           z-index: 9999;
+        }
+      `}</style>
+      <style jsx global>{`
+        /* Button Base Styles */
+        .btn-icon-text {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-weight: 500;
+          font-size: 0.875rem;
+          padding: 0.5rem 0.875rem;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+
+        .btn-icon-text .icon-left {
+          transition: transform 0.2s ease;
+        }
+
+        /* Soft Variant Styles */
+        .btn-soft-danger {
+          background-color: #fee2e2;
+          color: #dc2626;
+          border: 1px solid transparent;
+        }
+
+        .btn-soft-danger:hover {
+          background-color: #dc2626;
+          color: white;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(220, 38, 38, 0.15);
+        }
+
+        .btn-soft-danger:hover .icon-left {
+          transform: rotate(90deg);
+        }
+
+        /* Primary Button Style */
+        .btn-primary.btn-icon-text {
+          background-color: #3b82f6;
+          color: white;
+          border: none;
+          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-weight: 500;
+          font-size: 0.875rem;
+          padding: 0.5rem 0.875rem;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+
+        .btn-primary.btn-icon-text:hover {
+          background-color: #2563eb;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+          color: white;
+          text-decoration: none;
+        }
+
+        .btn-primary.btn-icon-text:hover .icon-left {
+          transform: translateX(-2px);
+        }
+
+        .btn-primary.btn-icon-text .icon-left {
+          transition: transform 0.2s ease;
+        }
+
+        /* Small button variant */
+        .btn-sm.btn-icon-text {
+          padding: 0.4rem 0.75rem;
+          font-size: 0.812rem;
+        }
+
+        .btn-sm.btn-icon-text .icon-left {
+          width: 14px;
+          height: 14px;
+        }
+
+        /* View Details Button Style */
+        .btn-soft-primary {
+          background-color: #eff6ff;
+          color: #3b82f6;
+          border: 1px solid transparent;
+        }
+
+        .btn-soft-primary:hover {
+          background-color: #3b82f6;
+          color: white;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+        }
+
+        .btn-soft-primary:hover .icon-left {
+          transform: translateX(-2px);
+        }
+
+        /* Disabled State */
+        .btn-icon-text:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none !important;
+          box-shadow: none !important;
+        }
+
+        /* Loading State */
+        .btn-icon-text .spinner-border {
+          width: 14px;
+          height: 14px;
+          border-width: 2px;
+        }
+
+        /* Ripple effect */
+        .btn-icon-text {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .btn-icon-text::after {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 120%;
+          height: 120%;
+          background: rgba(255, 255, 255, 0.2);
+          transform: translate(-50%, -50%) scale(0);
+          border-radius: 50%;
+          transition: transform 0.5s ease;
+        }
+
+        .btn-icon-text:active::after {
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 0;
         }
       `}</style>
     </Fragment>

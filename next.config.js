@@ -8,26 +8,31 @@ const nextConfig = {
     SAP_B1_COMPANY_DB: process.env.SAP_B1_COMPANY_DB,
     SAP_B1_USERNAME: process.env.SAP_B1_USERNAME,
     SAP_B1_PASSWORD: process.env.SAP_B1_PASSWORD,
-    //REDIS_URL: process.env.REDIS_URL,
-    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     SYNCFUSION_LICENSE_KEY: process.env.SYNCFUSION_LICENSE_KEY,
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:
+      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID:
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:
+      process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID:
+      process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
   },
-  
+
   sassOptions: {
     includePaths: [path.join(__dirname, "styles")],
   },
-  
+
   images: {
     domains: ["firebasestorage.googleapis.com"],
   },
-  
+
   async headers() {
     return [
       {
@@ -48,46 +53,87 @@ const nextConfig = {
       },
     ];
   },
-  
+
   async rewrites() {
     return [
-      {
-        source: "/dashboard/workers/edit-worker/:workerId",
-        destination: "/[workerId]",
-      },
+      // DASHBOARD/OVERVIEW
       {
         source: "/dashboard",
         destination: "/dashboard/overview",
       },
-      // New route rewrites
+      // CUSTOMERS
       {
-        source: '/dashboard/customers/list',
-        destination: '/dashboard/customers/list',
+        source: "/customers",
+        destination: "/dashboard/customers/list",
       },
       {
-        source: '/dashboard/workers/list',
-        destination: '/dashboard/workers/list',
+        source: "/customers/:id",
+        destination: "/dashboard/customers/[id]",
+      },
+
+      // WORKERS
+      {
+        source: "/workers/create",
+        destination: "/dashboard/workers/create-worker",
       },
       {
-        source: '/dashboard/scheduling/workers/schedules',
-        destination: '/dashboard/scheduling/workers/schedules',
+        source: "/workers",
+        destination: "/dashboard/workers/list",
       },
       {
-        source: '/dashboard/jobs/list-jobs',
-        destination: '/dashboard/jobs/list-jobs',
+        source: "/workers/view/:workerId",
+        destination: "/dashboard/workers/[workerId]",
       },
       {
-        source: '/dashboard/scheduling/jobs/current',
-        destination: '/dashboard/scheduling/jobs/current',
+        source: "/workers/edit-worker/:workerId",
+        destination: "/dashboard/workers/[workerId]",
+      },
+
+      // SCHEDULING
+      {
+        source: "/jobs/calendar",
+        destination: "/dashboard/scheduling/jobs/calendar",
+      },
+      {
+        source: "/schedule",
+        destination: "/dashboard/scheduling/workers/schedules",
+      },
+
+      // JOBS
+      {
+        source: "/jobs",
+        destination: "/dashboard/jobs/list-jobs",
+      },
+      {
+        source: "/jobs/view/:jobId",
+        destination: "/dashboard/jobs/:jobId", // Rewrite to /dashboard/jobs/{jobId}
+      },
+      {
+        source: "/jobs/edit-jobs/:id",
+        destination: "/dashboard/jobs/edit-jobs/:id",
+      },
+      {
+        source: "/jobs/create",
+        destination: "/dashboard/jobs/create-jobs",
+      },
+      {
+        source: "/jobs/create-jobs",
+        destination: "/dashboard/jobs/create-jobs?",
+      },
+
+      // AUTHENTICATION
+      {
+        source: "/sign-in",
+        destination: "/authentication/sign-in",
       },
     ];
   },
-  
+
   async redirects() {
     return [
       {
         source: "/",
-        destination: "/dashboard/overview",
+        destination: "/dashboard",
         permanent: true,
       },
     ];

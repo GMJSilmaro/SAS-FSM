@@ -13,7 +13,7 @@ export const handleAPIError = (error) => {
       pauseOnHover: true,
       draggable: true,
     });
-    Router.push('/authentication/sign-in');
+    Router.push('/sign-in');
     return;
   }
 

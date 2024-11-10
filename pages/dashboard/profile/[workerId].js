@@ -132,7 +132,7 @@ const EditProfile = () => {
         icon: "success",
       }).then(() => {
         // Redirect to workers/list after the alert is closed
-        router.push("/dashboard/workers/list");
+        router.push("/workers");
       });
     } catch (error) {
       console.error("Error updating skills data:", error);

@@ -1,6 +1,5 @@
 // pages/api/getJobContactType.js
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-import { renewSAPSession } from '../../utils/renewSAPSession';
 
 export default async function handler(req, res) {
   console.log('API Route hit: getJobContactType');
@@ -20,7 +19,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Updated endpoint to match SAP B1
     const endpoint = `${SAP_SERVICE_LAYER_BASE_URL}SQLQueries('sql09')/List`;
     console.log('Attempting to fetch from SAP:', endpoint);
     
@@ -57,7 +55,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Map the response to match the SAP B1 structure shown in the image
     const jobContactTypes = queryData.value.map(item => ({
       code: item.Code,
       name: item.Name

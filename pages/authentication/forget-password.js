@@ -47,7 +47,7 @@ const ForgetPassword = () => {
 									</Col>
 								</Row>
 								<span>
-									Return to <Link href="/authentication/sign-in">Sign in</Link>
+									Return to <Link href="/sign-in">Sign in</Link>
 								</span>
 							</Form>
 						</Card.Body>

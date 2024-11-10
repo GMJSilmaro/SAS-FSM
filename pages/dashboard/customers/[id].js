@@ -8,7 +8,8 @@ import {
   Tab,
   Breadcrumb,
   Button,
-  Spinner
+  Spinner,
+  Badge
 } from 'react-bootstrap';
 import { useRouter } from 'next/router';
 import { GeeksSEO } from 'widgets';
@@ -19,8 +20,7 @@ import { DocumentsTab } from 'sub-components/customer/DocumentsTab';
 import { HistoryTab } from 'sub-components/customer/HistoryTab';
 import { NotesTab } from 'sub-components/customer/NotesTab';
 import QuotationsTab from 'sub-components/customer/QuotationsTab';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import Link from 'next/link';
 
 const ViewCustomer = () => {
   const [activeTab, setActiveTab] = useState('accountInfo');
@@ -57,12 +57,6 @@ const ViewCustomer = () => {
 
         setCustomerData(customerInfo);
         setEquipments(equipmentData);
-
-        const customerName = localStorage.getItem('viewCustomerToast');
-        if (customerName) {
-          toast.info(`Viewing details for ${customerName}`);
-          localStorage.removeItem('viewCustomerToast');
-        }
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error.message || 'Failed to load data.');
@@ -78,23 +72,90 @@ const ViewCustomer = () => {
     if (key) setActiveTab(key);
   };
 
-  const handleEdit = () => {
-    router.push(`/dashboard/customers/edit/${id}`);
-  };
-
   if (loading) {
     return (
       <Container className="mt-5">
-           <Row>
-          <Col lg={12}>
-            <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-              <div className="mb-3">
-                <h1 className="mb-1 h2 fw-bold">Customers</h1>
-                <Breadcrumb>
-                  <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                  <Breadcrumb.Item href="#">Customers</Breadcrumb.Item>
-                  <Breadcrumb.Item active>Customer List</Breadcrumb.Item>
-                </Breadcrumb>
+        <Row>
+          <Col lg={12} md={12} sm={12}>
+            <div
+              style={{
+                background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
+                padding: "1.5rem 2rem",
+                borderRadius: "0 0 24px 24px",
+                marginTop: "-39px",
+                marginLeft: "10px",
+                marginRight: "10px",
+                marginBottom: "20px",
+              }}
+            >
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="d-flex flex-column">
+                  <div className="mb-3">
+                    <h1
+                      className="mb-2"
+                      style={{
+                        fontSize: "28px",
+                        fontWeight: "600",
+                        color: "#FFFFFF",
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      Loading...
+                    </h1>
+                    <p
+                      className="mb-2"
+                      style={{
+                        fontSize: "16px",
+                        color: "rgba(255, 255, 255, 0.7)",
+                        fontWeight: "400",
+                        lineHeight: "1.5",
+                      }}
+                    >
+                      View and manage customer details, equipment, and history
+                    </p>
+                  </div>
+
+                  <nav
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    <div className="d-flex align-items-center">
+                      <i
+                        className="fe fe-home"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      ></i>
+                      <Link
+                        href="/"
+                        className="text-decoration-none ms-2"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        Dashboard
+                      </Link>
+                      <span
+                        className="mx-2"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        /
+                      </span>
+                      <Link
+                        href="/customers"
+                        className="text-decoration-none"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        Loading...
+                      </Link>
+                      <span
+                        className="mx-2"
+                        style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                      >
+                        /
+                      </span>
+                      <span style={{ color: "#FFFFFF" }}>Loading...</span>
+                    </div>
+                  </nav>
+                </div>
               </div>
             </div>
           </Col>
@@ -124,7 +185,7 @@ const ViewCustomer = () => {
               <Card.Body>
                 <Card.Title className="text-danger">Error</Card.Title>
                 <Card.Text>{error}</Card.Text>
-                <Button variant="primary" onClick={() => router.push('/dashboard/customers/list')}>
+                <Button variant="primary" onClick={() => router.push('/customers')}>
                   Back to Customers List
                 </Button>
               </Card.Body>
@@ -144,7 +205,7 @@ const ViewCustomer = () => {
               <Card.Body>
                 <Card.Title>No Data Found</Card.Title>
                 <Card.Text>No customer data found for the given ID.</Card.Text>
-                <Button variant="primary" onClick={() => router.push('/dashboard/customers/list')}>
+                <Button variant="primary" onClick={() => router.push('/customers')}>
                   Back to Customers List
                 </Button>
               </Card.Body>
@@ -157,20 +218,114 @@ const ViewCustomer = () => {
 
   return (
     <Container>
-      <ToastContainer position="top-right" autoClose={3000} />
       <GeeksSEO title={`View Customer: ${customerData.cardName || ''} | FSM Portal`} />
       <Row>
         <Col lg={12} md={12} sm={12}>
-          <div className="border-bottom pb-4 mb-4 d-flex align-items-center justify-content-between">
-            <div className="mb-3 mb-md-0">
-              <h1 className="mb-1 h2 fw-bold">View Customer: {customerData.CardName}</h1>
-              <Breadcrumb>
-                <Breadcrumb.Item href="/dashboard">Dashboard</Breadcrumb.Item>
-                <Breadcrumb.Item href="/dashboard/customers/list">Customers</Breadcrumb.Item>
-                <Breadcrumb.Item active>View Customer</Breadcrumb.Item>
-              </Breadcrumb>
+          <div
+            style={{
+              background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
+              padding: "1.5rem 2rem",
+              borderRadius: "0 0 24px 24px",
+              marginTop: "-39px",
+              marginLeft: "10px",
+              marginRight: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-start">
+              <div className="d-flex flex-column">
+                <div className="mb-3">
+                  <h1
+                    className="mb-2"
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: "600",
+                      color: "#FFFFFF",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    {customerData?.CardName}
+                  </h1>
+                  <p
+                    className="mb-2"
+                    style={{
+                      fontSize: "16px",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      fontWeight: "400",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    View and manage customer details, equipment, and history
+                  </p>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-light text-dark">
+                      ID: {customerData?.CardCode}
+                    </span>
+                    {customerData?.CustomerType && (
+                      <Badge bg="secondary">
+                        {customerData.CustomerType}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <nav
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                >
+                  <div className="d-flex align-items-center">
+                    <i
+                      className="fe fe-home"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    ></i>
+                    <Link
+                      href="/"
+                      className="text-decoration-none ms-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      Dashboard
+                    </Link>
+                    <span
+                      className="mx-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      /
+                    </span>
+                    <Link
+                      href="/customers"
+                      className="text-decoration-none"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      Customers
+                    </Link>
+                    <span
+                      className="mx-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      /
+                    </span>
+                    <span style={{ color: "#FFFFFF" }}>Customer Details</span>
+                  </div>
+                </nav>
+              </div>
+
+              <div>
+                <Button
+                  variant="light"
+                  className="d-flex align-items-center gap-2"
+                  style={{
+                    padding: "0.5rem 1rem",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                  }}
+                  onClick={() => router.push('/customers')}
+                >
+                  <i className="fe fe-arrow-left"></i>
+                  Back to Customers
+                </Button>
+              </div>
             </div>
-            {/* <Button variant="primary" onClick={handleEdit}>Edit Customer</Button> */}
           </div>
         </Col>
       </Row>
