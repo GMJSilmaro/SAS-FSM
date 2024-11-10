@@ -48,7 +48,7 @@ try {
 export async function testFirebaseConnection() {
   try {
     // Test Firestore
-    const workersRef = collection(db, 'workers');
+    const workersRef = collection(db, 'users');
     const snapshot = await getDocs(workersRef);
     
     // Test Authentication

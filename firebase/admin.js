@@ -51,7 +51,7 @@ export function initAdmin() {
 // Test admin connection
 export async function testAdminConnection() {
   try {
-    const snapshot = await adminDb.collection('workers').limit(1).get();
+    const snapshot = await adminDb.collection('users').limit(1).get();
     return {
       success: true,
       documentsFound: snapshot.size
