@@ -8,27 +8,37 @@ import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Toaster } from 'react-hot-toast';
 import Swal from 'sweetalert2';
 
-// Move loadingMessages outside the component
+// Update the loadingMessages array with more realistic steps
 const loadingMessages = [
   {
     title: '<span class="fw-bold text-primary">Welcome Back! 👋</span>',
     message: 'Verifying your credentials...',
-    progress: 20
+    progress: 15
   },
   {
-    title: '<span class="fw-bold text-primary">Almost there! ⚡</span>',
-    message: 'Authenticating your account...',
-    progress: 40
+    title: '<span class="fw-bold text-primary">Authenticating! 🔐</span>',
+    message: 'Establishing secure connection...',
+    progress: 30
   },
   {
-    title: '<span class="fw-bold text-primary">Looking good! 🔐</span>',
-    message: 'Setting up your workspace...',
+    title: '<span class="fw-bold text-primary">Connecting to SAP! 🔄</span>',
+    message: 'Initializing SAP B1 Service Layer connection...',
+    progress: 45
+  },
+  {
+    title: '<span class="fw-bold text-primary">Setting Up! ⚡</span>',
+    message: 'Creating session and retrieving company databases...',
     progress: 60
   },
   {
-    title: '<span class="fw-bold text-primary">Nearly done! 🚀</span>',
-    message: 'Preparing your dashboard...',
-    progress: 80
+    title: '<span class="fw-bold text-primary">Almost Ready! 📊</span>',
+    message: 'Loading user permissions and preferences...',
+    progress: 75
+  },
+  {
+    title: '<span class="fw-bold text-primary">Final Steps! 🚀</span>',
+    message: 'Synchronizing with SAP services...',
+    progress: 90
   }
 ];
 
@@ -40,6 +50,8 @@ const LoadingMessage = () => {
     "Starting up the engines...",
     "Loading your dashboard...",
     "Connecting to services...",
+    "Configuring your settings...",
+    "Getting everything ready...",
   ];
 
   const [message, setMessage] = useState(messages[0]);
@@ -137,121 +149,202 @@ const SignIn = () => {
     checkAuth();
   }, [router]);
 
+  useEffect(() => {
+    return () => {
+      Swal.close();
+      setIsLoading(false);
+    };
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    let currentIndex = 0;
-
+    
     try {
-      // Show the first loading message
-      const loadingAlert = Swal.fire({
+      setIsLoading(true);
+      console.log('🔄 Starting authentication process...');
+
+      // Create a single modal that we'll reuse
+      const loadingModal = Swal.fire({
         title: loadingMessages[0].title,
         html: `
-          <div class="progress mb-3" style="height: 6px;">
-            <div class="progress-bar" role="progressbar" style="width: ${loadingMessages[0].progress}%" aria-valuenow="${loadingMessages[0].progress}" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="text-center mb-4">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="text-muted mb-3">${loadingMessages[0].message}</div>
+            <div class="progress" style="height: 6px;">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                   role="progressbar" 
+                   style="width: ${loadingMessages[0].progress}%">
+              </div>
+            </div>
           </div>
-          <p class="mb-0">${loadingMessages[0].message}</p>
         `,
         allowOutsideClick: false,
         showConfirmButton: false,
-        didOpen: () => {
-          // Update loading messages every 1.5 seconds
-          const interval = setInterval(() => {
-            currentIndex = (currentIndex + 1) % loadingMessages.length;
-            const currentMessage = loadingMessages[currentIndex];
+        didOpen: async (modal) => {
+          try {
+            // Initial authentication
+            await new Promise(resolve => setTimeout(resolve, 1500));
             
-            Swal.update({
-              title: currentMessage.title,
-              html: `
-                <div class="progress mb-3" style="height: 6px;">
-                  <div class="progress-bar" role="progressbar" style="width: ${currentMessage.progress}%" aria-valuenow="${currentMessage.progress}" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-                <p class="mb-0">${currentMessage.message}</p>
-              `
+            // Verify credentials with backend
+            const response = await fetch('/api/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password }),
+              credentials: 'include'
             });
-          }, 1500);
 
-          // Store the interval ID in Swal instance
-          Swal.intervalId = interval;
-        },
-        willClose: () => {
-          // Clear the interval when the alert is closed
-          clearInterval(Swal.intervalId);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Authentication failed');
+
+            // Simulate SAP B1 Service Layer connection steps
+            for (let i = 1; i < loadingMessages.length; i++) {
+              // Update modal content with spinner
+              modal.querySelector('.swal2-title').innerHTML = loadingMessages[i].title;
+              modal.querySelector('.swal2-html-container').innerHTML = `
+                <div class="text-center mb-2">
+                  <div class="spinner-border text-primary mb-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <div class="text-muted mb-2">${loadingMessages[i].message}</div>
+                  <div class="progress" style="height: 6px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: ${loadingMessages[i].progress}%">
+                    </div>
+                  </div>
+                </div>
+              `;
+
+              // Simulate different connection steps
+              switch (i) {
+                case 1: // Secure connection
+                  await new Promise(resolve => setTimeout(resolve, 1200));
+                  break;
+                case 2: // SAP B1 Service Layer
+                  console.log('🔌 Connecting to SAP B1 Service Layer...');
+                  await new Promise(resolve => setTimeout(resolve, 1500));
+                  break;
+                case 3: // Session creation
+                  console.log('🔑 Creating SAP session...');
+                  await new Promise(resolve => setTimeout(resolve, 1300));
+                  break;
+                case 4: // User permissions
+                  console.log('👤 Loading user profile...');
+                  await new Promise(resolve => setTimeout(resolve, 1400));
+                  break;
+                case 5: // Final sync
+                  console.log('🔄 Synchronizing services...');
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  break;
+              }
+            }
+
+            // Show success state with checkmark animation and redirect button
+            modal.querySelector('.swal2-title').innerHTML = 
+              '<span class="fw-bold text-success">Connection Established! 🎉</span>';
+            modal.querySelector('.swal2-html-container').innerHTML = `
+              <div class="text-center">
+                <div class="checkmark-circle mb-2">
+                  <div class="checkmark draw"></div>
+                </div>
+                <div class="text-muted mb-2">Congrats, Field Service Portal is ready! 🚀</div>
+                <div class="progress mb-2" style="height: 6px;">
+                  <div class="progress-bar bg-success" role="progressbar" style="width: 100%"></div>
+                </div>
+                <div class="countdown-text text-muted small mb-2">
+                  Redirecting in <span class="fw-bold text-primary">5</span> seconds...
+                </div>
+                <button class="btn btn-primary px-4 py-2">
+                  Go to Dashboard Now
+                </button>
+              </div>
+            `;
+
+            // Add click handler for immediate redirect
+            const redirectButton = modal.querySelector('.btn-primary');
+            redirectButton.addEventListener('click', () => {
+              router.push('/');
+            });
+
+            // Start countdown for auto-redirect
+            let countdown = 5;
+            const countdownElement = modal.querySelector('.countdown-text .fw-bold');
+            const countdownInterval = setInterval(() => {
+              countdown--;
+              if (countdownElement) {
+                countdownElement.textContent = countdown;
+              }
+              if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                router.push('/');
+              }
+            }, 1000);
+
+            // Wait for either button click or auto-redirect
+            await new Promise(resolve => {
+              setTimeout(resolve, 5500); // Slightly longer than countdown to ensure redirect happens
+            });
+
+          } catch (error) {
+            throw error; // Re-throw to be caught by outer catch block
+          }
         }
       });
-
-      console.log('🚀 Client: Starting login process...', { email });
-
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include'
-      });
-
-      console.log('📨 Client: Received response:', {
-        status: response.status,
-        ok: response.ok
-      });
-
-      const data = await response.json();
-      console.log('📦 Client: Response data:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      // Manually set cookies if needed
-      if (data.cookies) {
-        data.cookies.forEach(({ name, value }) => {
-          document.cookie = `${name}=${value}; Path=/; Secure; SameSite=Lax; Max-Age=${30 * 60}`;
-        });
-      }
-
-      // Verify cookies were set
-      console.log('🍪 Client: Cookies after login:', document.cookie);
-
-      // Add this line to set the flag
-      localStorage.setItem('showWelcomePopup', 'true');
-
-      // Close the loading alert
-      Swal.close();
-
-      // Show success message
-      await Swal.fire({
-        icon: 'success',
-        title: 'Login Successful!',
-        text: 'Redirecting to dashboard...',
-        timer: 1500,
-        showConfirmButton: false,
-        customClass: {
-          popup: 'animated fadeInUp'
-        }
-      });
-
-      router.push("/dashboard");
-
-      // After successful login
-      localStorage.setItem('lastLoginTime', new Date().toISOString());
 
     } catch (error) {
-      console.error('Login error:', error);
-      setIsLoading(false);
+      console.error('❌ Authentication error:', error.message);
       
-      // Close any existing alert
-      Swal.close();
-      
-      // Show error message
       Swal.fire({
         icon: 'error',
-        title: 'Login Failed',
-        text: error.message,
+        iconColor: '#dc3545',
+        title: 'Authentication Failed',
+        text: 'Unable to establish connection with SAP Business One. Please try again.',
+        showConfirmButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Try Again',
+        cancelButtonText: 'Need Help?',
         customClass: {
-          popup: 'animated fadeInUp'
+          popup: 'shadow-lg',
+          confirmButton: 'btn btn-primary px-4 me-2',
+          cancelButton: 'btn btn-outline-secondary px-4'
+        },
+        buttonsStyling: false
+      }).then((result) => {
+        if (result.dismiss === Swal.DismissReason.cancel) {
+          Swal.fire({
+            title: 'Connection Troubleshooting',
+            html: `
+              <div class="text-start">
+                <p class="mb-3">Common connection issues:</p>
+                <ul class="list-unstyled text-muted">
+                  <li class="mb-2">✓ Check your network connection</li>
+                  <li class="mb-2">✓ Verify SAP server status</li>
+                  <li class="mb-2">✓ Confirm your credentials</li>
+                  <li class="mb-2">✓ Check VPN connection if required</li>
+                </ul>
+                <div class="alert alert-info mt-3">
+                  <i class="fas fa-info-circle me-2"></i>
+                  Contact IT Support:
+                  <a href="mailto:support@company.com" class="d-block mt-1">
+                    support@company.com
+                  </a>
+                </div>
+              </div>
+            `,
+            showConfirmButton: true,
+            confirmButtonText: 'Close',
+            customClass: {
+              popup: 'shadow-lg',
+              confirmButton: 'btn btn-primary px-4'
+            },
+            buttonsStyling: false
+          });
         }
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -304,7 +397,7 @@ const SignIn = () => {
                       </InputGroup.Text>
                       <Form.Control
                         type="email"
-                        placeholder="name@company.com"
+                        placeholder="name@email.com"
                         className="border-0 py-2.5"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -437,7 +530,7 @@ const SignIn = () => {
         }
 
         .btn-primary:hover {
-          transform: translateY(-1px);
+          transform: translateY(-2px);
           box-shadow: 0 5px 15px rgba(0, 97, 242, 0.2);
         }
 
@@ -614,26 +707,157 @@ const SignIn = () => {
         /* SweetAlert2 Custom Styles */
         .swal2-popup {
           border-radius: 1rem;
-          padding: 2rem;
+          padding: 1.5rem;
+          max-width: 400px;
+        }
+
+        .swal2-icon {
+          border-width: 3px !important;
+          margin: 1.5rem auto !important;
         }
 
         .swal2-title {
           font-size: 1.5rem !important;
-          margin-bottom: 1rem !important;
+          margin: 0 0 0.5rem 0 !important;
+          padding: 0 !important;
         }
 
+        .swal2-html-container {
+          margin: 0 !important;
+          line-height: 1.5;
+        }
+
+        .swal2-actions {
+          margin-top: 1.5rem !important;
+        }
+
+        .list-unstyled {
+          padding-left: 0;
+          list-style: none;
+        }
+
+        .alert-info {
+          background-color: #f8f9fa;
+          border-left: 4px solid #0061f2;
+          padding: 1rem;
+        }
+
+        .shadow-lg {
+          box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important;
+        }
+
+        /* Animation for error icon */
+        @keyframes errorPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+
+        .swal2-icon.swal2-error {
+          animation: errorPulse 1s ease-in-out;
+        }
+
+        /* Loading Animation Styles */
         .progress {
           background-color: #e9ecef;
-          border-radius: 1rem;
+          border-radius: 0.5rem;
           overflow: hidden;
         }
 
         .progress-bar {
           background: linear-gradient(135deg, #0061f2 0%, #6900f2 100%);
-          transition: width 0.5s ease;
+          transition: width 0.5s ease-in-out;
         }
 
-        /* Animation for the alert */
+        /* Optimize animations */
+        .swal2-popup {
+          transform: translateZ(0);
+          backface-visibility: hidden;
+          perspective: 1000px;
+        }
+
+        .swal2-show {
+          animation: swal2-show 0.3s ease-out;
+        }
+
+        .swal2-hide {
+          animation: swal2-hide 0.15s ease-in forwards;
+        }
+
+        @keyframes swal2-show {
+          0% {
+            transform: scale(0.8);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes swal2-hide {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(0.8);
+            opacity: 0;
+          }
+        }
+
+        /* Success Alert Styles */
+        .swal2-success-ring {
+          border-color: #0061f2 !important;
+        }
+
+        .swal2-icon.swal2-success {
+          border-color: #0061f2 !important;
+          color: #0061f2 !important;
+        }
+
+        .swal2-icon.swal2-success [class^='swal2-success-line'] {
+          background-color: #0061f2 !important;
+        }
+
+        .swal2-timer-progress-bar {
+          height: 0.25rem !important;
+          opacity: 0.7;
+          background: linear-gradient(to right, #0061f2, #6900f2) !important;
+          transition: width 0.1s ease-in-out;
+        }
+
+        /* Pulse Animation for Button */
+        .pulse-animation {
+          animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(0, 97, 242, 0.7);
+          }
+          
+          70% {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 10px rgba(0, 97, 242, 0);
+          }
+          
+          100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(0, 97, 242, 0);
+          }
+        }
+
+        /* Progress Bar Animation */
+        .swal2-timer-progress-bar {
+          height: 0.25rem !important;
+          opacity: 0.7;
+          background: linear-gradient(to right, #0061f2, #6900f2) !important;
+          transition: width 0.1s ease-in-out;
+        }
+
+        /* Success Message Animations */
         @keyframes fadeInUp {
           from {
             opacity: 0;
@@ -646,12 +870,209 @@ const SignIn = () => {
         }
 
         .animated {
-          animation-duration: 0.3s;
+          animation-duration: 0.5s;
           animation-fill-mode: both;
         }
 
         .fadeInUp {
           animation-name: fadeInUp;
+        }
+
+        /* Enhanced Button Styles */
+        .btn-primary {
+          background: linear-gradient(135deg, #0061f2 0%, #6900f2 100%);
+          border: none;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(0, 97, 242, 0.2);
+        }
+
+        /* Container Styles */
+        .countdown-text {
+          font-size: 1.1rem;
+          color: #6c757d;
+        }
+
+        .countdown-text strong {
+          color: #0061f2;
+          font-size: 1.2rem;
+        }
+
+        /* Error Alert Styles */
+        .swal2-icon.swal2-error {
+          border-color: #dc3545;
+          color: #dc3545;
+        }
+
+        .swal2-icon.swal2-error [class^='swal2-x-mark-line'] {
+          background-color: #dc3545;
+        }
+
+        .animated {
+          animation-duration: 0.3s;
+          animation-fill-mode: both;
+        }
+
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 20px, 0);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
+
+        .fadeInUp {
+          animation-name: fadeInUp;
+        }
+
+        /* Ensure proper z-index stacking */
+        .swal2-container {
+          z-index: 9999;
+        }
+
+        /* Smooth transition for buttons */
+        .btn {
+          transition: all 0.2s ease-in-out;
+        }
+
+        .btn:active {
+          transform: scale(0.95);
+        }
+
+        /* Spinner customization */
+        .spinner-border {
+          width: 2.5rem;
+          height: 2.5rem;
+          border-width: 0.25em;
+        }
+
+        /* Checkmark animation */
+        .checkmark-circle {
+          width: 40px;
+          height: 40px;
+          position: relative;
+          display: inline-block;
+          vertical-align: top;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .checkmark {
+          width: 24px;
+          height: 48px;
+          position: absolute;
+          transform: rotate(45deg);
+          left: 14px;
+          top: 0px;
+        }
+
+        .checkmark.draw:after {
+          content: '';
+          width: 6px;
+          height: 0;
+          background-color: #198754;
+          position: absolute;
+          right: 0;
+          top: 0;
+          animation: drawCheck 0.2s ease-in-out 0s forwards;
+        }
+
+        .checkmark.draw::before {
+          content: '';
+          width: 0;
+          height: 6px;
+          background-color: #198754;
+          position: absolute;
+          left: 0;
+          bottom: 0;
+          animation: drawCheck 0.2s ease-in-out 0.2s forwards;
+        }
+
+        @keyframes drawCheck {
+          0% {
+            width: 0;
+            height: 0;
+          }
+          100% {
+            width: 100%;
+            height: 100%;
+          }
+        }
+
+        /* Progress bar enhancement */
+        .progress {
+          background-color: #e9ecef;
+          border-radius: 0.5rem;
+          overflow: hidden;
+        }
+
+        .progress-bar {
+          background: linear-gradient(135deg, #0061f2 0%, #6900f2 100%);
+          transition: width 0.5s ease-in-out;
+        }
+
+        .progress-bar-animated {
+          animation: progress-bar-stripes 1s linear infinite;
+        }
+
+        /* Modal enhancement */
+        .swal2-popup {
+          padding: 1.5rem;
+        }
+
+        .swal2-title {
+          font-size: 1.5rem !important;
+          margin-bottom: 1rem !important;
+        }
+
+        .text-muted {
+          color: #6c757d !important;
+          font-size: 1.1rem;
+        }
+
+        /* Countdown text styling */
+        .countdown-text {
+          font-size: 0.9rem;
+          opacity: 0.8;
+          margin-bottom: 1rem;
+        }
+
+        /* Enhanced button styling */
+        .btn-primary {
+          background: linear-gradient(135deg, #0061f2 0%, #6900f2 100%);
+          border: none;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 4px rgba(0, 97, 242, 0.1);
+        }
+
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0, 97, 242, 0.2);
+        }
+
+        .btn-primary:active {
+          transform: translateY(0);
+        }
+
+        /* Animation for countdown */
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.7; }
+          100% { opacity: 1; }
+        }
+
+        .countdown-text .fw-bold {
+          animation: pulse 1s infinite;
         }
       `}</style>
     </Fragment>

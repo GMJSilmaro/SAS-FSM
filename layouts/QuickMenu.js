@@ -359,134 +359,146 @@ const QuickMenu = ({ children }) => {
   // Sign out function
   const handleSignOut = async () => {
     try {
-      // Store current time as last login before signing out
-      localStorage.setItem('lastLoginTime', new Date().toISOString());
-      
       // First show confirmation alert
       const confirmResult = await Swal.fire({
-        title: '<span class="fw-bold text-danger">Sign Out?</span>',
+        title: '<span class="fw-bold text-primary">Sign Out? 👋</span>',
         html: `
-          <div class="d-flex flex-column align-items-center">
-            <div class="mb-3">
-              <i class="fe fe-log-out text-danger" style="font-size: 3rem;"></i>
+          <div class="text-center mb-2">
+            <div class="spinner-border text-primary mb-2" role="status">
+              <span class="visually-hidden">Loading...</span>
             </div>
-            <div class="text-muted fw-semibold">Are you sure you want to sign out?</div>
+            <div class="text-muted mb-2">Are you sure you want to sign out?</div>
+            <div class="progress" style="height: 6px;">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                   role="progressbar" 
+                   style="width: 100%">
+              </div>
+            </div>
           </div>
         `,
         showCancelButton: true,
         confirmButtonText: 'Yes, Sign Out',
         cancelButtonText: 'Cancel',
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d',
-        reverseButtons: true,
-        background: '#ffffff',
+        allowOutsideClick: false,
         customClass: {
-          popup: 'animated fadeInUp'
-        }
+          popup: 'shadow-lg',
+          confirmButton: 'btn btn-primary px-4 me-2',
+          cancelButton: 'btn btn-outline-secondary px-4'
+        },
+        buttonsStyling: false
       });
 
       if (confirmResult.isConfirmed) {
-        // Show loading alert with styled spinner
-        const loadingAlert = Swal.fire({
-          title: '<span class="fw-bold text-primary">Signing Out...</span>',
+        // Show loading state
+        const loadingModal = Swal.fire({
+          title: '<span class="fw-bold text-primary">Signing Out... 🔄</span>',
           html: `
-            <div class="d-flex flex-column align-items-center">
-              <div class="position-relative mb-3">
-                <div class="spinner-grow text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-                <div class="spinner-grow text-primary position-absolute top-50 start-50 translate-middle" 
-                     style="width: 2rem; height: 2rem; opacity: 0.7;" role="status">
-                </div>
+            <div class="text-center mb-2">
+              <div class="spinner-border text-primary mb-2" role="status">
+                <span class="visually-hidden">Loading...</span>
               </div>
-              <div class="text-muted fw-semibold">Clearing session data...</div>
-              <div class="progress mt-3" style="width: 200px; height: 4px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 50%"></div>
+              <div class="text-muted mb-2">Clearing your session data...</div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" 
+                     style="width: 15%">
+                </div>
               </div>
             </div>
           `,
           allowOutsideClick: false,
           showConfirmButton: false,
-          background: '#ffffff',
-          customClass: {
-            popup: 'animated fadeInUp'
+          didOpen: async (modal) => {
+            try {
+              // Store current time as last login
+              localStorage.setItem('lastLoginTime', new Date().toISOString());
+
+              // Update progress - 30%
+              modal.querySelector('.progress-bar').style.width = '30%';
+              modal.querySelector('.text-muted').textContent = 'Disconnecting from SAP services...';
+              await new Promise(resolve => setTimeout(resolve, 1000));
+
+              // Perform logout API call
+              const response = await fetch("/api/logout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: 'include',
+              });
+
+              if (!response.ok) throw new Error("Logout failed");
+
+              // Update progress - 60%
+              modal.querySelector('.progress-bar').style.width = '60%';
+              modal.querySelector('.text-muted').textContent = 'Revoking access tokens...';
+              await new Promise(resolve => setTimeout(resolve, 800));
+
+              // Clear cookies
+              const cookiesToClear = [
+                'customToken', 'uid', 'isAdmin', 'email', 
+                'workerId', 'LAST_ACTIVITY'
+              ];
+              cookiesToClear.forEach(cookie => Cookies.remove(cookie, { path: '/' }));
+
+              // Update progress - 90%
+              modal.querySelector('.progress-bar').style.width = '90%';
+              modal.querySelector('.text-muted').textContent = 'Finalizing sign out...';
+              await new Promise(resolve => setTimeout(resolve, 700));
+
+              // Show success state
+              modal.querySelector('.swal2-title').innerHTML = 
+                '<span class="fw-bold text-success">Successfully Signed Out! 🎉</span>';
+              modal.querySelector('.swal2-html-container').innerHTML = `
+                <div class="text-center">
+                  <div class="checkmark-circle mb-2">
+                    <div class="checkmark draw"></div>
+                  </div>
+                  <div class="text-muted mb-2">You have been successfully signed out</div>
+                  <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 100%"></div>
+                  </div>
+                  <div class="countdown-text text-muted small mb-2">
+                    Redirecting in <span class="fw-bold text-primary">3</span> seconds...
+                  </div>
+                </div>
+              `;
+
+              // Countdown and redirect
+              let countdown = 3;
+              const countdownElement = modal.querySelector('.countdown-text .fw-bold');
+              const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdownElement) {
+                  countdownElement.textContent = countdown;
+                }
+                if (countdown <= 0) {
+                  clearInterval(countdownInterval);
+                  localStorage.removeItem('welcomeShown');
+                  window.location.href = '/sign-in';
+                }
+              }, 1000);
+
+            } catch (error) {
+              throw error;
+            }
           }
         });
 
-        // Perform logout API call
-        const response = await fetch("/api/logout", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          // Update loading message
-          await loadingAlert.update({
-            title: '<span class="fw-bold text-primary">Almost done...</span>',
-            html: `
-              <div class="d-flex flex-column align-items-center">
-                <div class="position-relative mb-3">
-                  <div class="spinner-grow text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-                  <div class="spinner-grow text-primary position-absolute top-50 start-50 translate-middle" 
-                       style="width: 2rem; height: 2rem; opacity: 0.7;" role="status">
-                  </div>
-                </div>
-                <div class="text-muted fw-semibold">Finalizing sign out...</div>
-                <div class="progress mt-3" style="width: 200px; height: 4px;">
-                  <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 90%"></div>
-                </div>
-              </div>
-            `
-          });
-
-          // Clear cookies
-          const cookiesToClear = [
-            'customToken',
-            'uid',
-            'isAdmin',
-            'email',
-            'workerId',
-            'LAST_ACTIVITY'
-          ];
-
-          cookiesToClear.forEach(cookie => {
-            Cookies.remove(cookie, { path: '/' });
-          });
-
-          // Add a small delay for visual feedback
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // Show success message
-          await Swal.fire({
-            icon: 'success',
-            title: '<span class="fw-bold text-success">Successfully Signed Out!</span>',
-            text: 'Redirecting to login page...',
-            timer: 1500,
-            showConfirmButton: false,
-            customClass: {
-              popup: 'animated fadeInUp'
-            }
-          });
-          localStorage.removeItem('welcomeShown');
-          // Redirect to login page
-          window.location.href = '/sign-in';
-        } else {
-          throw new Error("Logout failed");
-        }
       }
     } catch (error) {
       console.error("Error logging out:", error.message);
       
-      // Show error alert
-      await Swal.fire({
+      Swal.fire({
         icon: 'error',
+        iconColor: '#dc3545',
         title: '<span class="fw-bold text-danger">Sign Out Failed</span>',
-        text: 'There was a problem signing you out. Please try again.',
-        confirmButtonColor: '#dc3545',
+        text: 'Unable to complete the sign out process. Please try again.',
+        showConfirmButton: true,
+        confirmButtonText: 'Try Again',
         customClass: {
-          popup: 'animated fadeInUp'
-        }
+          popup: 'shadow-lg',
+          confirmButton: 'btn btn-primary px-4'
+        },
+        buttonsStyling: false
       });
     }
   };

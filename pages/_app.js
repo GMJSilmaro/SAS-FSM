@@ -102,7 +102,6 @@ function MyApp({ Component, pageProps }) {
   
               {/* Enhanced Favicon Configuration */}
               <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-              <link rel="manifest" href="/site.webmanifest" crossOrigin="use-credentials" />
               <meta name="msapplication-TileColor" content="#da532c" />
               <meta name="theme-color" content="#ffffff" />
             </Head>
