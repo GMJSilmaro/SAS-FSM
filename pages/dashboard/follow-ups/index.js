@@ -308,7 +308,7 @@ const FollowUpsPage = () => {
                   <tr key={followUp.id}>
                     <td>{followUp.id}</td>
                     <td>
-                      <a href={`/jobs/${followUp.jobID}`}>
+                      <a href={`/jobs/view/${followUp.jobID}`}>
                         #{followUp.jobID}
                       </a>
                     </td>
@@ -327,7 +327,7 @@ const FollowUpsPage = () => {
                     </td>
                     <td>{followUp.technicianName}</td>
                     <td>{followUp.assignedCSOName || '-'}</td>
-                    <td>{format(new Date(followUp.createdAt), 'dd/MM/yyyy HH:mm')}</td>
+                    <td>{format(new Date(followUp.createdAt), 'dd/MM/yyyy hh:mm a')}</td>
                     
                   </tr>
                 ))}
