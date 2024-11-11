@@ -74,19 +74,6 @@ const formatAddress = (address) => {
     .join(', ');
 };
 
-// Helper function to determine expiration status color
-const getExpirationColor = (expirationDate) => {
-  if (!expirationDate) return 'secondary';
-  
-  const today = new Date();
-  const expDate = new Date(expirationDate);
-  const daysUntilExpiration = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-  
-  if (daysUntilExpiration <= 7) return 'danger';    // Less than 7 days
-  if (daysUntilExpiration <= 30) return 'warning';  // Less than 30 days
-  return 'success';                                 // More than 30 days
-};
-
 const WorkersListItems = () => {
   const { 
     workers, 
@@ -223,12 +210,12 @@ const WorkersListItems = () => {
       didOpen: () => {
         document.getElementById('viewBtn').addEventListener('click', () => {
           Swal.close();
-          router.push(`/workers/view/${row.id}`);
+          router.push(`/dashboard/workers/${row.id}`);
         });
         document.getElementById('editBtn').addEventListener('click', async () => {
           setIsEditing(true);
           Swal.close();
-          await router.push(`/workers/edit-worker/${row.id}`);
+          await router.push(`/dashboard/workers/${row.id}`);
           setIsEditing(false);
         });
         document.getElementById('removeBtn').addEventListener('click', () => {
@@ -339,189 +326,63 @@ const WorkersListItems = () => {
     }),
 
     columnHelper.accessor('fullName', {
-      header: 'Worker Info',
-      size: 250,
+      header: 'Worker Name',
+      size: 200,
       cell: info => (
         <div className="d-flex align-items-center">
           <Image
             src={info.row.original.profilePicture || '/images/avatar/default-avatar.png'}
             alt={info.getValue()}
-            width={40}
-            height={40}
+            width={32}
+            height={32}
             className="rounded-circle me-2"
           />
           <div>
-            <div className="fw-semibold text-dark">{info.getValue()}</div>
-            <small className="text-secondary d-block">{info.row.original.workerId}</small>
-            <small className="text-secondary d-block">{info.row.original.role}</small>
+            <div className="fw-semibold">{info.getValue()}</div>
+            <small className="text-muted">{info.row.original.workerId}</small>
           </div>
         </div>
       )
     }),
 
-    columnHelper.accessor('contact', {
-      header: 'Contact Details',
-      size: 200,
+    columnHelper.accessor('email', {
+      header: 'Contact',
+      size: 250,
       cell: info => (
         <div>
           <div className="d-flex align-items-center mb-1">
-            <MailIcon size={14} className="text-secondary me-2" />
-            <span className="text-dark">{info.row.original.email || '-'}</span>
+            <MailIcon size={14} className="text-muted me-2" />
+            <span>{info.getValue() || '-'}</span>
           </div>
-          <div className="d-flex align-items-center mb-1">
-            <PhoneIcon size={14} className="text-secondary me-2" />
-            <span className={info.row.original.activePhone1 ? 'text-success fw-medium' : 'text-secondary'}>
-              {info.row.original.primaryPhone || '-'}
-            </span>
+          <div className="d-flex align-items-center">
+            <PhoneIcon size={14} className="text-muted me-2" />
+            <span>{info.row.original.primaryPhone || '-'}</span>
           </div>
-          {info.row.original.secondaryPhone && (
-            <div className="d-flex align-items-center">
-              <PhoneIcon size={14} className="text-secondary me-2" />
-              <span className={info.row.original.activePhone2 ? 'text-success fw-medium' : 'text-secondary'}>
-                {info.row.original.secondaryPhone}
-              </span>
-            </div>
-          )}
         </div>
       )
     }),
 
-    columnHelper.accessor('skills', {
-      header: 'Skills & Role',
-      size: 200,
+    columnHelper.accessor('address', {
+      header: 'Address',
+      size: 300,
       cell: info => (
-        <div>
-          <div className="d-flex flex-wrap gap-1 mb-2">
-            {info.getValue()?.slice(0, 3).map((skill, index) => (
-              <Badge 
-                key={index} 
-                bg="primary" 
-                className="text-white"
-                style={{ 
-                  fontSize: '0.75rem',
-                  padding: '0.35em 0.8em',
-                  backgroundColor: '#0d6efd'
-                }}
-              >
-                {skill}
-              </Badge>
-            ))}
-            {info.getValue()?.length > 3 && (
-              <Badge 
-                bg="secondary" 
-                className="text-white"
-                style={{ 
-                  fontSize: '0.75rem',
-                  padding: '0.35em 0.8em'
-                }}
-              >
-                +{info.getValue().length - 3}
-              </Badge>
-            )}
-          </div>
-          {info.row.original.isFieldWorker && (
-            <Badge 
-              bg="info" 
-              className="text-white"
-              style={{ 
-                fontSize: '0.75rem',
-                padding: '0.35em 0.8em'
-              }}
-            >
-              Field Worker
-            </Badge>
-          )}
+        <div className="d-flex align-items-center">
+          <MapPinIcon size={14} className="text-muted me-2" />
+          <span className="text-truncate" style={{ maxWidth: '250px' }}>
+            {formatAddress(info.getValue()) || '-'}
+          </span>
         </div>
       )
     }),
 
-    columnHelper.accessor('emergency', {
-      header: 'Emergency Contact',
-      size: 200,
-      cell: info => (
-        <div>
-          <div className="fw-medium text-dark">{info.row.original.emergencyContactName}</div>
-          <small className="text-secondary d-block">{info.row.original.emergencyContactPhone}</small>
-          <small className="text-secondary d-block">{info.row.original.emergencyRelationship}</small>
-        </div>
-      )
-    }),
-
-    columnHelper.accessor('status', {
+    columnHelper.accessor('isActive', {
       header: 'Status',
-      size: 120,
-      cell: info => {
-        // Check if account is expired
-        const expirationDate = info.row.original.expirationDate;
-        const isExpired = expirationDate ? new Date(expirationDate) < new Date() : false;
-        
-        return (
-          <div className="d-flex flex-column gap-1">
-            <OverlayTrigger
-              placement="top"
-              overlay={
-                <Tooltip>
-                  Account status: {isExpired ? 'Expired' : (info.row.original.isActive ? 'Active' : 'Inactive')}
-                  {expirationDate && (
-                    <div>Expires: {formatDate(expirationDate)}</div>
-                  )}
-                </Tooltip>
-              }
-            >
-              <Badge 
-                bg={isExpired ? 'danger' : (info.row.original.isActive ? 'success' : 'danger')}
-                className="text-white"
-                style={{ 
-                  fontSize: '0.75rem',
-                  padding: '0.35em 0.8em'
-                }}
-              >
-                {isExpired ? 'Expired' : (info.row.original.isActive ? 'Active' : 'Inactive')}
-              </Badge>
-            </OverlayTrigger>
-
-            <OverlayTrigger
-              placement="top"
-              overlay={
-                <Tooltip>
-                  Indicates if the user is currently online or offline
-                </Tooltip>
-              }
-            >
-              <Badge 
-                bg={info.row.original.isOnline ? 'success' : 'danger'}
-                className="text-white"
-                style={{ 
-                  fontSize: '0.75rem',
-                  padding: '0.35em 0.8em'
-                }}
-              >
-                {info.row.original.isOnline ? 'Online' : 'Offline'}
-              </Badge>
-            </OverlayTrigger>
-
-            {/* Show expiration date with warning if approaching */}
-            {expirationDate && !isExpired && (
-              <OverlayTrigger
-                placement="top"
-                overlay={
-                  <Tooltip>
-                    Account expiration date
-                  </Tooltip>
-                }
-              >
-                <small 
-                  className={`text-${getExpirationColor(expirationDate)} d-flex align-items-center`}
-                  style={{ fontSize: '0.7rem' }}
-                >
-                  <Clock size={12} className="me-1" />
-                  Exp: {formatDate(expirationDate)}
-                </small>
-              </OverlayTrigger>
-            )}
-          </div>
-        );
-      }
+      size: 100,
+      cell: info => (
+        <Badge bg={info.getValue() ? 'success' : 'danger'}>
+          {info.getValue() ? 'Active' : 'Inactive'}
+        </Badge>
+      )
     }),
 
     columnHelper.accessor(() => 'actions', {
@@ -531,12 +392,26 @@ const WorkersListItems = () => {
       cell: info => (
         <div className="d-flex gap-2">
           <Button 
-            variant="light"
-            size="sm"
-            className="d-flex align-items-center gap-2"
+            className="header-button"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px',
+              color: 'white',
+              padding: '8px 16px',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
             onClick={() => handleRowClick(info.row.original)}
           >
-            <Eye size={14} />
+            <Eye size={14} className="me-1" />
             View
           </Button>
         </div>
@@ -678,47 +553,28 @@ const WorkersListItems = () => {
         </div>
       )}
       
-      {/* Stats Cards Row with updated styling */}
+      {/* Stats Cards Row */}
       <Row className="g-4 mb-4">
         {statCards.map((card, index) => (
           <Col key={index} lg={3} sm={6}>
-            <Card 
-              className="border-0" 
-              style={{
-                borderRadius: '16px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-              }}
-            >
+            <Card className="border-0 shadow-sm">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
-                    <p className="text-muted mb-1" style={{ fontSize: '0.875rem' }}>{card.title}</p>
-                    <h3 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '600' }}>{card.value}</h3>
-                    <Badge 
-                      bg={card.badge.variant}
-                      style={{
-                        padding: '0.35em 0.8em',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem'
-                      }}
-                    >
-                      {card.badge.text}
-                    </Badge>
+                    <p className="text-muted mb-1">{card.title}</p>
+                    <h3 className="mb-1">{card.value}</h3>
+                    <Badge bg={card.badge.variant}>{card.badge.text}</Badge>
                     <div className="small text-muted mt-2">{card.summary}</div>
                   </div>
-                  <div 
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '12px',
-                      background: card.background,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'transform 0.2s ease'
-                    }}
-                  >
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: card.background,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
                     {card.icon}
                   </div>
                 </div>
@@ -728,16 +584,10 @@ const WorkersListItems = () => {
         ))}
       </Row>
 
-      {/* Main Table Card with updated styling */}
+      {/* Main Table Card */}
       <Row>
         <Col md={12} xs={12}>
-          <Card 
-            className="border-0" 
-            style={{
-              borderRadius: '16px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-            }}
-          >
+          <Card className="border-0 shadow-sm">
             <Card.Body className="p-4">
               {/* Search and Actions */}
               {subHeaderComponentMemo}
@@ -855,7 +705,6 @@ const WorkersListItems = () => {
           min-width: 0;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
-          border-radius: 12px;
         }
 
         .loading-overlay {
@@ -869,40 +718,6 @@ const WorkersListItems = () => {
           justify-content: center;
           align-items: center;
           z-index: 9999;
-        }
-
-        /* Add hover effects for cards */
-        .card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        }
-
-        /* Style the table */
-        .table thead th {
-          background-color: #f8fafc;
-          border-bottom: 2px solid #e2e8f0;
-          color: #64748b;
-          font-weight: 600;
-          text-transform: uppercase;
-          font-size: 0.75rem;
-          letter-spacing: 0.05em;
-        }
-
-        .table tbody tr:hover {
-          background-color: #f1f5f9;
-        }
-
-        /* Style the buttons */
-        .btn {
-          border-radius: 8px;
-          padding: 0.5rem 1rem;
-          font-weight: 500;
-          transition: all 0.2s ease;
-        }
-
-        .btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
       `}</style>
     </Fragment>

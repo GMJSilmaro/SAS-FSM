@@ -57,6 +57,7 @@ import {
   Bell,
   GeoAltFill,
   BellFill,
+  ThreeDotsVertical,
 } from "react-bootstrap-icons";
 import {
   FaPencilAlt, // For edit button
@@ -104,6 +105,10 @@ import { Toaster } from 'react-hot-toast';
 import { ReactQuillEditor } from "widgets";
 import DOMPurify from 'dompurify'; // Add this for sanitizing HTML
 import FollowUpModal from '../../../components/FollowUpModal';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { format } from 'date-fns';
+import { getAuth } from 'firebase/auth';
+
 
 // Helper function to fetch worker details from Firebase
 const fetchWorkerDetails = async (workerIds) => {
@@ -119,57 +124,7 @@ const fetchWorkerDetails = async (workerIds) => {
   return workersData;
 };
 
-// Modified geocodeAddress function
-const geocodeAddress = async (address, id) => {
-  try {
-    // Check if coordinates are already cached
-    const jobDoc = await getDoc(doc(db, "jobs", id));
-    const jobData = jobDoc.data();
 
-    if (jobData?.cachedCoordinates) {
-      return jobData.cachedCoordinates;
-    }
-
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-        address
-      )}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Geocoding failed with status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
-      const { lat, lng } = data.results[0].geometry.location;
-      const coordinates = { lat, lng };
-
-      // Cache the coordinates
-      await setDoc(
-        doc(db, "jobs", id),
-        { cachedCoordinates: coordinates },
-        { merge: true }
-      );
-
-      return coordinates;
-    } else {
-      console.error("Geocoding response error:", data.status);
-      return null;
-    }
-  } catch (error) {
-    console.error("Geocoding error:", error);
-    return null;
-  }
-};
-const formatDateOnly = (timestamp) => {
-  if (timestamp instanceof Timestamp) {
-    return timestamp.toDate().toLocaleDateString(); // Returns date in MM/DD/YYYY or localized format
-  } else {
-    return "Invalid Date"; // Fallback for invalid timestamp
-  }
-};
 // Add this helper function near the top with other helper functions
 const formatTime = (timeString) => {
   if (!timeString) return "N/A";
@@ -195,7 +150,7 @@ const getJobStatusName = (status) => {
     case "Job Complete":
       return "Job Complete";
     case "InProgress":
-      return "In Progress";
+      return "InProgress";
     case "In Progress":
       return "In Progress";
     case "Validate":
@@ -233,13 +188,55 @@ const getStatusColor = (status) => {
 
 const googleMapsLibraries = ["places"];
 
+// Add this helper function at the top with your other helpers
+const getFollowUpStatusStyle = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'logged':
+      return { bg: '#FFF3CD', color: '#856404', border: '#FFEEBA' };
+    case 'in progress':
+      return { bg: '#CCE5FF', color: '#004085', border: '#B8DAFF' };
+    case 'closed':
+      return { bg: '#D4EDDA', color: '#155724', border: '#C3E6CB' };
+    case 'cancelled':
+      return { bg: '#F8D7DA', color: '#721C24', border: '#F5C6CB' };
+    default:
+      return { bg: '#E2E3E5', color: '#383D41', border: '#D6D8DB' };
+  }
+};
+
+// Update getPriorityColor function to handle numeric priorities
+const getPriorityColor = (priority) => {
+  // Handle numeric priorities
+  if (typeof priority === 'number') {
+    switch (priority) {
+      case 1: return '#198754'; // Low - green
+      case 2: return '#0d6efd'; // Normal - blue
+      case 3: return '#fd7e14'; // High - orange
+      case 4: return '#dc3545'; // Urgent - red
+      case 5: return '#6610f2'; // Critical - purple
+      default: return '#6c757d'; // Default - grey
+    }
+  }
+  
+  // Handle string priorities (fallback)
+  const priorityStr = String(priority || '').toLowerCase();
+  switch (priorityStr) {
+    case 'urgent': return '#dc3545';
+    case 'high': return '#fd7e14';
+    case 'normal': return '#0d6efd';
+    case 'low': return '#198754';
+    default: return '#6c757d';
+  }
+};
+
 const JobDetails = () => {
+  // Move all useState declarations to the top
   const router = useRouter();
-  const { jobId } = router.query; // Extract job ID from URL
+  const { jobId } = router.query;
   const [job, setJob] = useState(null);
-  const [workers, setWorkers] = useState([]); // To store worker details
-  const [location, setLocation] = useState(null); // Store location for Google Map
-  const [activeTab, setActiveTab] = useState("overview"); // State for active tab
+  const [workers, setWorkers] = useState([]);
+  const [location, setLocation] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
   const [technicianNotes, setTechnicianNotes] = useState([]);
   const [newTechnicianNote, setNewTechnicianNote] = useState("");
   const [editingNote, setEditingNote] = useState(null);
@@ -292,11 +289,56 @@ const JobDetails = () => {
     isDone: false
   }]);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
-  const workerId = Cookies.get('workerId');
+  const csoId = Cookies.get('workerId');
   const [userDetails, setUserDetails] = useState(null);
   const [editingFollowUpId, setEditingFollowUpId] = useState(null);
+  const [followUpPriority, setFollowUpPriority] = useState([]);
+  const [isEditing, setIsEditing] = useState(null);
+  // Add this state and useEffect to fetch follow-up types
+  const [followUpTypes, setFollowUpTypes] = useState([]);
 
   console.log("Job ID from URL:", jobId);
+
+  // Define constants
+  const FOLLOW_UP_STATUSES = ['Logged', 'In Progress', 'Closed', 'Cancelled'];
+
+  // Helper functions (outside of useEffect)
+  const getTypeWithColor = (typeName) => {
+    const type = followUpTypes.find(t => t.name === typeName);
+    return (
+      <div className={styles.followUpTypeWrapper}>
+        {type && (
+          <div 
+            className={styles.typeIndicator}
+            style={{ backgroundColor: type.color }} 
+          />
+        )}
+        <span>{typeName}</span>
+      </div>
+    );
+  };
+
+  // Add the new useEffect for fetching follow-up types
+  useEffect(() => {
+    const fetchFollowUpTypes = async () => {
+      try {
+        const settingsRef = doc(db, 'settings', 'followUp');
+        const settingsDoc = await getDoc(settingsRef);
+        
+        if (settingsDoc.exists() && settingsDoc.data().types) {
+          const types = settingsDoc.data().types;
+          setFollowUpTypes(Object.entries(types).map(([id, type]) => ({
+            id,
+            ...type
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching follow-up types:', error);
+      }
+    };
+
+    fetchFollowUpTypes();
+  }, []);
 
   const handleEditClick = () => {
     router.push(`/jobs/edit-jobs/${jobId}`);
@@ -330,20 +372,13 @@ const JobDetails = () => {
               console.error("assignedWorkers is not an array");
             }
 
-            // Use the street address to get coordinates
-            const streetAddress = jobData.location?.address?.streetAddress;
-            if (streetAddress) {
-              const coordinates = await geocodeAddress(jobData.location?.locationName || streetAddress, jobId);
-              if (coordinates) {
-                setLocation(coordinates);
-                setMapKey((prevKey) => prevKey + 1); // Force map re-render
-              } else {
-                console.error(
-                  "No valid coordinates found for the given address"
-                );
-              }
+            // Use coordinates directly from the location object
+            if (jobData.location?.coordinates) {
+              const { latitude, longitude } = jobData.location.coordinates;
+              setLocation({ lat: latitude, lng: longitude });
+              setMapKey((prevKey) => prevKey + 1); // Force map re-render
             } else {
-              console.error("No valid street address found for the given job");
+              console.log("No coordinates found for this job");
             }
 
             setTechnicianNotes(jobData.technicianNotes || []);
@@ -358,67 +393,6 @@ const JobDetails = () => {
       };
 
       fetchJob();
-    }
-  }, [jobId]);
-
-  useEffect(() => {
-    if (jobId && activeTab === "notes") {
-      // Only fetch notes when on the notes tab
-      console.log("Fetching notes for job:", jobId); // Debug log
-
-      const notesRef = collection(db, "jobs", jobId, "technicianNotes");
-      const q = query(notesRef, orderBy("createdAt", "desc"));
-
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const fetchedNotes = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            const createdAt = data.createdAt?.toDate?.() || new Date();
-            return {
-              id: doc.id,
-              ...data,
-              createdAt,
-            };
-          });
-          console.log("Fetched notes:", fetchedNotes); // Debug log
-          setTechnicianNotes(fetchedNotes);
-        },
-        (error) => {
-          console.error("Error fetching notes:", error);
-          toast.error("Error loading notes. Please try again.");
-        }
-      );
-
-      return () => unsubscribe();
-    }
-  }, [jobId, activeTab]); // Add activeTab to the dependency array
-
-  useEffect(() => {
-    if (jobId) {
-      const notesRef = collection(db, "jobs", jobId, "technicianNotes");
-      const q = query(notesRef, orderBy("createdAt", "desc"));
-
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const fetchedNotes = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              createdAt: data.createdAt ? data.createdAt.toDate() : new Date(), // Convert to Date object or use current date as fallback
-            };
-          });
-          setTechnicianNotes(fetchedNotes);
-        },
-        (error) => {
-          console.error("Error fetching notes:", error);
-          toast.error("Error loading notes. Please try again.");
-        }
-      );
-
-      return () => unsubscribe();
     }
   }, [jobId]);
 
@@ -1658,7 +1632,7 @@ const JobDetails = () => {
           <div className={styles.headerLeft}>
             <h6 className={styles.sectionTitle}>Job Description</h6>
             <Badge bg="light" text="dark" className={styles.wordCount}>
-              {job.jobDescription?.split(/\s+/).filter(Boolean).length || 0} words
+              {job.jobDescription?.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length || 0} words
             </Badge>
           </div>
           {!isEditingDescription && (
@@ -1678,15 +1652,9 @@ const JobDetails = () => {
         </div>
 
         <div className={styles.metaInfo}>
-          <div className={styles.metaItem}>
-            <PersonFill size={12} />
-            <span>{job.createdBy?.fullName || "System User"}</span>
-          </div>
+        
           <div className={styles.metaDivider}>•</div>
-          <div className={styles.metaItem}>
-            <Calendar4 size={12} />
-            <span>{formatDateTime(job.createdAt)}</span>
-          </div>
+        
         </div>
 
         {isEditingDescription ? (
@@ -1722,7 +1690,10 @@ const JobDetails = () => {
           <div className={styles.descriptionContent}>
             <div className={styles.descriptionLabel}>Description:</div>
             {job.jobDescription ? (
-              <p className={styles.descriptionText}>{job.jobDescription}</p>
+              <div 
+                className={styles.descriptionText}
+                dangerouslySetInnerHTML={{ __html: job.jobDescription }}
+              />
             ) : (
               <p className={styles.emptyDescription}>No description provided</p>
             )}
@@ -1765,7 +1736,125 @@ const JobDetails = () => {
     );
   }
 
-  const handleUpdateFollowUp = async (followUpId, newStatus) => {
+  const getCurrentUserInfo = () => {
+    const email = Cookies.get('email') || 'unknown@email.com';
+    const workerId = Cookies.get('workerId') || 'UNKNOWN';
+    
+    return {
+      email,
+      workerId
+    };
+  };
+
+  const handleCreateFollowUp = async (followUpData) => {
+    try {
+      const userInfo = getCurrentUserInfo();
+      const followUpId = `followup-${Date.now()}`;
+      
+      const newFollowUp = {
+        id: followUpId,
+        jobID: jobId,
+        jobName: job.jobName,
+        customerID: job.customerID,
+        customerName: job.customerName,
+        notes: followUpData.notes,
+        type: followUpData.type,
+        status: followUpData.status || 'Logged',
+        priority: followUpData.priority || 'Normal',
+        dueDate: followUpData.dueDate,
+        assignedCSOId: null,
+        assignedCSOName: null,
+        assignedWorkers: job.assignedWorkers || [],
+        createdBy: {
+          workerId: userInfo.workerId,
+          email: userInfo.email
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: {
+          workerId: userInfo.workerId,
+          email: userInfo.email
+        }
+      };
+
+      const jobRef = doc(db, 'jobs', jobId);
+      await updateDoc(jobRef, {
+        [`followUps.${followUpId}`]: newFollowUp,
+        lastFollowUp: serverTimestamp(),
+        followUpCount: (job.followUpCount || 0) + 1
+      });
+
+      // Update local state
+      setJob(prevJob => ({
+        ...prevJob,
+        followUps: {
+          ...prevJob.followUps,
+          [followUpId]: newFollowUp
+        },
+        followUpCount: (prevJob.followUpCount || 0) + 1,
+        lastFollowUp: new Date()
+      }));
+
+      toast.success('Follow-up created successfully');
+      setShowFollowUpModal(false);
+    } catch (error) {
+      console.error('Error creating follow-up:', error);
+      toast.error('Failed to create follow-up');
+    }
+  };
+
+  // Add delete handler
+  const handleDeleteFollowUp = async (followUpId) => {
+      try {
+        const jobRef = doc(db, 'jobs', jobId);
+        const updatedFollowUps = { ...job.followUps };
+        delete updatedFollowUps[followUpId];
+        
+        await updateDoc(jobRef, {
+          followUps: updatedFollowUps,
+          followUpCount: (job.followUpCount || 1) - 1
+        });
+
+        toast.success('Follow-up deleted successfully');
+      } catch (error) {
+        console.error('Error deleting follow-up:', error);
+        toast.error('Failed to delete follow-up');
+      }
+  };
+
+  const handleStatusClick = (status) => {
+    router.push(`/dashboard/follow-ups?status=${status}`);
+  };
+
+  const handleEditFollowUp = async (followUpId, updatedData) => {
+    try {
+      const userInfo = getCurrentUserInfo();
+      
+      const updatedFollowUp = {
+        ...job.followUps[followUpId],
+        ...updatedData,
+        updatedAt: new Date().toISOString(),
+        updatedBy: {
+          fullName: userInfo.fullName,
+          email: userInfo.email,
+          workerId: userInfo.workerId
+        }
+      };
+
+      const jobRef = doc(db, 'jobs', jobId);
+      await updateDoc(jobRef, {
+        [`followUps.${followUpId}`]: updatedFollowUp
+      });
+
+      toast.success('Follow-up updated successfully');
+      setIsEditing(null);
+    } catch (error) {
+      console.error('Error updating follow-up:', error);
+      toast.error('Failed to update follow-up');
+    }
+  };
+
+  const handleStatusChange = async (followUpId, newStatus) => {
     try {
       const jobRef = doc(db, 'jobs', jobId);
       await updateDoc(jobRef, {
@@ -1773,11 +1862,11 @@ const JobDetails = () => {
         [`followUps.${followUpId}.updatedAt`]: new Date().toISOString()
       });
       
-      setEditingFollowUpId(null);
-      toast.success('Follow-up updated successfully');
+      setIsEditing(null);
+      toast.success('Status updated successfully');
     } catch (error) {
-      console.error('Error updating follow-up:', error);
-      toast.error('Failed to update follow-up');
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
     }
   };
 
@@ -2022,97 +2111,140 @@ const JobDetails = () => {
 
                 {/* Follow-ups Section */}
                 <section className={styles.sidebarSection}>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="mb-0">Follow-ups</h6>
-                    <Button 
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => setShowFollowUpModal(true)}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      <i className="fe fe-plus"></i>
-                      Create Follow-up
-                    </Button>
-                  </div>
-                  
-                  {/* Display existing follow-ups if any */}
-                  {job.followUps && Object.entries(job.followUps).length > 0 ? (
-                    <div className={styles.followUpList}>
-                      {Object.entries(job.followUps).map(([id, followUp]) => (
-                        <div key={id} className={`${styles.followUpItem} d-flex justify-content-between align-items-center`}>
-                          <div className="d-flex align-items-center gap-2">
-                            {editingFollowUpId === id ? (
-                              <Form.Select
-                                size="sm"
-                                value={followUp.status}
-                                onChange={(e) => handleUpdateFollowUp(id, e.target.value)}
-                                style={{ width: 'auto' }}
-                                autoFocus
-                                onBlur={() => setEditingFollowUpId(null)}
-                              >
-                                <option value="Logged">Logged</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Closed">Closed</option>
-                                <option value="Cancelled">Cancelled</option>
-                              </Form.Select>
-                            ) : (
-                              <Badge 
-                                bg={followUp.status === 'Logged' ? 'warning' : 
-                                    followUp.status === 'In Progress' ? 'info' : 
-                                    followUp.status === 'Closed' ? 'success' : 
-                                    followUp.status === 'Cancelled' ? 'danger' : 'secondary'}
-                                className="me-2"
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => setEditingFollowUpId(id)}
-                              >
-                                {followUp.status}
-                              </Badge>
-                            )}
-                            <span className="text-muted small">
-                              {followUp.type} - {new Date(followUp.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <div className="d-flex gap-2">
-                            <Button 
-                              variant="link" 
-                              size="sm" 
-                              className="p-0"
-                              onClick={() => setEditingFollowUpId(id)}
-                            >
-                              <i className="fe fe-edit-2"></i>
-                            </Button>
-                            <Button 
-                              variant="link" 
-                              size="sm" 
-                              className="p-0 text-danger"
-                              onClick={() => {
-                                Swal.fire({
-                                  title: 'Delete Follow-up?',
-                                  text: 'This action cannot be undone',
-                                  icon: 'warning',
-                                  showCancelButton: true,
-                                  confirmButtonColor: '#d33',
-                                  cancelButtonColor: '#3085d6',
-                                  confirmButtonText: 'Yes, delete it!'
-                                }).then((result) => {
-                                  if (result.isConfirmed) {
-                                    handleDeleteFollowUp(id);
-                                  }
-                                });
+                  <div className={styles.followUpsContainer}>
+                    <div className={styles.followUpsHeader}>
+                      <h6 className={styles.followUpsTitle}>
+                        <FaStickyNote className="me-2" />
+                        Follow-ups
+                      </h6>
+                      <Badge bg="primary" className={styles.followUpsCount}>
+                        {Object.keys(job.followUps || {}).length} items
+                      </Badge>
+                    </div>
+                    
+                    <div className={styles.followUpsScroll}>
+                      {(!job.followUps || Object.keys(job.followUps).length === 0) ? (
+                        <div className={styles.noFollowUps}>
+                          <FaStickyNote size={24} className="text-muted mb-2" />
+                          <p className="text-muted mb-0">No follow-ups yet</p>
+                        </div>
+                      ) : (
+                        Object.entries(job.followUps)
+                          .sort(([, a], [, b]) => new Date(b.createdAt) - new Date(a.createdAt))
+                          .map(([id, followUp]) => (
+                            <div 
+                              key={id} 
+                              className={styles.followUpCard}
+                              style={{ 
+                                borderLeft: `4px solid ${getPriorityColor(followUp.priority)}` // Add priority color
+                              }}
+                              onClick={(e) => {
+                                if (!e.target.closest('.actionButtons') && !e.target.closest('.statusBadge')) {
+                                  router.push({
+                                    pathname: '/dashboard/follow-ups',
+                                    query: {
+                                      followUpId: id, 
+                                      status: followUp.status,
+                                      type: followUp.type
+                                    }
+                                  });
+                                }
                               }}
                             >
-                              <i className="fe fe-trash-2"></i>
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                              <div className={styles.followUpContent}>
+                                <div className={styles.statusTypeRow}>
+                                  {isEditing === followUp.id ? (
+                                    <div className="statusBadge" onClick={(e) => e.stopPropagation()}>
+                                      <Form.Select 
+                                        size="sm"
+                                        value={followUp.status}
+                                        onChange={(e) => handleStatusChange(followUp.id, e.target.value)}
+                                        style={{ width: 'auto', minWidth: '120px' }}
+                                      >
+                                        {FOLLOW_UP_STATUSES.map(status => (
+                                          <option key={status} value={status}>
+                                            {status}
+                                          </option>
+                                        ))}
+                                      </Form.Select>
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className={`${styles.statusBadge} statusBadge`}
+                                      style={{ 
+                                        backgroundColor: getFollowUpStatusStyle(followUp.status).bg,
+                                        color: getFollowUpStatusStyle(followUp.status).color,
+                                        border: `1px solid ${getFollowUpStatusStyle(followUp.status).border}`,
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500',
+                                        display: 'inline-block'
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditing(followUp.id);
+                                      }}
+                                    >
+                                      {followUp.status}
+                                    </div>
+                                  )}
+                                  <span className={styles.followUpType}>
+                                    {getTypeWithColor(followUp.type)}
+                                  </span>
+                                  
+                            
+                                </div>
+
+                                <div className={styles.followUpNotes}>{followUp.notes}</div>
+
+                                <div className={styles.datesRow}>
+                                  <div className={styles.dateItem}>
+                                    <i className="fe fe-calendar me-1" />
+                                    Due: {new Date(followUp.dueDate).toLocaleDateString()}
+                                    <i className="fe fe-clock me-1" />
+                                    Created: {new Date(followUp.createdAt).toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                     <i className="fe fe-clock me-1" />
+                                    Updated: {new Date(followUp.updatedAt).toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                  </div>
+                                  
+                                </div>
+                                <div className={styles.createdBy}>Created By: {followUp.createdBy?.workerId}</div>
+                              </div>
+
+                              <div className={styles.actionButtonsContainer}>
+                                <div className={styles.actionButtons}>
+                                  <button 
+                                    className={`${styles.actionBtn} ${styles.edit}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsEditing(followUp.id);
+                                    }}
+                                  >
+                                    <i className="fe fe-edit-2" />
+                                  </button>
+                                  <button 
+                                    className={`${styles.actionBtn} ${styles.delete}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteFollowUp(followUp.id);
+                                    }}
+                                  >
+                                    <i className="fe fe-trash-2" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-muted text-center py-3">
-                      <i className="fe fe-clipboard mb-2 d-block"></i>
-                      No follow-ups yet
-                    </div>
-                  )}
+                  </div>
                 </section>
 
                   {/* Equipment List Section */}
@@ -2171,7 +2303,7 @@ const JobDetails = () => {
                           </div>
                           <div className={styles.arrangedBy}>
                             <PersonFill size={14} className="me-1" />
-                            Arranged by: {job.createdBy?.fullName || "System"}
+                            Arranged by: {job.createdBy?.fullName}
                           </div>
                         </div>
                       </div>
@@ -2370,8 +2502,7 @@ const JobDetails = () => {
         show={showFollowUpModal}
         onHide={() => setShowFollowUpModal(false)}
         jobId={jobId}
-        technicianId={workerId}
-        technicianName={userDetails?.fullName || 'Unknown Technician'}
+        handleCreateFollowUp={handleCreateFollowUp} // Pass the function as prop
         onSuccess={handleFollowUpSuccess}
       />
     </>

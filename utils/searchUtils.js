@@ -69,104 +69,131 @@ function highlightText(text, searchTerm) {
         });
       }
 
-    // Search jobs
-    const jobsRef = collection(db, "jobs");
-    const jobsSnapshot = await getDocs(query(jobsRef, firestoreLimit(10)));
-    jobsSnapshot.forEach((doc) => {
-      const jobData = doc.data();
-      // Check multiple fields
-      if (
-        jobData.jobName?.toLowerCase().includes(searchQueryLower) ||
-        jobData.jobID?.toLowerCase().includes(searchQueryLower) ||
-        jobData.customerName?.toLowerCase().includes(searchQueryLower) ||
-        jobData.jobStatus?.toLowerCase().includes(searchQueryLower)
-      ) {
-        results.push({
-          id: doc.id,
-          type: 'job',
-          title: highlightText(jobData.jobName || 'Untitled Job', searchQuery),
-          subtitle: `Job ID: ${highlightText(jobData.jobID, searchQuery)} | Customer: ${highlightText(jobData.customerName || 'N/A', searchQuery)}`,
-          link: `/dashboard/jobs/${doc.id}`,
-          rawTitle: jobData.jobName || 'Untitled Job' // Keep raw text for sorting
-        });
-      }
-    });
-
-    // Search workers
-    const workersRef = collection(db, "users");
-
-    // Modified worker search to use a simpler query
-    const workersSnapshot = await getDocs(query(
-      workersRef,
-      firestoreLimit(10)
-    ));
-
-    // No need for separate email query since we'll filter in memory
-    const workerResults = new Map();
-
-    workersSnapshot.docs.forEach((doc) => {
-      if (!workerResults.has(doc.id)) {
-        const workerData = doc.data();
-        const searchableFields = [
-          workerData.fullName,
-          workerData.email,
-          workerData.workerId
-        ].map(field => (field || '').toLowerCase());
-
-        // Check if any field contains the search query
-        if (searchableFields.some(field => field.includes(searchQueryLower))) {
-          workerResults.set(doc.id, {
-            id: doc.id,
-            type: 'worker',
-            title: highlightText(workerData.fullName || 'Unnamed Worker', searchQuery),
-            subtitle: `${highlightText(workerData.workerId || 'N/A', searchQuery)} | ${workerData.role || 'No Role'}`,
-            link: `/workers/${doc.id}`,
-            rawTitle: workerData.fullName || 'Unnamed Worker',
-            email: highlightText(workerData.email || '', searchQuery),
-            role: workerData.role
+      // Search jobs and their follow-ups
+      const jobsRef = collection(db, "jobs");
+      const jobsSnapshot = await getDocs(query(jobsRef, where("followUpCount", ">", 0)));
+      
+      jobsSnapshot.forEach((doc) => {
+        const jobData = doc.data();
+        
+        // Search through follow-ups within the job
+        if (jobData.followUps) {
+          Object.entries(jobData.followUps).forEach(([followUpId, followUp]) => {
+            if (
+              followUpId.toLowerCase().includes(searchQueryLower) ||
+              followUp.notes?.toLowerCase().includes(searchQueryLower) ||
+              followUp.type?.toLowerCase().includes(searchQueryLower) ||
+              followUp.status?.toLowerCase().includes(searchQueryLower)
+            ) {
+              results.push({
+                id: followUpId,
+                type: 'followUp',
+                title: highlightText(followUp.type || 'Untitled Follow-up', searchQuery),
+                subtitle: `ID: ${highlightText(followUpId, searchQuery)} | ${followUp.status || 'No Status'}`,
+                description: highlightText(followUp.notes || 'No notes', searchQuery),
+                link: `/dashboard/follow-ups?followUpId=${followUpId}&status=${followUp.status}&type=${followUp.type}`,
+                rawTitle: followUp.type || 'Untitled Follow-up',
+                jobID: jobData.jobID,
+                customerName: jobData.customerName,
+                status: followUp.status,
+                createdAt: followUp.createdAt
+              });
+            }
           });
         }
-      }
-    });
 
-    // Add worker results to the main results array
-    results.push(...workerResults.values());
+        // Existing job search logic
+        if (
+          jobData.jobName?.toLowerCase().includes(searchQueryLower) ||
+          jobData.jobID?.toLowerCase().includes(searchQueryLower) ||
+          jobData.customerName?.toLowerCase().includes(searchQueryLower)
+        ) {
+          results.push({
+            id: doc.id,
+            type: 'job',
+            title: highlightText(jobData.jobName || 'Untitled Job', searchQuery),
+            subtitle: `Job ID: ${highlightText(jobData.jobID, searchQuery)} | Customer: ${highlightText(jobData.customerName || 'N/A', searchQuery)}`,
+            link: `/dashboard/jobs/${doc.id}`,
+            rawTitle: jobData.jobName || 'Untitled Job'
+          });
+        }
+      });
 
-    // Search follow-ups
-    const followUpsRef = collection(db, "followUps");
-    const followUpsSnapshot = await getDocs(query(followUpsRef, firestoreLimit(10)));
-    followUpsSnapshot.forEach((doc) => {
-      const followUpData = doc.data();
-      // Check multiple fields
-      if (
-        followUpData.title?.toLowerCase().includes(searchQueryLower) ||
-        followUpData.followUpID?.toLowerCase().includes(searchQueryLower) ||
-        followUpData.description?.toLowerCase().includes(searchQueryLower)
-      ) {
-        results.push({
-          id: doc.id,
-          type: 'followUp',
-          title: highlightText(followUpData.title || 'Untitled Follow-up', searchQuery),
-          subtitle: `Follow-up ID: ${highlightText(followUpData.followUpID || 'N/A', searchQuery)}`,
-          link: `/dashboard/follow-ups/${doc.id}`,
-          rawTitle: followUpData.title || 'Untitled Follow-up'
-        });
-      }
-    });
+      // Search workers
+      const workersRef = collection(db, "users");
 
-    // Sort results - prioritize SAP customers
-    results.sort((a, b) => {
-      const typeOrder = { customer: 1, job: 2, worker: 3, followUp: 4 };
-      return typeOrder[a.type] - typeOrder[b.type];
-    });
+      // Modified worker search to use a simpler query
+      const workersSnapshot = await getDocs(query(
+        workersRef,
+        firestoreLimit(10)
+      ));
 
-    return results.slice(0, 10);
+      // No need for separate email query since we'll filter in memory
+      const workerResults = new Map();
 
-  } catch (error) {
-    console.error('Error performing quick search:', error);
-    return [];
-  }
-};
+      workersSnapshot.docs.forEach((doc) => {
+        if (!workerResults.has(doc.id)) {
+          const workerData = doc.data();
+          const searchableFields = [
+            workerData.fullName,
+            workerData.email,
+            workerData.workerId
+          ].map(field => (field || '').toLowerCase());
+
+          // Check if any field contains the search query
+          if (searchableFields.some(field => field.includes(searchQueryLower))) {
+            workerResults.set(doc.id, {
+              id: doc.id,
+              type: 'worker',
+              title: highlightText(workerData.fullName || 'Unnamed Worker', searchQuery),
+              subtitle: `${highlightText(workerData.workerId || 'N/A', searchQuery)} | ${workerData.role || 'No Role'}`,
+              link: `/workers/${doc.id}`,
+              rawTitle: workerData.fullName || 'Unnamed Worker',
+              email: highlightText(workerData.email || '', searchQuery),
+              role: workerData.role
+            });
+          }
+        }
+      });
+
+      // Add worker results to the main results array
+      results.push(...workerResults.values());
+
+      // Search follow-ups
+      const followUpsRef = collection(db, "followUps");
+      const followUpsSnapshot = await getDocs(query(followUpsRef, firestoreLimit(10)));
+      followUpsSnapshot.forEach((doc) => {
+        const followUpData = doc.data();
+        // Check multiple fields
+        if (
+          followUpData.title?.toLowerCase().includes(searchQueryLower) ||
+          followUpData.followUpID?.toLowerCase().includes(searchQueryLower) ||
+          followUpData.description?.toLowerCase().includes(searchQueryLower)
+        ) {
+          results.push({
+            id: doc.id,
+            type: 'followUp',
+            title: highlightText(followUpData.title || 'Untitled Follow-up', searchQuery),
+            subtitle: `Follow-up ID: ${highlightText(followUpData.followUpID || 'N/A', searchQuery)}`,
+            link: `/dashboard/follow-ups/${doc.id}`,
+            rawTitle: followUpData.title || 'Untitled Follow-up'
+          });
+        }
+      });
+
+      // Sort results - prioritize SAP customers
+      results.sort((a, b) => {
+        const typeOrder = { customer: 1, job: 2, worker: 3, followUp: 4 };
+        return typeOrder[a.type] - typeOrder[b.type];
+      });
+
+      return results.slice(0, 10);
+
+    } catch (error) {
+      console.error('Error performing quick search:', error);
+      return [];
+    }
+  };
 // Update the performGlobalSearch function to handle the full search
 export const performGlobalSearch = async (db, searchQuery) => {
   try {

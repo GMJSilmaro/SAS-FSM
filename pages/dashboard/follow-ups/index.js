@@ -15,6 +15,7 @@ import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } f
 import { db } from '../../../firebase';
 import { format } from 'date-fns';
 import { FaFilter, FaEllipsisV } from 'react-icons/fa';
+import Link from 'next/link';
 
 const FollowUpsPage = () => {
   const router = useRouter();
@@ -27,11 +28,25 @@ const FollowUpsPage = () => {
       start: router.query.startDate || null,
       end: router.query.endDate || null
     },
-    assignedWorker: router.query.workerId || 'all'
+    assignedWorker: router.query.workerId || 'all',
+    followUpId: router.query.followUpId || ''
   });
   const [workers, setWorkers] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
   const [followUpTypes, setFollowUpTypes] = useState([]);
+
+  // Add a useEffect to update filters when URL changes
+  useEffect(() => {
+    if (router.isReady) {
+      setFilters(prev => ({
+        ...prev,
+        status: router.query.status || 'all',
+        type: router.query.type || 'all',
+        followUpId: router.query.followUpId || '',
+        assignedWorker: router.query.workerId || 'all'
+      }));
+    }
+  }, [router.isReady, router.query]);
 
   // Fetch workers for filter dropdown
   useEffect(() => {
@@ -58,6 +73,13 @@ const FollowUpsPage = () => {
     return technician ? technician.workerName : '-';
   };
 
+  // Add this helper function next to getTechnicianName
+  const getCSOName = (workers, createdBy) => {
+    if (!workers || !createdBy?.workerId) return '-';
+    const cso = workers.find(w => w.workerId === createdBy.workerId);
+    return cso ? cso.fullName : '-';
+  };
+
   // Fetch jobs with follow-ups
   useEffect(() => {
     const fetchJobs = async () => {
@@ -78,46 +100,53 @@ const FollowUpsPage = () => {
 
           // Process and flatten follow-ups from jobs
           const processedJobs = jobsData.reduce((acc, job) => {
-            console.log('Processing job:', job.jobID, 'followUps:', job.followUps);
-
             if (job.followUps) {
               Object.entries(job.followUps).forEach(([followUpId, followUp]) => {
-                // Get technician name from assignedWorkers
-                const technicianName = getTechnicianName(job.assignedWorkers, followUp.technicianId);
-                console.log('Technician lookup:', { 
-                  technicianId: followUp.technicianId, 
-                  assignedWorkers: job.assignedWorkers,
-                  foundName: technicianName 
+                // If there's a followUpId in the URL/filters, only process that specific one
+                if (filters.followUpId && followUpId !== filters.followUpId) {
+                  return; // Skip if not matching the specific followUpId
+                }
+
+                const technicianName = followUp.assignedWorkers?.length > 0 
+                  ? followUp.assignedWorkers[0].workerName 
+                  : '-';
+
+                const csoName = getCSOName(workers, followUp.createdBy);
+
+                // Only apply other filters if no specific followUpId is provided
+                if (!filters.followUpId) {
+                  const statusMatch = filters.status === 'all' || followUp.status === filters.status;
+                  const typeMatch = filters.type === 'all' || followUp.type === filters.type;
+                  const workerMatch = filters.assignedWorker === 'all' || 
+                    followUp.assignedWorkers?.some(w => w.workerId === filters.assignedWorker);
+                  
+                  let dateMatch = true;
+                  if (filters.dateRange.start && filters.dateRange.end) {
+                    const followUpDate = new Date(followUp.createdAt);
+                    const startDate = new Date(filters.dateRange.start);
+                    const endDate = new Date(filters.dateRange.end);
+                    dateMatch = followUpDate >= startDate && followUpDate <= endDate;
+                  }
+
+                  if (!statusMatch || !typeMatch || !workerMatch || !dateMatch) {
+                    return; // Skip if doesn't match filters
+                  }
+                }
+
+                acc.push({
+                  id: followUpId,
+                  ...followUp,
+                  jobID: job.jobID || job.jobNo,
+                  jobName: job.jobName,
+                  customerName: job.customerName,
+                  customerID: job.customerID,
+                  priority: followUp.priority || 4,
+                  assignedWorkers: followUp.assignedWorkers || [],
+                  technicianName: technicianName,
+                  csoName: csoName,
+                  createdAt: followUp.createdAt,
+                  updatedAt: followUp.updatedAt
                 });
-
-                // Apply filters
-                const statusMatch = filters.status === 'all' || followUp.status === filters.status;
-                const typeMatch = filters.type === 'all' || followUp.type === filters.type;
-                const workerMatch = filters.assignedWorker === 'all' || 
-                  job.assignedWorkers?.some(w => w.workerId === filters.assignedWorker);
-                
-                // Handle date filtering
-                let dateMatch = true;
-                if (filters.dateRange.start && filters.dateRange.end) {
-                  const followUpDate = new Date(followUp.createdAt);
-                  const startDate = new Date(filters.dateRange.start);
-                  const endDate = new Date(filters.dateRange.end);
-                  dateMatch = followUpDate >= startDate && followUpDate <= endDate;
-                }
-
-                if (statusMatch && typeMatch && workerMatch && dateMatch) {
-                  acc.push({
-                    id: followUpId,
-                    ...followUp,
-                    jobID: job.jobID,
-                    jobName: job.jobName,
-                    customerName: job.customerName,
-                    customerID: job.customerID,
-                    priority: job.priority || followUp.priority || 'Low',
-                    assignedWorkers: job.assignedWorkers || [],
-                    technicianName: technicianName // Use the looked up name
-                  });
-                }
               });
             }
             return acc;
@@ -145,7 +174,18 @@ const FollowUpsPage = () => {
       'Closed': 'success',
       'Cancelled': 'danger'
     };
-    return <Badge bg={statusColors[status] || 'secondary'}>{status}</Badge>;
+    return (
+      <Badge 
+        bg={statusColors[status] || 'secondary'}
+        style={{ 
+          fontSize: '0.85rem',
+          padding: '0.35em 0.65em',
+          fontWeight: '500'
+        }}
+      >
+        {status}
+      </Badge>
+    );
   };
 
   // Add function to fetch follow-up types
@@ -189,6 +229,36 @@ const FollowUpsPage = () => {
     ) : typeName;
   };
 
+  // First, add this helper function for priority colors
+  const getPriorityBadge = (priority) => {
+    const priorityNum = Number(priority);
+    
+    const getPriorityDetails = (num) => {
+      switch (num) {
+        case 1: return { label: 'Low', color: 'success' };
+        case 2: return { label: 'Normal', color: 'primary' };
+        case 3: return { label: 'High', color: 'warning' };
+        case 4: return { label: 'Urgent', color: 'danger' };
+        case 5: return { label: 'Critical', color: 'dark' };
+        default: return { label: 'Normal', color: 'secondary' };
+      }
+    };
+
+    const details = getPriorityDetails(priorityNum);
+    return (
+      <Badge 
+        bg={details.color}
+        style={{ 
+          fontSize: '0.85rem',
+          padding: '0.35em 0.65em',
+          fontWeight: '500'
+        }}
+      >
+        {details.label}
+      </Badge>
+    );
+  };
+
   return (
     <Container fluid className="px-6 py-4">
       <Row className="align-items-center justify-content-between g-3 mb-4">
@@ -196,8 +266,15 @@ const FollowUpsPage = () => {
           <h1 className="mb-0 h2">Follow-ups</h1>
         </Col>
         <Col md={6} className="d-flex justify-content-end gap-2">
-          {/* Filter Controls */}
           <div className="d-flex gap-2">
+            <Form.Control
+              type="text"
+              placeholder="Follow-up ID"
+              value={filters.followUpId}
+              onChange={(e) => setFilters(prev => ({ ...prev, followUpId: e.target.value }))}
+              style={{ width: '350px' }}
+            />
+            
             <Form.Select 
               value={filters.assignedWorker}
               onChange={(e) => setFilters(prev => ({ ...prev, assignedWorker: e.target.value }))}
@@ -292,15 +369,15 @@ const FollowUpsPage = () => {
               <thead className="bg-light">
                 <tr>
                   <th>Follow-up ID</th>
-                  <th>Job #</th>
+                  <th>Job No.</th>
                   <th>Customer</th>
                   <th>Type</th>
                   <th>Status</th>
                   <th>Priority</th>
-                  <th>Workers</th>
+                  <th>Worker</th>
                   <th>CSO</th>
                   <th>Created</th>
-                  
+                  <th>Updated</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,27 +385,22 @@ const FollowUpsPage = () => {
                   <tr key={followUp.id}>
                     <td>{followUp.id}</td>
                     <td>
-                      <a href={`/jobs/view/${followUp.jobID}`}>
+                      <Link href={`/dashboard/jobs/${followUp.jobID}`}>
                         #{followUp.jobID}
-                      </a>
+                      </Link>
                     </td>
                     <td>
-                      <a href={`/customers/view/${followUp.customerID}`}>
+                      <Link href={`/customers/${followUp.customerID}`}>
                         {followUp.customerName}
-                      </a>
+                      </Link>
                     </td>
                     <td>{getTypeWithColor(followUp.type)}</td>
                     <td>{getStatusBadge(followUp.status)}</td>
-                    <td>
-                      <Badge bg={followUp.priority === 'High' ? 'danger' : 
-                               followUp.priority === 'Mid' ? 'warning' : 'info'}>
-                        {followUp.priority}
-                      </Badge>
-                    </td>
+                    <td>{getPriorityBadge(followUp.priority)}</td>
                     <td>{followUp.technicianName}</td>
-                    <td>{followUp.assignedCSOName || '-'}</td>
-                    <td>{format(new Date(followUp.createdAt), 'dd/MM/yyyy hh:mm a')}</td>
-                    
+                    <td>{followUp.csoName}</td>
+                    <td>{format(new Date(followUp.createdAt), 'dd/MM/yyyy HH:mm')}</td>
+                    <td>{format(new Date(followUp.updatedAt), 'dd/MM/yyyy HH:mm')}</td>
                   </tr>
                 ))}
               </tbody>

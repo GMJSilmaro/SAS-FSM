@@ -5,7 +5,7 @@ import { useMediaQuery } from "react-responsive";
 import { ListGroup, Dropdown, Badge, Button, InputGroup, Form } from "react-bootstrap";
 import Image from "next/image";
 import SimpleBar from "simplebar-react";
-import { FaBell, FaSearch, FaTimes, FaTasks, FaCalendarAlt, FaFilter } from "react-icons/fa";
+import { FaBell, FaSearch, FaTimes, FaTasks, FaCalendarAlt, FaFilter, FaStickyNote } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from 'react-toastify';
@@ -922,6 +922,28 @@ const QuickMenu = ({ children }) => {
   useEffect(() => {
     fetchFollowUpTypes();
   }, []);
+
+  // Add this function to handle View All click
+  const handleViewAllFollowUps = () => {
+    // Reset all filters to default
+    setFilters({
+      status: 'all',
+      type: 'all',
+      dateRange: {
+        start: null,
+        end: null
+      }
+    });
+
+    // Navigate to follow-ups page with reset filters
+    router.push({
+      pathname: '/dashboard/follow-ups',
+      query: {
+        status: 'all',
+        type: 'all'
+      }
+    });
+  };
 
   return (
     <Fragment>

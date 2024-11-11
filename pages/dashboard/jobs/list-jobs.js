@@ -54,11 +54,16 @@ import {
   createColumnHelper,
 } from "@tanstack/react-table";
 import { GeeksSEO, PageHeading } from "widgets";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { Users, Activity, Clock, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { FaUser, FaPlus } from "react-icons/fa";
+
+const stripHtmlTags = (html) => {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, '');
+};
 
 const FilterPanel = ({
   filters,
@@ -335,6 +340,7 @@ const ViewJobs = () => {
   const [perPage, setPerPage] = useState(10);
   const [totalRows, setTotalRows] = useState(0);
   const [error, setError] = useState(null);
+  const [followUpSettings, setFollowUpSettings] = useState({});
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -514,29 +520,77 @@ const ViewJobs = () => {
         </OverlayTrigger>
       ),
     }),
+    columnHelper.accessor("jobDescription", {
+      header: "Description",
+      size: 150,
+      cell: (info) => {
+        const rawDescription = info.getValue() || "No description available";
+        const cleanDescription = stripHtmlTags(rawDescription);
+        
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <Tooltip>
+                <div style={{ maxWidth: "250px", whiteSpace: "normal" }}>
+                  {cleanDescription}
+                </div>
+              </Tooltip>
+            }
+          >
+            <div 
+              className="text-truncate" 
+              style={{ 
+                maxWidth: "200px",
+                fontSize: "0.875rem",
+                color: "#64748b"
+              }}
+            >
+              {cleanDescription}
+            </div>
+          </OverlayTrigger>
+        );
+      },
+    }),
     columnHelper.accessor("customerName", {
       header: "Customer",
       size: 200,
       cell: (info) => {
-        const customerName = info.getValue().replace(/^C\d+ - /, "");
-        const cardCodeMatch = info.getValue().match(/^C(\d+)/);
-        const cardCode = cardCodeMatch
-          ? `C${cardCodeMatch[1].padStart(6, "0")}`
-          : null;
+        const row = info.row.original;
+        const customerName = info.getValue();
+        const customerId = row.customerID;
+        
         return (
           <OverlayTrigger
             placement="top"
             overlay={<Tooltip>View Customer Details</Tooltip>}
           >
-            {cardCode ? (
-              <Link href={`/customers/${cardCode}`} passHref>
-                <span className="text-primary cursor-pointer">
-                  {customerName}
-                </span>
-              </Link>
-            ) : (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (customerId) {
+                  try {
+                    router.push(`/customers/view/${customerId}`);
+                  } catch (error) {
+                    console.error('Navigation Error:', error);
+                  }
+                } else {
+                  console.warn('No customer ID available for:', customerName);
+                }
+              }}
+              style={{
+                cursor: customerId ? 'pointer' : 'default',
+                color: customerId ? '#3b82f6' : 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+              }}
+              className="customer-link"
+            >
+              <FaUser size={14} className="text-muted" />
               <span>{customerName}</span>
-            )}
+            </div>
           </OverlayTrigger>
         );
       },
@@ -547,9 +601,148 @@ const ViewJobs = () => {
       cell: (info) => info.getValue() || "No location",
     }),
     columnHelper.accessor("jobStatus", {
-      header: "Status",
+      header: "Job Status",
       size: 120,
       cell: (info) => getStatusBadge(info.getValue()),
+    }),
+    columnHelper.accessor("followUps", {
+      header: "Follow-up Status",
+      size: 150,
+      cell: (info) => {
+        const followUps = info.getValue();
+        const jobId = info.row.original.id;
+
+        if (!followUps || Object.keys(followUps).length === 0) {
+          return (
+            <div 
+              className="follow-up-badge no-followup"
+              style={{
+                backgroundColor: '#f3f4f6',
+                color: '#6b7280',
+                padding: "4px 12px",
+                borderRadius: "12px",
+                fontSize: "0.75rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              <i className="fe fe-clock me-1"></i>
+              No Follow-up
+            </div>
+          );
+        }
+
+        const sortedFollowUps = Object.entries(followUps)
+          .map(([id, followUp]) => ({
+            id,
+            ...followUp,
+            createdAt: new Date(followUp.createdAt)
+          }))
+          .sort((a, b) => b.createdAt - a.createdAt);
+
+        const lastFollowUp = sortedFollowUps[0];
+        const remainingCount = sortedFollowUps.length - 1;
+
+        const getStatusStyle = (status) => {
+          switch (status?.toLowerCase()) {
+            case 'logged':
+              return {
+                bg: '#fff7ed',
+                color: '#c2410c',
+                icon: 'fe-file-text'
+              };
+            case 'in progress':
+              return {
+                bg: '#eff6ff',
+                color: '#1d4ed8',
+                icon: 'fe-loader'
+              };
+            case 'closed':
+              return {
+                bg: '#f0fdf4',
+                color: '#15803d',
+                icon: 'fe-check-circle'
+              };
+            case 'cancelled':
+              return {
+                bg: '#fef2f2',
+                color: '#dc2626',
+                icon: 'fe-x-circle'
+              };
+            default:
+              return {
+                bg: '#f3f4f6',
+                color: '#6b7280',
+                icon: 'fe-help-circle'
+              };
+          }
+        };
+
+        const style = getStatusStyle(lastFollowUp.status);
+        const typeSettings = Object.values(followUpSettings).find(t => t.name === lastFollowUp.type);
+
+        return (
+          <div 
+            onClick={() => {
+              if (remainingCount > 0) {
+                router.push(`/dashboard/jobs/${jobId}#follow-ups`);
+              }
+            }}
+            style={{ cursor: remainingCount > 0 ? 'pointer' : 'default' }}
+          >
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip>
+                  <div className="text-start">
+                    <div className="fw-bold" style={{ color: typeSettings?.color }}>
+                      {lastFollowUp.type}
+                    </div>
+                    <div><strong>Status:</strong> {lastFollowUp.status}</div>
+                    <div><strong>Priority:</strong> {getPriorityLabel(lastFollowUp.priority)}</div>
+                    {lastFollowUp.dueDate && (
+                      <div><strong>Due:</strong> {new Date(lastFollowUp.dueDate).toLocaleDateString()}</div>
+                    )}
+                    {remainingCount > 0 && (
+                      <div className="mt-2 text-muted">
+                        Click to view {remainingCount} more follow-up{remainingCount > 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                </Tooltip>
+              }
+            >
+              <div 
+                className="follow-up-badge"
+                style={{
+                  backgroundColor: style.bg,
+                  color: style.color,
+                  padding: "4px 12px",
+                  borderRadius: "12px",
+                  fontSize: "0.75rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  transition: "all 0.2s ease",
+                  border: `1px solid ${style.color}20`
+                }}
+              >
+                <i className={`fe ${style.icon}`} style={{ fontSize: "12px" }}></i>
+                <span>{lastFollowUp.status}</span>
+                {remainingCount > 0 && (
+                  <span className="ms-1 badge bg-secondary" style={{ fontSize: '0.7rem' }}>
+                    +{remainingCount}
+                  </span>
+                )}
+                {lastFollowUp.priority === 4 && (
+                  <span className="ms-1" style={{ color: "#dc2626" }}>•</span>
+                )}
+              </div>
+            </OverlayTrigger>
+          </div>
+        );
+      },
     }),
     columnHelper.accessor("priority", {
       header: "Priority",
@@ -558,23 +751,116 @@ const ViewJobs = () => {
     }),
     columnHelper.accessor("assignedWorkers", {
       header: "Assigned Workers",
-      size: 130,
+      size: 50,
       cell: (info) => {
         const workers = info.getValue() || [];
+        const displayLimit = 3;
+        const remainingCount = workers.length > displayLimit ? workers.length - displayLimit : 0;
+        
         return (
-          <OverlayTrigger
-            placement="top"
-            overlay={
-              <Tooltip>
-                {workers.map((w) => w.workerName).join(", ") ||
-                  "No workers assigned"}
-              </Tooltip>
-            }
-          >
-            <div className="text-truncate" style={{ maxWidth: "130px" }}>
-              {workers.length > 0 ? `${workers.length} worker(s)` : "None"}
+          <div className="d-flex align-items-center">
+            <div className="worker-avatars d-flex align-items-center">
+              {workers.slice(0, displayLimit).map((worker, index) => (
+                <OverlayTrigger
+                  key={index}
+                  placement="top"
+                  overlay={
+                    <Tooltip>{worker.workerName || 'Unknown'}</Tooltip>
+                  }
+                >
+                  <div 
+                    className="worker-avatar"
+                    style={{
+                      marginLeft: index > 0 ? '-8px' : '0',
+                      zIndex: workers.length - index,
+                      position: 'relative',
+                    }}
+                  >
+                    {worker.profilePicture ? (
+                      <img
+                        src={worker.profilePicture}
+                        alt={worker.workerName}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          border: '2px solid #fff',
+                          objectFit: 'cover',
+                          backgroundColor: '#f1f5f9',
+                        }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = '/images/avatar/placeholder.png';
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          border: '2px solid #fff',
+                          backgroundColor: '#e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '14px',
+                          color: '#64748b',
+                        }}
+                      >
+                        {worker.workerName?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                    )}
+                  </div>
+                </OverlayTrigger>
+              ))}
+              {remainingCount > 0 && (
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip>
+                      {workers.slice(displayLimit).map(w => w.workerName || 'Unknown').join(', ')}
+                    </Tooltip>
+                  }
+                >
+                  <div
+                    className="remaining-count"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: '#cbd5e1',
+                      border: '2px solid #fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginLeft: '-8px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: '#475569',
+                      zIndex: 0,
+                    }}
+                  >
+                    +{remainingCount}
+                  </div>
+                </OverlayTrigger>
+              )}
             </div>
-          </OverlayTrigger>
+            {workers.length === 0 && (
+              <span 
+                className="text-muted"
+                style={{
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <FaUser size={14} />
+                Unassigned
+              </span>
+            )}
+          </div>
         );
       },
     }),
@@ -620,20 +906,152 @@ const ViewJobs = () => {
         );
       },
     }),
+  
+    columnHelper.accessor("createdAt", {
+      header: "Created At",
+      size: 150,
+      cell: (info) => {
+        const timestamp = info.getValue();
+        if (!timestamp) return "N/A";
+        
+        const date = new Date(timestamp.seconds * 1000);
+        const formattedDate = date.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const formattedTime = date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <Tooltip>
+                Created on: {formattedDate} at {formattedTime}
+              </Tooltip>
+            }
+          >
+            <div className="d-flex flex-column">
+              <span style={{ fontSize: "0.875rem", color: "#475569" }}>
+                {formattedDate}
+              </span>
+              <small className="text-muted" style={{ fontSize: "0.75rem" }}>
+                {formattedTime}
+              </small>
+            </div>
+          </OverlayTrigger>
+        );
+      },
+    }),
+    columnHelper.accessor("updatedAt", {
+      header: "Last Updated",
+      size: 150,
+      cell: (info) => {
+        const timestamp = info.getValue();
+        if (!timestamp) return "N/A";
+        
+        const date = new Date(timestamp.seconds * 1000);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+        
+        // Format relative time
+        let relativeTime;
+        if (diffInSeconds < 60) {
+          relativeTime = 'Just now';
+        } else if (diffInSeconds < 3600) {
+          const minutes = Math.floor(diffInSeconds / 60);
+          relativeTime = `${minutes}m ago`;
+        } else if (diffInSeconds < 86400) {
+          const hours = Math.floor(diffInSeconds / 3600);
+          relativeTime = `${hours}h ago`;
+        } else if (diffInSeconds < 604800) {
+          const days = Math.floor(diffInSeconds / 86400);
+          relativeTime = `${days}d ago`;
+        } else {
+          relativeTime = date.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        }
+
+        const formattedDate = date.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const formattedTime = date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <Tooltip>
+                Last updated on: {formattedDate} at {formattedTime}
+              </Tooltip>
+            }
+          >
+            <div 
+              className="d-flex align-items-center"
+              style={{
+                backgroundColor: "#f1f5f9",
+                padding: "4px 8px",
+                borderRadius: "6px",
+                fontSize: "0.875rem",
+                color: "#64748b",
+                width: "fit-content"
+              }}
+            >
+              <i className="fe fe-clock me-1" style={{ fontSize: "12px" }}></i>
+              {relativeTime}
+            </div>
+          </OverlayTrigger>
+        );
+      },
+    }),
     columnHelper.accessor("createdBy", {
       header: "Created By",
-      size: 100,
-      cell: (info) => (
-        <OverlayTrigger
-          placement="top"
-          overlay={<Tooltip>{info.getValue()?.fullName || "N/A"}</Tooltip>}
-        >
-          <div className="text-truncate" style={{ maxWidth: "180px" }}>
-            {info.getValue()?.fullName || "N/A"}
-          </div>
-        </OverlayTrigger>
-      ),
+      size: 130,
+      cell: (info) => {
+        const creator = info.getValue()?.fullName || "N/A";
+        return (
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <Tooltip>
+                {creator}
+              </Tooltip>
+            }
+          >
+            <span
+              style={{
+                backgroundColor: "#e2e8f0",
+                color: "#475569",
+                padding: "4px 12px",
+                borderRadius: "12px",
+                fontSize: "0.85rem",
+                display: "inline-block",
+                fontWeight: "500",
+                whiteSpace: "nowrap",
+                maxWidth: "130px",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
+              }}
+            >
+              <i className="fe fe-user me-1" style={{ fontSize: "12px" }}></i>
+              {creator}
+            </span>
+          </OverlayTrigger>
+        );
+      },
     }),
+   
     columnHelper.accessor(() => null, {
       id: "actions",
       header: "Actions",
@@ -1081,6 +1499,33 @@ const ViewJobs = () => {
     },
   ];
 
+  useEffect(() => {
+    const fetchFollowUpSettings = async () => {
+      try {
+        const settingsRef = doc(db, 'settings', 'followUp');
+        const settingsDoc = await getDoc(settingsRef);
+        if (settingsDoc.exists()) {
+          setFollowUpSettings(settingsDoc.data().types || {});
+        }
+      } catch (error) {
+        console.error('Error fetching follow-up settings:', error);
+      }
+    };
+
+    fetchFollowUpSettings();
+  }, []);
+
+  // Helper function to convert priority numbers to labels
+  const getPriorityLabel = (priority) => {
+    switch (priority) {
+      case 1: return 'Low';
+      case 2: return 'Normal';
+      case 3: return 'High';
+      case 4: return 'Urgent';
+      default: return 'Normal';
+    }
+  };
+
   return (
     <Fragment>
       {editLoading && (
@@ -1509,6 +1954,78 @@ const ViewJobs = () => {
         .btn-icon-text:active::after {
           transform: translate(-50%, -50%) scale(1);
           opacity: 0;
+        }
+
+        /* Worker Avatar Styles */
+        .worker-avatars {
+          display: flex;
+          align-items: center;
+        }
+
+        .worker-avatar {
+          transition: all 0.2s ease;
+        }
+
+        .worker-avatar:hover {
+          transform: translateY(-2px);
+          z-index: 10 !important;
+        }
+
+        .worker-avatar img,
+        .worker-avatar > div {
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          transition: all 0.2s ease;
+        }
+
+        .worker-avatar:hover img,
+        .worker-avatar:hover > div {
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .remaining-count {
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          transition: all 0.2s ease;
+        }
+
+        .remaining-count:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Customer Link Styles */
+        .customer-link {
+          padding: 4px 8px;
+          border-radius: 6px;
+        }
+
+        .customer-link:hover {
+          background-color: #f1f5f9;
+          color: #2563eb !important;
+          transform: translateX(2px);
+        }
+
+        .customer-link:active {
+          transform: translateX(0px);
+        }
+
+        .follow-up-badge {
+          transition: all 0.2s ease;
+        }
+
+        .follow-up-badge:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .follow-up-badge.no-followup {
+          background-color: #f3f4f6;
+          color: #6b7280;
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          display: inline-flex;
+          alignItems: "center",
+          gap: "4px"
         }
       `}</style>
     </Fragment>

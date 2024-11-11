@@ -10,17 +10,23 @@ import { collection, getDocs } from "firebase/firestore";
 const FollowUpModal = ({ 
   show, 
   onHide, 
-  jobId, 
-  technicianId, 
-  technicianName, 
-  onSuccess
+  jobId,
+  onSuccess,
+  handleCreateFollowUp
 }) => {
   const [type, setType] = useState('');
   const [notes, setNotes] = useState('');
-  const [priority, setPriority] = useState('Normal');
+  const [priority, setPriority] = useState(2);
   const [dueDate, setDueDate] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [followUpTypes, setFollowUpTypes] = useState([]);
+
+  const priorityOptions = [
+    { value: 1, label: 'Low' },
+    { value: 2, label: 'Normal' },
+    { value: 3, label: 'High' },
+    { value: 4, label: 'Urgent' }
+  ];
 
   useEffect(() => {
     const fetchFollowUpTypes = async () => {
@@ -54,42 +60,27 @@ const FollowUpModal = ({
     setIsSubmitting(true);
 
     try {
-      const jobRef = doc(db, "jobs", jobId);
-      
       const followUpData = {
-        id: `followup-${Date.now()}`,
         type,
-        status: "Logged",
         notes,
         priority,
         dueDate: dueDate ? dueDate.toISOString() : null,
-        technicianId,
-        technicianName,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        assignedCSOId: null,
-        assignedCSOName: null
+        status: "Logged"
       };
 
-      await updateDoc(jobRef, {
-        [`followUps.${followUpData.id}`]: followUpData,
-        followUpCount: increment(1),
-        lastFollowUp: serverTimestamp(),
-        [`subStatus.${type.toLowerCase()}`]: true
-      });
-
+      await handleCreateFollowUp(followUpData);
+      
+      // Reset form
+      setType('');
+      setNotes('');
+      setPriority(2);
+      setDueDate(null);
+      
       if (onSuccess) {
         onSuccess(followUpData);
       }
 
-      toast.success("Follow-up created successfully!");
       onHide();
-      
-      setType('');
-      setNotes('');
-      setPriority('Normal');
-      setDueDate(null);
-
     } catch (error) {
       console.error('Error creating follow-up:', error);
       toast.error("Failed to create follow-up");
@@ -129,12 +120,13 @@ const FollowUpModal = ({
             <Form.Label>Priority</Form.Label>
             <Form.Select
               value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+              onChange={(e) => setPriority(Number(e.target.value))}
             >
-              <option value="Low">Low</option>
-              <option value="Normal">Normal</option>
-              <option value="High">High</option>
-              <option value="Urgent">Urgent</option>
+              {priorityOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </Form.Select>
           </Form.Group>
 

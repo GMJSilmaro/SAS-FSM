@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -29,53 +29,56 @@ import {
 } from "firebase/firestore";
 import Swal from "sweetalert2";
 import styles from "./CreateJobs.module.css";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 import JobTask from "./tabs/JobTasklist";
 import { useRouter } from "next/router";
 import { FlatPickr, FormSelect, DropFiles, ReactQuillEditor } from "widgets";
 import { getAuth } from "firebase/auth";
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { FaAsterisk } from 'react-icons/fa';
+import { OverlayTrigger, Tooltip } from "react-bootstrap";
+import { FaAsterisk } from "react-icons/fa";
 
 // Add this helper function at the top of your file
 const sanitizeDataForFirestore = (data) => {
   // Remove undefined values and convert null to empty strings
   const sanitized = {};
-  
-  Object.keys(data).forEach(key => {
+
+  Object.keys(data).forEach((key) => {
     const value = data[key];
-    
+
     if (value === undefined) {
       return; // Skip undefined values
     }
-    
+
     if (value === null) {
       sanitized[key] = ""; // Convert null to empty string
     } else if (Array.isArray(value)) {
       // Sanitize arrays
-      sanitized[key] = value.map(item => {
-        if (typeof item === 'object') {
-          return sanitizeDataForFirestore(item);
-        }
-        return item ?? "";
-      }).filter(item => item !== undefined);
+      sanitized[key] = value
+        .map((item) => {
+          if (typeof item === "object") {
+            return sanitizeDataForFirestore(item);
+          }
+          return item ?? "";
+        })
+        .filter((item) => item !== undefined);
     } else if (value instanceof Date) {
       // Convert Date objects to Firestore Timestamp
       sanitized[key] = Timestamp.fromDate(value);
-    } else if (typeof value === 'object' && value !== null) {
+    } else if (typeof value === "object" && value !== null) {
       // Recursively sanitize nested objects
       sanitized[key] = sanitizeDataForFirestore(value);
     } else {
       sanitized[key] = value;
     }
   });
-  
+
   return sanitized;
 };
 
 const AddNewJobs = ({ validateJobForm }) => {
   const router = useRouter();
-  const { startDate, endDate, startTime, endTime, workerId, scheduleSession } = router.query;
+  const { startDate, endDate, startTime, endTime, workerId, scheduleSession } =
+    router.query;
 
   useEffect(() => {
     if (router.isReady) {
@@ -105,13 +108,23 @@ const AddNewJobs = ({ validateJobForm }) => {
 
       // Handle worker selection if workerId is provided
       if (workerId) {
-        const selectedWorker = workers.find(worker => worker.value === workerId);
+        const selectedWorker = workers.find(
+          (worker) => worker.value === workerId
+        );
         if (selectedWorker) {
           setSelectedWorkers([selectedWorker]);
         }
       }
     }
-  }, [router.isReady, startDate, endDate, startTime, endTime, workerId, scheduleSession]);
+  }, [
+    router.isReady,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    workerId,
+    scheduleSession,
+  ]);
 
   const timestamp = Timestamp.now();
 
@@ -216,7 +229,7 @@ const AddNewJobs = ({ validateJobForm }) => {
     },
     jobContactType: {
       code: "",
-      name: ""
+      name: "",
     },
     createdBy: {
       workerId: "",
@@ -305,7 +318,7 @@ const AddNewJobs = ({ validateJobForm }) => {
     },
     jobContactType: {
       code: "",
-      name: ""
+      name: "",
     },
     createdBy: {
       workerId: "",
@@ -326,7 +339,7 @@ const AddNewJobs = ({ validateJobForm }) => {
   const [currentUser, setCurrentUser] = useState({
     workerId: "",
     fullName: "",
-    uid: ""
+    uid: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -336,36 +349,35 @@ const AddNewJobs = ({ validateJobForm }) => {
     const getCurrentUserInfo = async () => {
       try {
         // Fetch user info from the existing endpoint
-        const response = await fetch('/api/getUserInfo');
-        
+        const response = await fetch("/api/getUserInfo");
+
         if (!response.ok) {
-          throw new Error('Failed to fetch user info');
+          throw new Error("Failed to fetch user info");
         }
 
         const { user } = await response.json();
-        
-        console.log('Fetched user data:', user);
+
+        console.log("Fetched user data:", user);
 
         if (!user.workerId) {
-          throw new Error('Worker ID not found in user data');
+          throw new Error("Worker ID not found in user data");
         }
 
         // Set the current user data with actual full name from Firestore
         setCurrentUser({
           workerId: user.workerId,
-          fullName: user.name || 'anonymous',
-          uid: user.uid || ''
+          fullName: user.name || "anonymous",
+          uid: user.uid || "",
         });
 
         //toast.success("User information loaded successfully");
-
       } catch (error) {
         console.error("Error getting user info:", error);
         toast.error("Unable to get user information. Using default values.");
         setCurrentUser({
           workerId: "unknown",
           fullName: "anonymous",
-          uid: ""
+          uid: "",
         });
       }
     };
@@ -402,26 +414,29 @@ const AddNewJobs = ({ validateJobForm }) => {
   const fetchJobContactTypes = async () => {
     try {
       const jobContactTypeResponse = await fetch("/api/getJobContactType", {
-        method: 'POST',
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-        }
+        },
       });
-  
+
       if (!jobContactTypeResponse.ok) {
         const errorData = await jobContactTypeResponse.json();
-        throw new Error(`Failed to fetch job contact types: ${errorData.message || jobContactTypeResponse.statusText}`);
+        throw new Error(
+          `Failed to fetch job contact types: ${
+            errorData.message || jobContactTypeResponse.statusText
+          }`
+        );
       }
-  
+
       const jobContactTypeData = await jobContactTypeResponse.json();
 
       const formattedJobContactTypes = jobContactTypeData.map((item) => ({
         value: item.code,
-        label: item.name
+        label: item.name,
       }));
-      
+
       setJobContactTypes(formattedJobContactTypes);
-  
     } catch (error) {
       console.error("Error fetching job contact types:", error);
       toast.error(`Failed to fetch job contact types: ${error.message}`);
@@ -441,9 +456,9 @@ const AddNewJobs = ({ validateJobForm }) => {
       const response = await fetch("/api/getCustomers", {
         signal: controller.signal,
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
       });
 
       clearTimeout(timeoutId);
@@ -466,8 +481,8 @@ const AddNewJobs = ({ validateJobForm }) => {
       const formattedOptions = data.map((item) => ({
         value: item.cardCode,
         label: `${item.cardCode} - ${item.cardName}`, // Keep combined display label
-        cardCode: item.cardCode,  // Add separate cardCode
-        cardName: item.cardName,  // Add separate cardName
+        cardCode: item.cardCode, // Add separate cardCode
+        cardName: item.cardName, // Add separate cardName
       }));
 
       setCustomers(formattedOptions);
@@ -476,97 +491,102 @@ const AddNewJobs = ({ validateJobForm }) => {
       toast.dismiss("customersFetch");
 
       if (formattedOptions.length === 0) {
-        toast('No customers found in the database', {
-          icon: '⚠️',
+        toast("No customers found in the database", {
+          icon: "⚠️",
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#856404',
-            padding: '16px',
-            borderLeft: '6px solid #ffc107',
-            borderRadius: '4px'
-          }
+            background: "#fff",
+            color: "#856404",
+            padding: "16px",
+            borderLeft: "6px solid #ffc107",
+            borderRadius: "4px",
+          },
         });
       } else {
-        toast.success(`Successfully loaded ${formattedOptions.length} customers`, {
-          duration: 5000,
-          style: {
-            background: '#fff',
-            color: '#28a745',
-            padding: '16px',
-            borderLeft: '6px solid #28a745',
-            borderRadius: '4px'
-          },
-          iconTheme: {
-            primary: '#28a745',
-            secondary: '#fff'
+        toast.success(
+          `Successfully loaded ${formattedOptions.length} customers`,
+          {
+            duration: 5000,
+            style: {
+              background: "#fff",
+              color: "#28a745",
+              padding: "16px",
+              borderLeft: "6px solid #28a745",
+              borderRadius: "4px",
+            },
+            iconTheme: {
+              primary: "#28a745",
+              secondary: "#fff",
+            },
           }
-        });
+        );
       }
-
     } catch (error) {
       console.error("Error fetching customers:", error);
       setCustomers([]);
       setIsLoading(false);
       toast.dismiss("customersFetch");
 
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         toast.error("Request timed out. Retrying...", {
           duration: 3000,
           style: {
-            background: '#fff',
-            color: '#dc3545',
-            padding: '16px',
-            borderLeft: '6px solid #dc3545',
-            borderRadius: '4px'
-          }
+            background: "#fff",
+            color: "#dc3545",
+            padding: "16px",
+            borderLeft: "6px solid #dc3545",
+            borderRadius: "4px",
+          },
         });
       } else {
         toast.error(`Failed to fetch customers: ${error.message}`, {
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#dc3545',
-            padding: '16px',
-            borderLeft: '6px solid #dc3545',
-            borderRadius: '4px'
+            background: "#fff",
+            color: "#dc3545",
+            padding: "16px",
+            borderLeft: "6px solid #dc3545",
+            borderRadius: "4px",
           },
           iconTheme: {
-            primary: '#dc3545',
-            secondary: '#fff'
-          }
+            primary: "#dc3545",
+            secondary: "#fff",
+          },
         });
       }
 
       if (retryCount < MAX_RETRY_ATTEMPTS) {
         const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-        toast.error(`Retrying in ${retryDelay/1000} seconds...`, {
+        toast.error(`Retrying in ${retryDelay / 1000} seconds...`, {
           duration: retryDelay,
           style: {
-            background: '#fff',
-            color: '#dc3545',
-            padding: '16px',
-            borderLeft: '6px solid #dc3545',
-            borderRadius: '4px'
-          }
+            background: "#fff",
+            color: "#dc3545",
+            padding: "16px",
+            borderLeft: "6px solid #dc3545",
+            borderRadius: "4px",
+          },
         });
-        
+
         setTimeout(() => {
-          setRetryCount(prev => prev + 1);
+          setRetryCount((prev) => prev + 1);
           fetchCustomers();
         }, retryDelay);
       } else {
-        toast.error("Maximum retry attempts reached. Please refresh the page.", {
-          duration: 5000,
-          style: {
-            background: '#fff',
-            color: '#dc3545',
-            padding: '16px',
-            borderLeft: '6px solid #dc3545',
-            borderRadius: '4px'
+        toast.error(
+          "Maximum retry attempts reached. Please refresh the page.",
+          {
+            duration: 5000,
+            style: {
+              background: "#fff",
+              color: "#dc3545",
+              padding: "16px",
+              borderLeft: "6px solid #dc3545",
+              borderRadius: "4px",
+            },
           }
-        });
-        
+        );
+
         // Reset retry count after max attempts
         setRetryCount(0);
       }
@@ -575,23 +595,23 @@ const AddNewJobs = ({ validateJobForm }) => {
 
   useEffect(() => {
     let isMounted = true;
-  
+
     const initializeData = async () => {
       if (isMounted) {
         await fetchSchedulingWindows();
-        
+
         if (isMounted) {
           await fetchCustomers(); // Remove the toast from here
         }
-        
+
         if (isMounted) {
           await fetchJobContactTypes();
         }
       }
     };
-  
+
     initializeData();
-  
+
     return () => {
       isMounted = false;
     };
@@ -601,11 +621,18 @@ const AddNewJobs = ({ validateJobForm }) => {
     const fetchUsers = async () => {
       try {
         const usersCollection = collection(db, "users");
-        const usersSnapshot = await getDocs(usersCollection);
+
+        // Add the role filter to the query
+        const usersQuery = query(
+          usersCollection,
+          where("role", "==", "Worker") // Only get users where role is "Worker"
+        );
+
+        const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map((doc) => ({
           value: doc.id,
-          label: doc.data().firstName + " " + doc.data().lastName, // Remove workerId prefix
-          workerId: doc.data().workerId // Keep workerId as separate property if needed
+          label: doc.data().firstName + " " + doc.data().lastName,
+          workerId: doc.data().workerId,
         }));
         setWorkers(usersList);
       } catch (error) {
@@ -720,28 +747,28 @@ const AddNewJobs = ({ validateJobForm }) => {
   const handleCustomerChange = async (selectedOption) => {
     console.log("handleCustomerChange called with:", selectedOption);
 
-        setSelectedContact(null);
-        setSelectedLocation(null);
+    setSelectedContact(null);
+    setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
-        setSelectedServiceCall(null);
-        setSelectedSalesOrder(null);
-        
+    setSelectedServiceCall(null);
+    setSelectedSalesOrder(null);
+
     const selectedCustomer = customers.find(
       (option) => option.value === selectedOption.value
     );
-  
+
     console.log("Selected customer:", selectedCustomer);
-  
+
     setFormData((prevFormData) => ({
       ...prevFormData,
-      customerID: selectedCustomer ? selectedCustomer.cardCode : "",  // Use separate cardCode
+      customerID: selectedCustomer ? selectedCustomer.cardCode : "", // Use separate cardCode
       customerName: selectedCustomer ? selectedCustomer.cardName : "", // Use separate cardName
     }));
-  
+
     // Fetch related data for the selected customer
     try {
       console.log("Fetching related data for customer:", selectedOption.value);
-  
+
       // Fetch contacts for the customer
       const contactsResponse = await fetch("/api/getContacts", {
         method: "POST",
@@ -750,48 +777,51 @@ const AddNewJobs = ({ validateJobForm }) => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!contactsResponse.ok) {
         throw new Error("Failed to fetch contacts");
       }
-  
+
       const contactsData = await contactsResponse.json();
       console.log("Fetched contacts:", contactsData);
-  
+
       const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
         label: item.contactId,
         ...item,
       }));
       setContacts(formattedContacts);
-  
+
       if (formattedContacts.length === 0) {
-        toast('No contacts found for this customer.', {
-          icon: '⚠️',
+        toast("No contacts found for this customer.", {
+          icon: "⚠️",
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#856404',
-            padding: '16px',
-            borderLeft: '6px solid #ffc107'
-          }
+            background: "#fff",
+            color: "#856404",
+            padding: "16px",
+            borderLeft: "6px solid #ffc107",
+          },
         });
       } else {
-        toast.success(`Successfully fetched ${formattedContacts.length} contacts.`, {
-          duration: 5000,
-          style: {
-            background: '#fff',
-            color: '#28a745',
-            padding: '16px',
-            borderLeft: '6px solid #28a745'
-          },
-          iconTheme: {
-            primary: '#28a745',
-            secondary: '#fff'
+        toast.success(
+          `Successfully fetched ${formattedContacts.length} contacts.`,
+          {
+            duration: 5000,
+            style: {
+              background: "#fff",
+              color: "#28a745",
+              padding: "16px",
+              borderLeft: "6px solid #28a745",
+            },
+            iconTheme: {
+              primary: "#28a745",
+              secondary: "#fff",
+            },
           }
-        });
+        );
       }
-  
+
       // Fetch locations for the customer
       const locationsResponse = await fetch("/api/getLocation", {
         method: "POST",
@@ -800,36 +830,34 @@ const AddNewJobs = ({ validateJobForm }) => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!locationsResponse.ok) {
         throw new Error("Failed to fetch locations");
       }
-  
+
       const locationsData = await locationsResponse.json();
       console.log("Fetched locations:", locationsData);
-  
+
       // Format locations with more detailed information
       const formattedLocations = locationsData
         .sort((a, b) => {
           // Sort by addressType ('B' comes before 'S')
-          if (a.addressType === 'B' && b.addressType === 'S') return -1;
-          if (a.addressType === 'S' && b.addressType === 'B') return 1;
+          if (a.addressType === "B" && b.addressType === "S") return -1;
+          if (a.addressType === "S" && b.addressType === "B") return 1;
           return a.address.localeCompare(b.address);
         })
         .map((item) => ({
           value: item.siteId,
           label: (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontWeight: 'bold' }}>
-                {item.building ? `${item.building} - ` : ''}{item.address}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ fontWeight: "bold" }}>
+                {item.building ? `${item.building} - ` : ""}
+                {item.address}
               </div>
-              <div style={{ fontSize: '0.85em', color: '#666' }}>
-                {[
-                  item.city,
-                  item.stateProvince,
-                  item.zipCode,
-                  item.countryName
-                ].filter(Boolean).join(', ')}
+              <div style={{ fontSize: "0.85em", color: "#666" }}>
+                {[item.city, item.stateProvince, item.zipCode, item.countryName]
+                  .filter(Boolean)
+                  .join(", ")}
               </div>
             </div>
           ),
@@ -837,47 +865,50 @@ const AddNewJobs = ({ validateJobForm }) => {
           addressType: item.addressType,
           ...item,
         }));
-  
+
       const groupedLocations = [
         {
-          label: 'Billing Addresses',
-          options: formattedLocations.filter(loc => loc.addressType === 'B')
+          label: "Billing Addresses",
+          options: formattedLocations.filter((loc) => loc.addressType === "B"),
         },
         {
-          label: 'Shipping Addresses', 
-          options: formattedLocations.filter(loc => loc.addressType === 'S')
-        }
+          label: "Shipping Addresses",
+          options: formattedLocations.filter((loc) => loc.addressType === "S"),
+        },
       ];
-  
+
       setLocations(groupedLocations);
-  
+
       if (formattedLocations.length === 0) {
-        toast('No locations found for this customer.', {
-          icon: '⚠️',
+        toast("No locations found for this customer.", {
+          icon: "⚠️",
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#856404',
-            padding: '16px',
-            borderLeft: '6px solid #ffc107'
-          }
+            background: "#fff",
+            color: "#856404",
+            padding: "16px",
+            borderLeft: "6px solid #ffc107",
+          },
         });
       } else {
-        toast.success(`Successfully fetched ${formattedLocations.length} locations.`, {
-          duration: 5000,
-          style: {
-            background: '#fff',
-            color: '#28a745',
-            padding: '16px',
-            borderLeft: '6px solid #28a745'
-          },
-          iconTheme: {
-            primary: '#28a745',
-            secondary: '#fff'
+        toast.success(
+          `Successfully fetched ${formattedLocations.length} locations.`,
+          {
+            duration: 5000,
+            style: {
+              background: "#fff",
+              color: "#28a745",
+              padding: "16px",
+              borderLeft: "6px solid #28a745",
+            },
+            iconTheme: {
+              primary: "#28a745",
+              secondary: "#fff",
+            },
           }
-        });
+        );
       }
-  
+
       // Fetch equipments for the customer
       const equipmentsResponse = await fetch("/api/getEquipments", {
         method: "POST",
@@ -886,48 +917,51 @@ const AddNewJobs = ({ validateJobForm }) => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!equipmentsResponse.ok) {
         throw new Error("Failed to fetch equipments");
       }
-  
+
       const equipmentsData = await equipmentsResponse.json();
       console.log("Fetched equipments:", equipmentsData);
-  
+
       const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
         label: item.ItemCode,
         ...item,
       }));
       setEquipments(formattedEquipments);
-  
+
       if (formattedEquipments.length === 0) {
-        toast('No equipments found for this customer.', {
-          icon: '⚠️',
+        toast("No equipments found for this customer.", {
+          icon: "⚠️",
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#856404',
-            padding: '16px',
-            borderLeft: '6px solid #ffc107'
-          }
+            background: "#fff",
+            color: "#856404",
+            padding: "16px",
+            borderLeft: "6px solid #ffc107",
+          },
         });
       } else {
-        toast.success(`Successfully fetched ${formattedEquipments.length} equipments.`, {
-          duration: 5000,
-          style: {
-            background: '#fff',
-            color: '#28a745',
-            padding: '16px',
-            borderLeft: '6px solid #28a745'
-          },
-          iconTheme: {
-            primary: '#28a745',
-            secondary: '#fff'
+        toast.success(
+          `Successfully fetched ${formattedEquipments.length} equipments.`,
+          {
+            duration: 5000,
+            style: {
+              background: "#fff",
+              color: "#28a745",
+              padding: "16px",
+              borderLeft: "6px solid #28a745",
+            },
+            iconTheme: {
+              primary: "#28a745",
+              secondary: "#fff",
+            },
           }
-        });
+        );
       }
-  
+
       // Fetch service calls for the customer
       const serviceCallResponse = await fetch("/api/getServiceCall", {
         method: "POST",
@@ -936,64 +970,66 @@ const AddNewJobs = ({ validateJobForm }) => {
         },
         body: JSON.stringify({ cardCode: selectedOption.value }),
       });
-  
+
       if (!serviceCallResponse.ok) {
         throw new Error("Failed to fetch service calls");
       }
-  
+
       const serviceCallsData = await serviceCallResponse.json();
       console.log("Fetched service calls:", serviceCallsData);
-  
+
       const formattedServiceCalls = serviceCallsData.map((item) => ({
         value: item.serviceCallID,
         label: item.serviceCallID + " - " + item.subject,
       }));
       setServiceCalls(formattedServiceCalls);
-  
+
       if (formattedServiceCalls.length === 0) {
-        toast('No service calls found for this customer.', {
-          icon: '⚠️',
+        toast("No service calls found for this customer.", {
+          icon: "⚠️",
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#856404',
-            padding: '16px',
-            borderLeft: '6px solid #ffc107'
-          }
+            background: "#fff",
+            color: "#856404",
+            padding: "16px",
+            borderLeft: "6px solid #ffc107",
+          },
         });
       } else {
-        toast.success(`Successfully fetched ${formattedServiceCalls.length} service calls.`, {
-          duration: 5000,
-          style: {
-            background: '#fff',
-            color: '#28a745',
-            padding: '16px',
-            borderLeft: '6px solid #28a745'
-          },
-          iconTheme: {
-            primary: '#28a745',
-            secondary: '#fff'
+        toast.success(
+          `Successfully fetched ${formattedServiceCalls.length} service calls.`,
+          {
+            duration: 5000,
+            style: {
+              background: "#fff",
+              color: "#28a745",
+              padding: "16px",
+              borderLeft: "6px solid #28a745",
+            },
+            iconTheme: {
+              primary: "#28a745",
+              secondary: "#fff",
+            },
           }
-        });
+        );
       }
-  
+
       // Clear sales orders when customer changes
       setSalesOrders([]);
-  
     } catch (error) {
       console.error("Error in handleCustomerChange:", error);
       toast.error(`Error: ${error.message}`, {
         duration: 5000,
         style: {
-          background: '#fff',
-          color: '#dc3545',
-          padding: '16px',
-          borderLeft: '6px solid #dc3545'
+          background: "#fff",
+          color: "#dc3545",
+          padding: "16px",
+          borderLeft: "6px solid #dc3545",
         },
         iconTheme: {
-          primary: '#dc3545',
-          secondary: '#fff'
-        }
+          primary: "#dc3545",
+          secondary: "#fff",
+        },
       });
       setContacts([]);
       setLocations([]);
@@ -1005,13 +1041,13 @@ const AddNewJobs = ({ validateJobForm }) => {
 
   const handleJobContactTypeChange = (selectedOption) => {
     setSelectedJobContactType(selectedOption);
-    
-      setFormData(prevData => ({
-        ...prevData,
+
+    setFormData((prevData) => ({
+      ...prevData,
       jobContactType: {
         code: selectedOption ? selectedOption.value : "",
-        name: selectedOption ? selectedOption.label : ""
-      }
+        name: selectedOption ? selectedOption.label : "",
+      },
     }));
   };
 
@@ -1026,7 +1062,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
     setFormData((prevFormData) => ({
       ...prevFormData,
-        contact: {
+      contact: {
         ...prevFormData.contact, // Ensure you don't overwrite other fields like notification
         contactID: selectedOption.value || "",
         contactFullname: fullName,
@@ -1051,11 +1087,11 @@ const AddNewJobs = ({ validateJobForm }) => {
     // Update nested `location` and `address` in `formData`
     setFormData((prevFormData) => ({
       ...prevFormData,
-        location: {
+      location: {
         ...prevFormData.location,
         locationName: selectedLocation.address || "", // Changed from label
         addressType: selectedLocation.addressType || "", // Added addressType
-          address: {
+        address: {
           ...prevFormData.location.address,
           streetNo: selectedLocation.streetNo || "",
           streetAddress: selectedLocation.address || "",
@@ -1065,17 +1101,22 @@ const AddNewJobs = ({ validateJobForm }) => {
           stateProvince: selectedLocation.stateProvince || "",
           city: selectedLocation.city || "",
           postalCode: selectedLocation.zipCode || "",
-          addressType: selectedLocation.addressType === 'B' ? 'Billing' : 'Shipping', // Added human-readable addressType
+          addressType:
+            selectedLocation.addressType === "B" ? "Billing" : "Shipping", // Added human-readable addressType
         },
-        displayAddress: `${selectedLocation.building ? `${selectedLocation.building} - ` : ''}${selectedLocation.address}`, // Added formatted display address
+        displayAddress: `${
+          selectedLocation.building ? `${selectedLocation.building} - ` : ""
+        }${selectedLocation.address}`, // Added formatted display address
         fullAddress: [
           selectedLocation.building && `${selectedLocation.building}`,
           selectedLocation.address,
           selectedLocation.city,
           selectedLocation.stateProvince,
           selectedLocation.zipCode,
-          selectedLocation.countryName
-        ].filter(Boolean).join(', '), // Added full formatted address
+          selectedLocation.countryName,
+        ]
+          .filter(Boolean)
+          .join(", "), // Added full formatted address
       },
     }));
 
@@ -1087,13 +1128,15 @@ const AddNewJobs = ({ validateJobForm }) => {
         selectedLocation.city,
         selectedLocation.stateProvince,
         selectedLocation.zipCode,
-        selectedLocation.countryName
-      ].filter(Boolean).join(', ');
+        selectedLocation.countryName,
+      ]
+        .filter(Boolean)
+        .join(", ");
 
       console.log("Geocoding address:", fullAddress); // For debugging
 
       const coordinates = await fetchCoordinates(fullAddress);
-      
+
       setFormData((prevFormData) => ({
         ...prevFormData,
         location: {
@@ -1108,42 +1151,44 @@ const AddNewJobs = ({ validateJobForm }) => {
       toast.success(`Location coordinates fetched successfully`, {
         duration: 3000,
         style: {
-          background: '#fff',
-          color: '#28a745',
-          padding: '16px',
-          borderLeft: '6px solid #28a745'
-        }
+          background: "#fff",
+          color: "#28a745",
+          padding: "16px",
+          borderLeft: "6px solid #28a745",
+        },
       });
-
     } catch (error) {
       console.error("Error fetching coordinates:", error);
       toast.error(`Error fetching location coordinates: ${error.message}`, {
         duration: 5000,
         style: {
-          background: '#fff',
-          color: '#dc3545',
-          padding: '16px',
-          borderLeft: '6px solid #dc3545'
-        }
+          background: "#fff",
+          color: "#dc3545",
+          padding: "16px",
+          borderLeft: "6px solid #dc3545",
+        },
       });
     }
   };
 
   const handleSelectedServiceCallChange = async (selectedServiceCall) => {
-    console.log("handleSelectedServiceCallChange called with:", selectedServiceCall);
+    console.log(
+      "handleSelectedServiceCallChange called with:",
+      selectedServiceCall
+    );
     setSelectedServiceCall(selectedServiceCall);
     setSelectedSalesOrder(null); // Reset sales order selection
-    
+
     if (!selectedServiceCall) {
       setSalesOrders([]); // Clear sales orders if no service call selected
-      toast.error('Please select a service call', {
+      toast.error("Please select a service call", {
         duration: 3000,
         style: {
-          background: '#fff',
-          color: '#dc3545',
-          padding: '16px',
-          borderLeft: '6px solid #dc3545'
-        }
+          background: "#fff",
+          color: "#dc3545",
+          padding: "16px",
+          borderLeft: "6px solid #dc3545",
+        },
       });
       return;
     }
@@ -1153,9 +1198,9 @@ const AddNewJobs = ({ validateJobForm }) => {
         // Show loading toast
         toast.loading("Fetching sales orders...", { id: "salesOrdersFetch" });
 
-        console.log('Fetching sales orders with:', {
+        console.log("Fetching sales orders with:", {
           cardCode: selectedCustomer.value,
-          serviceCallID: selectedServiceCall.value
+          serviceCallID: selectedServiceCall.value,
         });
 
         const salesOrderResponse = await fetch("/api/getSalesOrder", {
@@ -1163,25 +1208,30 @@ const AddNewJobs = ({ validateJobForm }) => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             cardCode: selectedCustomer.value,
-            serviceCallID: selectedServiceCall.value 
+            serviceCallID: selectedServiceCall.value,
           }),
         });
 
         if (!salesOrderResponse.ok) {
           const errorData = await salesOrderResponse.json();
-          console.error('Sales order fetch error:', errorData);
+          console.error("Sales order fetch error:", errorData);
           toast.dismiss("salesOrdersFetch");
-          toast.error(`Error fetching sales orders: ${errorData.error || 'Unknown error'}`, {
-            duration: 5000,
-            style: {
-              background: '#fff',
-              color: '#dc3545',
-              padding: '16px',
-              borderLeft: '6px solid #dc3545'
+          toast.error(
+            `Error fetching sales orders: ${
+              errorData.error || "Unknown error"
+            }`,
+            {
+              duration: 5000,
+              style: {
+                background: "#fff",
+                color: "#dc3545",
+                padding: "16px",
+                borderLeft: "6px solid #dc3545",
+              },
             }
-          });
+          );
           setSalesOrders([]);
           return;
         }
@@ -1190,16 +1240,16 @@ const AddNewJobs = ({ validateJobForm }) => {
         console.log("Fetched sales orders:", response);
 
         if (!response.value) {
-          console.error('Unexpected response format:', response);
+          console.error("Unexpected response format:", response);
           toast.dismiss("salesOrdersFetch");
-          toast.error('No sales orders found for this service call', {
+          toast.error("No sales orders found for this service call", {
             duration: 5000,
             style: {
-              background: '#fff',
-              color: '#dc3545',
-              padding: '16px',
-              borderLeft: '6px solid #dc3545'
-            }
+              background: "#fff",
+              color: "#dc3545",
+              padding: "16px",
+              borderLeft: "6px solid #dc3545",
+            },
           });
           setSalesOrders([]);
           return;
@@ -1209,66 +1259,70 @@ const AddNewJobs = ({ validateJobForm }) => {
           value: item.DocNum.toString(),
           label: `${item.DocNum} - ${getStatusText(item.DocStatus)}`,
           docTotal: item.DocTotal,
-          docStatus: item.DocStatus
+          docStatus: item.DocStatus,
         }));
-        
+
         setSalesOrders(formattedSalesOrders);
         toast.dismiss("salesOrdersFetch");
 
         // Show success or warning toast based on the number of sales orders found
         if (formattedSalesOrders.length === 0) {
-          toast('No sales orders found for this service call', {
-            icon: '⚠️',
+          toast("No sales orders found for this service call", {
+            icon: "⚠️",
             duration: 5000,
             style: {
-              background: '#fff',
-              color: '#856404',
-              padding: '16px',
-              borderLeft: '6px solid #ffc107',
-              borderRadius: '4px'
-            }
+              background: "#fff",
+              color: "#856404",
+              padding: "16px",
+              borderLeft: "6px solid #ffc107",
+              borderRadius: "4px",
+            },
           });
         } else {
-          toast.success(`Found ${formattedSalesOrders.length} sales order${formattedSalesOrders.length > 1 ? 's' : ''} for Service Call ${selectedServiceCall.value}`, {
-            duration: 5000,
-            style: {
-              background: '#fff',
-              color: '#28a745',
-              padding: '16px',
-              borderLeft: '6px solid #28a745',
-              borderRadius: '4px'
-            },
-            iconTheme: {
-              primary: '#28a745',
-              secondary: '#fff'
+          toast.success(
+            `Found ${formattedSalesOrders.length} sales order${
+              formattedSalesOrders.length > 1 ? "s" : ""
+            } for Service Call ${selectedServiceCall.value}`,
+            {
+              duration: 5000,
+              style: {
+                background: "#fff",
+                color: "#28a745",
+                padding: "16px",
+                borderLeft: "6px solid #28a745",
+                borderRadius: "4px",
+              },
+              iconTheme: {
+                primary: "#28a745",
+                secondary: "#fff",
+              },
             }
-          });
+          );
         }
-
       } catch (error) {
         console.error("Error fetching sales orders:", error);
         toast.dismiss("salesOrdersFetch");
         toast.error(`Error: ${error.message}`, {
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#dc3545',
-            padding: '16px',
-            borderLeft: '6px solid #dc3545',
-            borderRadius: '4px'
-          }
+            background: "#fff",
+            color: "#dc3545",
+            padding: "16px",
+            borderLeft: "6px solid #dc3545",
+            borderRadius: "4px",
+          },
         });
         setSalesOrders([]);
       }
     }
   };
-  
+
   // Helper function to convert status codes to readable text
   const getStatusText = (status) => {
     const statusMap = {
-      'O': 'Open',
-      'C': 'Closed',
-      'P': 'Pending'
+      O: "Open",
+      C: "Closed",
+      P: "Pending",
     };
     return statusMap[status] || status;
   };
@@ -1354,7 +1408,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
     const start = new Date(`2000/01/01 ${startTime}`);
     const end = new Date(`2000/01/01 ${endTime}`);
-    
+
     // If end time is before start time, assume it's next day
     if (end < start) {
       end.setDate(end.getDate() + 1);
@@ -1362,25 +1416,28 @@ const AddNewJobs = ({ validateJobForm }) => {
 
     const diffMs = end - start;
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     return {
       hours: Math.floor(diffMins / 60),
-      minutes: diffMins % 60
+      minutes: diffMins % 60,
     };
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
-    if (name === 'startTime' || name === 'endTime') {
+
+    if (name === "startTime" || name === "endTime") {
       const newFormData = {
         ...formData,
-        [name]: value
+        [name]: value,
       };
 
       // Calculate duration if both times are set
       if (newFormData.startTime && newFormData.endTime) {
-        const duration = calculateDuration(newFormData.startTime, newFormData.endTime);
+        const duration = calculateDuration(
+          newFormData.startTime,
+          newFormData.endTime
+        );
         newFormData.estimatedDurationHours = duration.hours;
         newFormData.estimatedDurationMinutes = duration.minutes;
       }
@@ -1389,7 +1446,7 @@ const AddNewJobs = ({ validateJobForm }) => {
     } else {
       setFormData({
         ...formData,
-        [name]: value
+        [name]: value,
       });
     }
   };
@@ -1406,34 +1463,39 @@ const AddNewJobs = ({ validateJobForm }) => {
           existingJobsRef,
           where("assignedWorkers", "array-contains", {
             workerId: worker.value,
-            workerName: worker.label
+            workerName: worker.label,
           })
         );
 
         const querySnapshot = await getDocs(existingJobsQuery);
 
         // Parse dates using a more reliable method
-        const newJobStart = new Date(`${formData.startDate}T${formData.startTime}`);
+        const newJobStart = new Date(
+          `${formData.startDate}T${formData.startTime}`
+        );
         const newJobEnd = new Date(`${formData.endDate}T${formData.endTime}`);
 
-        console.log(`New Job Schedule - Start: ${newJobStart}, End: ${newJobEnd}`);
+        console.log(
+          `New Job Schedule - Start: ${newJobStart}, End: ${newJobEnd}`
+        );
 
         const conflicts = [];
 
         for (const doc of querySnapshot.docs) {
           const jobData = doc.data();
-          
+
           // Parse existing job dates
           const existingJobStart = new Date(jobData.startDate);
           const existingJobEnd = new Date(jobData.endDate);
 
-          console.log(`Existing Job (${doc.id}) - Start: ${existingJobStart}, End: ${existingJobEnd}`);
+          console.log(
+            `Existing Job (${doc.id}) - Start: ${existingJobStart}, End: ${existingJobEnd}`
+          );
 
           // Check for overlap with improved date comparison
-          const hasOverlap = (
+          const hasOverlap =
             (newJobStart <= existingJobEnd && newJobEnd >= existingJobStart) ||
-            (existingJobStart <= newJobEnd && existingJobEnd >= newJobStart)
-          );
+            (existingJobStart <= newJobEnd && existingJobEnd >= newJobStart);
 
           if (hasOverlap) {
             conflicts.push({
@@ -1441,7 +1503,11 @@ const AddNewJobs = ({ validateJobForm }) => {
               workerName: worker.label,
               conflictingJobId: doc.id,
               conflictingJobTime: `${existingJobStart.toLocaleDateString()} ${existingJobStart.toLocaleTimeString()} - ${existingJobEnd.toLocaleTimeString()}`,
-              message: `Worker ${worker.label} has a scheduling conflict with Job #${doc.id} (${existingJobStart.toLocaleDateString()} ${existingJobStart.toLocaleTimeString()} - ${existingJobEnd.toLocaleTimeString()})`
+              message: `Worker ${
+                worker.label
+              } has a scheduling conflict with Job #${
+                doc.id
+              } (${existingJobStart.toLocaleDateString()} ${existingJobStart.toLocaleTimeString()} - ${existingJobEnd.toLocaleTimeString()})`,
             });
           }
         }
@@ -1451,7 +1517,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
       const results = await Promise.all(promises);
       const allConflicts = results.filter(Boolean).flat();
-      
+
       console.log("Schedule conflict check results:", allConflicts);
       return allConflicts;
     } catch (error) {
@@ -1465,14 +1531,14 @@ const AddNewJobs = ({ validateJobForm }) => {
     try {
       // Show success message with Swal
       await Swal.fire({
-        icon: 'success',
-        title: 'Job Created Successfully!',
+        icon: "success",
+        title: "Job Created Successfully!",
         text: `Job #${jobId} has been created`,
-        confirmButtonText: 'View Job',
+        confirmButtonText: "View Job",
         showCancelButton: true,
-        cancelButtonText: 'Create Another',
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#6c757d',
+        cancelButtonText: "Create Another",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#6c757d",
       }).then((result) => {
         if (result.isConfirmed) {
           // Redirect to job details page
@@ -1490,7 +1556,7 @@ const AddNewJobs = ({ validateJobForm }) => {
           setTasks([]);
           setProgress(0);
           setIsSubmitting(false);
-          setActiveKey('summary');
+          setActiveKey("summary");
         }
       });
     } catch (error) {
@@ -1498,11 +1564,11 @@ const AddNewJobs = ({ validateJobForm }) => {
       toast.error("Error handling success state", {
         duration: 5000,
         style: {
-          background: '#fff',
-          color: '#dc3545',
-          padding: '16px',
-          borderLeft: '6px solid #dc3545'
-        }
+          background: "#fff",
+          color: "#dc3545",
+          padding: "16px",
+          borderLeft: "6px solid #dc3545",
+        },
       });
     }
   };
@@ -1543,7 +1609,7 @@ const AddNewJobs = ({ validateJobForm }) => {
         stateProvince: "",
         city: "",
         postalCode: "",
-      }
+      },
     },
     equipments: [],
     adminWorkerNotify: false,
@@ -1554,9 +1620,11 @@ const AddNewJobs = ({ validateJobForm }) => {
   const generateNewJobNo = () => {
     const date = new Date();
     const year = date.getFullYear().toString().substr(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0");
     return `JOB${year}${month}${day}${random}`;
   };
 
@@ -1610,12 +1678,12 @@ const AddNewJobs = ({ validateJobForm }) => {
           {
             duration: 5000,
             style: {
-              background: '#fff',
-              color: '#dc3545',
-              padding: '16px',
-              borderLeft: '6px solid #dc3545',
-              maxWidth: '500px'
-            }
+              background: "#fff",
+              color: "#dc3545",
+              padding: "16px",
+              borderLeft: "6px solid #dc3545",
+              maxWidth: "500px",
+            },
           }
         );
         return;
@@ -1634,30 +1702,32 @@ const AddNewJobs = ({ validateJobForm }) => {
 
       if (conflicts.length > 0) {
         // Create a formatted message showing all conflicts
-        const conflictMessage = conflicts.map(conflict => 
-          `• ${conflict.message}`
-        ).join('\n');
+        const conflictMessage = conflicts
+          .map((conflict) => `• ${conflict.message}`)
+          .join("\n");
 
         const result = await Swal.fire({
-          title: 'Schedule Conflicts Detected',
+          title: "Schedule Conflicts Detected",
           html: `
             <div class="text-start">
               <p class="mb-3">The following scheduling conflicts were found:</p>
               <div class="alert alert-warning">
-                ${conflicts.map(c => `<p class="mb-2">${c.message}</p>`).join('')}
+                ${conflicts
+                  .map((c) => `<p class="mb-2">${c.message}</p>`)
+                  .join("")}
               </div>
               <p class="mt-3">Do you want to proceed with creating this job anyway?</p>
             </div>
           `,
-          icon: 'warning',
+          icon: "warning",
           showCancelButton: true,
-          confirmButtonText: 'Yes, proceed anyway',
-          cancelButtonText: 'No, let me adjust the schedule',
-          confirmButtonColor: '#28a745',
-          cancelButtonColor: '#dc3545',
+          confirmButtonText: "Yes, proceed anyway",
+          cancelButtonText: "No, let me adjust the schedule",
+          confirmButtonColor: "#28a745",
+          cancelButtonColor: "#dc3545",
           customClass: {
-            htmlContainer: 'text-start'
-          }
+            htmlContainer: "text-start",
+          },
         });
 
         if (!result.isConfirmed) {
@@ -1715,18 +1785,35 @@ const AddNewJobs = ({ validateJobForm }) => {
           },
           coordinates: formData.location?.coordinates || {
             latitude: "",
-            longitude: ""
+            longitude: "",
           },
-          displayAddress: `${selectedLocation?.building ? `${selectedLocation.building} - ` : ''}${selectedLocation?.address}`,
+          displayAddress: `${
+            selectedLocation?.building ? `${selectedLocation.building} - ` : ""
+          }${selectedLocation?.address}`,
           fullAddress: [
             selectedLocation?.building && `${selectedLocation.building}`,
             selectedLocation?.address,
             selectedLocation?.city,
             selectedLocation?.stateProvince,
             selectedLocation?.zipCode,
-            selectedLocation?.countryName
-          ].filter(Boolean).join(', ')
+            selectedLocation?.countryName,
+          ]
+            .filter(Boolean)
+            .join(", "),
         },
+        equipments: formData.equipments.map((equipment) => ({
+          itemCode: equipment.itemCode || "",
+          itemName: equipment.itemName || "",
+          itemGroup: equipment.itemGroup || "",
+          brand: equipment.brand || "",
+          equipmentLocation: equipment.equipmentLocation || "",
+          equipmentType: equipment.equipmentType || "",
+          modelSeries: equipment.modelSeries || "",
+          serialNo: equipment.serialNo || "",
+          notes: equipment.notes || "",
+          warrantyStartDate: equipment.warrantyStartDate || null,
+          warrantyEndDate: equipment.warrantyEndDate || null,
+        })),
 
         // Contact
         contact: {
@@ -1737,20 +1824,22 @@ const AddNewJobs = ({ validateJobForm }) => {
         },
 
         // Workers
-        assignedWorkers: selectedWorkers.map(worker => ({
+        assignedWorkers: selectedWorkers.map((worker) => ({
           workerId: worker.value || "",
           workerName: worker.label || "",
         })),
 
         // Tasks
-        taskList: tasks.map(task => ({
+        taskList: tasks.map((task) => ({
           taskID: task.taskID || "",
           taskName: task.taskName || "",
           taskDescription: task.taskDescription || "",
           assignedTo: task.assignedTo || "",
           isPriority: Boolean(task.isPriority),
           isDone: Boolean(task.isDone),
-          completionDate: task.completionDate ? Timestamp.fromDate(new Date(task.completionDate)) : null,
+          completionDate: task.completionDate
+            ? Timestamp.fromDate(new Date(task.completionDate))
+            : null,
         })),
 
         // Metadata
@@ -1781,43 +1870,41 @@ const AddNewJobs = ({ validateJobForm }) => {
         toast.success("Job created successfully!", {
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#28a745',
-            padding: '16px',
-            borderLeft: '6px solid #28a745'
-          }
+            background: "#fff",
+            color: "#28a745",
+            padding: "16px",
+            borderLeft: "6px solid #28a745",
+          },
         });
 
         // Handle success (redirect, reset form, etc.)
         handleSubmitSuccess({ jobId: jobNo });
-
       } catch (firestoreError) {
         console.error("Firestore save error:", firestoreError);
         throw new Error(`Failed to save job: ${firestoreError.message}`);
       }
-
     } catch (error) {
       console.error("Submit error:", error);
       setIsSubmitting(false);
       setProgress(0);
-      
+
       toast.error(`Error creating job: ${error.message}`, {
         duration: 5000,
         style: {
-          background: '#fff',
-          color: '#dc3545',
-          padding: '16px',
-          borderLeft: '6px solid #dc3545'
-        }
+          background: "#fff",
+          color: "#dc3545",
+          padding: "16px",
+          borderLeft: "6px solid #dc3545",
+        },
       });
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const missingFields = validateJobForm(formData);
-    
+
     if (missingFields.length > 0) {
       toast.error(
         <div>
@@ -1831,18 +1918,18 @@ const AddNewJobs = ({ validateJobForm }) => {
         {
           duration: 5000,
           style: {
-            background: '#fff',
-            color: '#dc3545',
-            padding: '16px',
-            borderLeft: '6px solid #dc3545',
-            maxWidth: '500px'
-          }
+            background: "#fff",
+            color: "#dc3545",
+            padding: "16px",
+            borderLeft: "6px solid #dc3545",
+            maxWidth: "500px",
+          },
         }
       );
-      
+
       // If there's a task-related error, switch to the Task tab
-      if (missingFields.some(field => field.toLowerCase().includes('task'))) {
-        setActiveKey('task');
+      if (missingFields.some((field) => field.toLowerCase().includes("task"))) {
+        setActiveKey("task");
       }
       return;
     }
@@ -1864,10 +1951,12 @@ const AddNewJobs = ({ validateJobForm }) => {
   useEffect(() => {
     const initializeCustomer = async () => {
       const params = new URLSearchParams(window.location.search);
-      const customerCode = params.get('customerCode');
-      
+      const customerCode = params.get("customerCode");
+
       if (customerCode && customers.length > 0) {
-        const customerOption = customers.find(customer => customer.value === customerCode);
+        const customerOption = customers.find(
+          (customer) => customer.value === customerCode
+        );
         if (customerOption) {
           handleCustomerChange(customerOption);
         }
@@ -1883,7 +1972,14 @@ const AddNewJobs = ({ validateJobForm }) => {
       placement="top"
       overlay={<Tooltip>This field is required</Tooltip>}
     >
-      <FaAsterisk style={{ color: 'red', marginLeft: '4px', fontSize: '8px', verticalAlign: 'super' }} />
+      <FaAsterisk
+        style={{
+          color: "red",
+          marginLeft: "4px",
+          fontSize: "8px",
+          verticalAlign: "super",
+        }}
+      />
     </OverlayTrigger>
   );
 
@@ -1895,7 +1991,12 @@ const AddNewJobs = ({ validateJobForm }) => {
         placement="top"
         overlay={<Tooltip>This field is required</Tooltip>}
       >
-        <span className="text-danger" style={{ marginLeft: '4px', cursor: 'help' }}>*</span>
+        <span
+          className="text-danger"
+          style={{ marginLeft: "4px", cursor: "help" }}
+        >
+          *
+        </span>
       </OverlayTrigger>
     </Form.Label>
   );
@@ -1913,21 +2014,26 @@ const AddNewJobs = ({ validateJobForm }) => {
             <Row className="mb-3">
               <Form.Group as={Col} md="7" controlId="customerList">
                 <Form.Label>
-                  <RequiredFieldWithTooltip label="Customer"/>
+                  <RequiredFieldWithTooltip label="Customer" />
                   <OverlayTrigger
                     placement="right"
                     overlay={
                       <Tooltip id="customer-search-tooltip">
                         <div className="text-start">
-                          <strong>Customer Search:</strong><br/>
-                          • Search by customer code or name<br/>
-                          • Selection will load related contacts and locations<br/>
-                          • Required to proceed with job creation
+                          <strong>Customer Search:</strong>
+                          <br />
+                          • Search by customer code or name
+                          <br />
+                          • Selection will load related contacts and locations
+                          <br />• Required to proceed with job creation
                         </div>
                       </Tooltip>
                     }
                   >
-                    <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                    <i
+                      className="fe fe-help-circle text-muted"
+                      style={{ cursor: "pointer" }}
+                    ></i>
                   </OverlayTrigger>
                 </Form.Label>
                 <Select
@@ -1935,9 +2041,11 @@ const AddNewJobs = ({ validateJobForm }) => {
                   options={customers}
                   value={selectedCustomer}
                   onChange={handleCustomerChange}
-                  placeholder={isLoading ? "Loading customers..." : "Enter Customer Name"}
+                  placeholder={
+                    isLoading ? "Loading customers..." : "Enter Customer Name"
+                  }
                   isDisabled={isLoading}
-                  noOptionsMessage={() => 
+                  noOptionsMessage={() =>
                     isLoading ? "Loading..." : "No customers found"
                   }
                 />
@@ -1951,21 +2059,26 @@ const AddNewJobs = ({ validateJobForm }) => {
             <Row className="mb-3">
               <Form.Group as={Col} md="3" controlId="jobWorker">
                 <Form.Label>
-                  <RequiredFieldWithTooltip label="Contact ID"/>
+                  <RequiredFieldWithTooltip label="Contact ID" />
                   <OverlayTrigger
                     placement="right"
                     overlay={
                       <Tooltip id="contact-tooltip">
                         <div className="text-start">
-                          <strong>Contact Information:</strong><br/>
-                          • Shows contacts linked to selected customer<br/>
-                           Auto-fills contact details<br/>
-                          • Required for job communication
+                          <strong>Contact Information:</strong>
+                          <br />
+                          • Shows contacts linked to selected customer
+                          <br />
+                          Auto-fills contact details
+                          <br />• Required for job communication
                         </div>
                       </Tooltip>
                     }
                   >
-                    <i className="fe fe-help-circle text-muted" style={{ cursor: 'pointer' }}></i>
+                    <i
+                      className="fe fe-help-circle text-muted"
+                      style={{ cursor: "pointer" }}
+                    ></i>
                   </OverlayTrigger>
                 </Form.Label>
                 <Select
@@ -2014,7 +2127,11 @@ const AddNewJobs = ({ validateJobForm }) => {
               </Form.Group>
             </Row>
             <Row className="mb-3">
-              <Form.Group as={Col} md="4" controlId="validationCustomPhoneNumber">
+              <Form.Group
+                as={Col}
+                md="4"
+                controlId="validationCustomPhoneNumber"
+              >
                 <Form.Label>Phone Number</Form.Label>
                 <Form.Control
                   defaultValue={formData.contact.phoneNumber}
@@ -2026,7 +2143,11 @@ const AddNewJobs = ({ validateJobForm }) => {
                   Please provide a valid phone number.
                 </Form.Control.Feedback>
               </Form.Group>
-              <Form.Group as={Col} md="4" controlId="validationCustomMobilePhone">
+              <Form.Group
+                as={Col}
+                md="4"
+                controlId="validationCustomMobilePhone"
+              >
                 <Form.Label>Mobile Phone</Form.Label>
                 <Form.Control
                   defaultValue={formData.contact.mobilePhone}
@@ -2066,21 +2187,26 @@ const AddNewJobs = ({ validateJobForm }) => {
                 <Row className="mb-3">
                   <Form.Group as={Col} md="4" controlId="jobLocation">
                     <Form.Label>
-                      <RequiredFieldWithTooltip label="Site / Location"/>
+                      <RequiredFieldWithTooltip label="Site / Location" />
                       <OverlayTrigger
                         placement="right"
                         overlay={
                           <Tooltip id="location-tooltip">
                             <div className="text-start">
-                              <strong>Location Details:</strong><br/>
-                              • Shows addresses linked to customer<br/>
-                              • Auto-fills complete address<br/>
-                              • Used for job site information
+                              <strong>Location Details:</strong>
+                              <br />
+                              • Shows addresses linked to customer
+                              <br />
+                              • Auto-fills complete address
+                              <br />• Used for job site information
                             </div>
                           </Tooltip>
                         }
                       >
-                        <i className="fe fe-help-circle text-muted ms-1" style={{ cursor: 'pointer' }}></i>
+                        <i
+                          className="fe fe-help-circle text-muted ms-1"
+                          style={{ cursor: "pointer" }}
+                        ></i>
                       </OverlayTrigger>
                     </Form.Label>
                     <Select
@@ -2090,112 +2216,140 @@ const AddNewJobs = ({ validateJobForm }) => {
                       onChange={handleLocationChange}
                       placeholder="Select Site ID"
                       isGrouped={true}
-                      formatGroupLabel={data => (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          fontSize: '0.9em',
-                          fontWeight: 'bold',
-                          padding: '8px 0',
-                          color: '#2c3e50',
-                          borderBottom: '2px solid #eee',
-                          width: '100%'
-                        }}>
+                      formatGroupLabel={(data) => (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            fontSize: "0.9em",
+                            fontWeight: "bold",
+                            padding: "8px 0",
+                            color: "#2c3e50",
+                            borderBottom: "2px solid #eee",
+                            width: "100%",
+                          }}
+                        >
                           <span>{data.label}</span>
-                          <span style={{
-                            background: '#e9ecef',
-                            borderRadius: '4px',
-                            padding: '2px 8px',
-                            fontSize: '0.8em'
-                          }}>
+                          <span
+                            style={{
+                              background: "#e9ecef",
+                              borderRadius: "4px",
+                              padding: "2px 8px",
+                              fontSize: "0.8em",
+                            }}
+                          >
                             {data.options.length}
                           </span>
                         </div>
                       )}
-                      formatOptionLabel={option => (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '10px',
-                          padding: '4px 0'
-                        }}>
+                      formatOptionLabel={(option) => (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                            padding: "4px 0",
+                          }}
+                        >
                           <div style={{ flex: 1 }}>
-                            <div style={{ 
-                              fontWeight: '500',
-                              color: '#2c3e50',
-                              marginBottom: '2px'
-                            }}>
-                              {option.building ? `${option.building} - ` : ''}{option.address}
+                            <div
+                              style={{
+                                fontWeight: "500",
+                                color: "#2c3e50",
+                                marginBottom: "2px",
+                              }}
+                            >
+                              {option.building ? `${option.building} - ` : ""}
+                              {option.address}
                             </div>
-                            <div style={{ 
-                              fontSize: '0.85em', 
-                              color: '#666',
-                              lineHeight: '1.3'
-                            }}>
+                            <div
+                              style={{
+                                fontSize: "0.85em",
+                                color: "#666",
+                                lineHeight: "1.3",
+                              }}
+                            >
                               {[
                                 option.city,
                                 option.stateProvince,
                                 option.zipCode,
-                                option.countryName
-                              ].filter(Boolean).join(', ')}
+                                option.countryName,
+                              ]
+                                .filter(Boolean)
+                                .join(", ")}
                             </div>
                           </div>
-                          <div style={{
-                            fontSize: '0.75em',
-                            padding: '3px 8px',
-                            borderRadius: '12px',
-                            background: option.addressType === 'B' ? '#e3f2fd' : '#fff3e0',
-                            color: option.addressType === 'B' ? '#1976d2' : '#f57c00',
-                            whiteSpace: 'nowrap',
-                            alignSelf: 'center'
-                          }}>
-                            {option.addressType === 'B' ? 'Billing' : 'Shipping'}
+                          <div
+                            style={{
+                              fontSize: "0.75em",
+                              padding: "3px 8px",
+                              borderRadius: "12px",
+                              background:
+                                option.addressType === "B"
+                                  ? "#e3f2fd"
+                                  : "#fff3e0",
+                              color:
+                                option.addressType === "B"
+                                  ? "#1976d2"
+                                  : "#f57c00",
+                              whiteSpace: "nowrap",
+                              alignSelf: "center",
+                            }}
+                          >
+                            {option.addressType === "B"
+                              ? "Billing"
+                              : "Shipping"}
                           </div>
                         </div>
                       )}
                       styles={{
                         control: (base) => ({
                           ...base,
-                          minHeight: '45px',
-                          borderColor: '#dee2e6',
-                          '&:hover': {
-                            borderColor: '#80bdff'
-                          }
+                          minHeight: "45px",
+                          borderColor: "#dee2e6",
+                          "&:hover": {
+                            borderColor: "#80bdff",
+                          },
                         }),
                         group: (base) => ({
                           ...base,
                           paddingTop: 8,
-                          paddingBottom: 8
+                          paddingBottom: 8,
                         }),
                         option: (base, state) => ({
                           ...base,
-                          padding: '8px 12px',
-                          borderBottom: '1px solid #f0f0f0',
-                          backgroundColor: state.isFocused ? '#f8f9fa' : 'white',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: '#f8f9fa'
-                          }
+                          padding: "8px 12px",
+                          borderBottom: "1px solid #f0f0f0",
+                          backgroundColor: state.isFocused
+                            ? "#f8f9fa"
+                            : "white",
+                          cursor: "pointer",
+                          "&:hover": {
+                            backgroundColor: "#f8f9fa",
+                          },
                         }),
                         menu: (base) => ({
                           ...base,
                           zIndex: 9999,
-                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)'
+                          boxShadow:
+                            "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
                         }),
                         groupHeading: (base) => ({
                           ...base,
-                          margin: '8px 0',
-                          fontSize: '0.9em',
-                          fontWeight: 'bold'
-                        })
+                          margin: "8px 0",
+                          fontSize: "0.9em",
+                          fontWeight: "bold",
+                        }),
                       }}
                       noOptionsMessage={() => (
-                        <div style={{ 
-                          padding: '8px', 
-                          textAlign: 'center',
-                          color: '#666'
-                        }}>
+                        <div
+                          style={{
+                            padding: "8px",
+                            textAlign: "center",
+                            color: "#666",
+                          }}
+                        >
                           No locations found for this customer
                         </div>
                       )}
@@ -2385,33 +2539,40 @@ const AddNewJobs = ({ validateJobForm }) => {
                   <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
                 </Form.Select>
               </Form.Group> */}
-             <Form.Group as={Col} md="3" controlId="serviceCall">
-              <RequiredFieldWithTooltip label="Service Call" />
-              <Select
-                instanceId="service-call-select"
-                options={serviceCalls}
-                value={selectedServiceCall}
-                onChange={handleSelectedServiceCallChange}
-                placeholder="Select Service Call"
-                isDisabled={!selectedCustomer}
-              />
-            </Form.Group>
+              <Form.Group as={Col} md="3" controlId="serviceCall">
+                <Form.Label>Service Call</Form.Label>
+                <Select
+                  instanceId="service-call-select"
+                  options={serviceCalls}
+                  value={selectedServiceCall}
+                  onChange={handleSelectedServiceCallChange}
+                  placeholder="Select Service Call"
+                  isDisabled={!selectedCustomer}
+                />
+              </Form.Group>
 
-            <Form.Group as={Col} md="3" controlId="salesOrder">
-              <RequiredFieldWithTooltip label="Sales Order" />
-              <Select
-                instanceId="sales-order-select"
-                options={salesOrders}
-                value={selectedSalesOrder}
-                onChange={(selectedOption) => setSelectedSalesOrder(selectedOption)}
-                placeholder={selectedServiceCall ? "Select Sales Order" : "Select Service Call first"}
-                isDisabled={!selectedServiceCall || salesOrders.length === 0}
-                noOptionsMessage={() => selectedServiceCall 
-                  ? "No sales orders found for this service call"
-                  : "Please select a service call first"
-                }
-              />
-            </Form.Group>
+              <Form.Group as={Col} md="3" controlId="salesOrder">
+                <Form.Label>Sales Order</Form.Label>
+                <Select
+                  instanceId="sales-order-select"
+                  options={salesOrders}
+                  value={selectedSalesOrder}
+                  onChange={(selectedOption) =>
+                    setSelectedSalesOrder(selectedOption)
+                  }
+                  placeholder={
+                    selectedServiceCall
+                      ? "Select Sales Order"
+                      : "Select Service Call first"
+                  }
+                  isDisabled={!selectedServiceCall || salesOrders.length === 0}
+                  noOptionsMessage={() =>
+                    selectedServiceCall
+                      ? "No sales orders found for this service call"
+                      : "Please select a service call first"
+                  }
+                />
+              </Form.Group>
 
               <Form.Group as={Col} md="3" controlId="jobContactType">
                 <RequiredFieldWithTooltip label="Job Contact Type" />
@@ -2421,7 +2582,7 @@ const AddNewJobs = ({ validateJobForm }) => {
                   value={selectedJobContactType}
                   onChange={handleJobContactTypeChange}
                   placeholder="Select Contact Type"
-                  isDisabled={!selectedServiceCall || salesOrders.length === 0}
+                  // isDisabled={!selectedServiceCall || salesOrders.length === 0}
                   isClearable
                   noOptionsMessage={() => "No contact types available"}
                 />
@@ -2431,9 +2592,8 @@ const AddNewJobs = ({ validateJobForm }) => {
                   </small>
                 )}
               </Form.Group>
-
             </Row>
-           
+
             <Row className="mb-3">
               <Form.Group as={Col} md="4" controlId="jobCategory">
                 <RequiredFieldWithTooltip label="Job Priority" />
@@ -2524,7 +2684,7 @@ const AddNewJobs = ({ validateJobForm }) => {
             </Row>
             <Row className="mb-3">
               <Form.Group as={Col} md="4" controlId="startTime">
-              <RequiredFieldWithTooltip label="Start Time" />
+                <RequiredFieldWithTooltip label="Start Time" />
                 <Form.Control
                   type="time"
                   name="startTime"
@@ -2535,7 +2695,7 @@ const AddNewJobs = ({ validateJobForm }) => {
               </Form.Group>
 
               <Form.Group as={Col} md="4" controlId="endTime">
-              <RequiredFieldWithTooltip label="End Time" />
+                <RequiredFieldWithTooltip label="End Time" />
                 <Form.Control
                   type="time"
                   name="endTime"
@@ -2554,7 +2714,10 @@ const AddNewJobs = ({ validateJobForm }) => {
                     value={formData.estimatedDurationHours}
                     onChange={handleInputChange}
                     placeholder="Hours"
-                    readOnly={formData.scheduleSession !== "custom" || (formData.startTime && formData.endTime)}
+                    readOnly={
+                      formData.scheduleSession !== "custom" ||
+                      (formData.startTime && formData.endTime)
+                    }
                     required
                   />
                   <InputGroup.Text>h</InputGroup.Text>
@@ -2564,7 +2727,10 @@ const AddNewJobs = ({ validateJobForm }) => {
                     value={formData.estimatedDurationMinutes}
                     onChange={handleInputChange}
                     placeholder="Minutes"
-                    readOnly={formData.scheduleSession !== "custom" || (formData.startTime && formData.endTime)}
+                    readOnly={
+                      formData.scheduleSession !== "custom" ||
+                      (formData.startTime && formData.endTime)
+                    }
                     required
                   />
                   <InputGroup.Text>m</InputGroup.Text>
@@ -2578,7 +2744,7 @@ const AddNewJobs = ({ validateJobForm }) => {
             </Row>
             <hr className="my-4" />
             <Row className="mb-3">
-            <Form.Group as={Col} controlId="jobName" className="mb-3">
+              <Form.Group as={Col} controlId="jobName" className="mb-3">
                 <RequiredFieldWithTooltip label="Subject" />
                 <Form.Control
                   type="text"
@@ -2628,11 +2794,15 @@ const AddNewJobs = ({ validateJobForm }) => {
                 >
                   {isSubmitting ? (
                     <>
-                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      <span
+                        className="spinner-border spinner-border-sm me-2"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
                       Creating Job...
                     </>
                   ) : (
-                    'Submit'
+                    "Submit"
                   )}
                 </Button>
               </Col>
@@ -2643,13 +2813,13 @@ const AddNewJobs = ({ validateJobForm }) => {
       {isSubmitting && (
         <div className={styles.loadingOverlay}>
           <div className="text-center">
-            <div className="progress mb-3" style={{ width: '200px' }}>
-              <div 
-                className="progress-bar progress-bar-striped progress-bar-animated" 
-                role="progressbar" 
+            <div className="progress mb-3" style={{ width: "200px" }}>
+              <div
+                className="progress-bar progress-bar-striped progress-bar-animated"
+                role="progressbar"
                 style={{ width: `${progress}%` }}
-                aria-valuenow={progress} 
-                aria-valuemin="0" 
+                aria-valuenow={progress}
+                aria-valuemin="0"
                 aria-valuemax="100"
               />
             </div>
