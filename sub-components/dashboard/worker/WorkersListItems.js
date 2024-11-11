@@ -471,44 +471,33 @@ const WorkersListItems = () => {
     testAccess();
   }, []);
 
-  const fetchStats = async () => {
-    try {
-      const usersRef = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersRef);
-      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const calculateStats = useCallback(() => {
+    if (!workers || !Array.isArray(workers)) return;
 
-      // Filter to only get users with role "Worker"
-      const workersList = usersList.filter(user => user.role === "Worker");
+    // Calculate stats directly from workers array
+    const totalWorkers = workers.length;
+    const active = workers.filter(worker => worker.isActive).length;
+    const inactive = workers.filter(worker => !worker.isActive).length;
+    const fieldWorkers = workers.filter(worker => worker.isFieldWorker).length;
 
-      // Calculate stats from workers
-      const totalWorkers = workersList.length;
-      const active = workersList.filter(worker => worker.activeUser).length;
-      const inactive = workersList.filter(worker => !worker.activeUser).length;
-      const fieldWorkers = workersList.filter(worker => worker.isFieldWorker).length;
+    setStats({
+      totalUsers: totalWorkers,
+      active,
+      inactive,
+      fieldWorkers,
+    });
 
-      setStats({
-        totalUsers: totalWorkers,
-        active,
-        inactive,
-        fieldWorkers,
-      });
-
-      console.log('Workers Stats:', {
-        total: totalWorkers,
-        active,
-        inactive,
-        fieldWorkers
-      });
-
-    } catch (error) {
-      console.error("Error fetching worker stats:", error);
-      toast.error('Error loading worker statistics');
-    }
-  };
+    console.log('Workers Stats:', {
+      total: totalWorkers,
+      active,
+      inactive,
+      fieldWorkers
+    });
+  }, [workers]);
 
   useEffect(() => {
-    fetchStats();
-  }, [workers]); // This will update stats whenever workers data changes
+    calculateStats();
+  }, [calculateStats]);
 
   const statCards = [
     {
@@ -539,7 +528,7 @@ const WorkersListItems = () => {
       title: 'Inactive Workers',
       value: stats.inactive,
       icon: <CheckCircle className="text-info" />,
-      badge: { text: 'Inactive', variant: 'secondary' },
+      badge: { text: 'Inactive', variant: 'danger' },
       background: '#e7f6f8',
       summary: 'Currently Inactive Users'
     }

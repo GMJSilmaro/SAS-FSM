@@ -2113,13 +2113,23 @@ const JobDetails = () => {
                 <section className={styles.sidebarSection}>
                   <div className={styles.followUpsContainer}>
                     <div className={styles.followUpsHeader}>
-                      <h6 className={styles.followUpsTitle}>
-                        <FaStickyNote className="me-2" />
-                        Follow-ups
-                      </h6>
-                      <Badge bg="primary" className={styles.followUpsCount}>
-                        {Object.keys(job.followUps || {}).length} items
-                      </Badge>
+                      <div className={styles.headerLeft}>
+                        <h6 className={styles.followUpsTitle}>
+                          <FaStickyNote />
+                          Follow-ups
+                        </h6>
+                        <Badge className={styles.followUpsCount}>
+                          {Object.keys(job.followUps || {}).length} Items
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="outline-primary"
+                        className={styles.addFollowUpBtn}
+                        onClick={() => setShowFollowUpModal(true)}
+                      >
+                        <Plus />
+                        Add Follow-up
+                      </Button>
                     </div>
                     
                     <div className={styles.followUpsScroll}>

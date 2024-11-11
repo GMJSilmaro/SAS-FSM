@@ -1,6 +1,6 @@
 /* eslint-disable react/display-name */
 import Link from 'next/link';
-import React, { Fragment, useState, useEffect, useCallback } from "react";
+import React, { Fragment, useState, useEffect, useCallback, useMemo } from "react";
 import { useMediaQuery } from "react-responsive";
 import { ListGroup, Dropdown, Badge, Button, InputGroup, Form } from "react-bootstrap";
 import Image from "next/image";
@@ -9,7 +9,7 @@ import { FaBell, FaSearch, FaTimes, FaTasks, FaCalendarAlt, FaFilter, FaStickyNo
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from 'react-toastify';
-import { performGlobalSearch, performQuickSearch } from '../utils/searchUtils';
+import { globalQuickSearch } from '../utils/searchUtils';
 import { GKTippy } from "widgets";
 import DarkLightMode from "layouts/DarkLightMode";
 import NotificationList from "data/Notification";
@@ -40,6 +40,7 @@ import { getCompanyDetails } from '../utils/companyCache';
 import { useSessionRenewal } from '../hooks/useSessionRenewal';
 import { initializeSessionRenewalCheck, handleSessionError } from '../utils/middlewareClient';
 import { useLogo } from '../contexts/LogoContext';
+import debounce from 'lodash/debounce';
 
 const formatNotificationTime = (timestamp) => {
   try {
@@ -89,7 +90,33 @@ const formatNotificationTime = (timestamp) => {
   }
 };
 
-const SearchResults = React.memo(({ results, onClose, router }) => {
+const getStatusTag = (type, status) => {
+  const statusColors = {
+    'Created': { bg: '#FEF3C7', text: '#D97706' },
+    'In Progress': { bg: '#DBEAFE', text: '#2563EB' },
+    'Completed': { bg: '#D1FAE5', text: '#059669' },
+    'Cancelled': { bg: '#FEE2E2', text: '#DC2626' },
+    'Pending': { bg: '#E5E7EB', text: '#4B5563' }
+  };
+
+  const color = statusColors[status] || statusColors['Pending'];
+
+  return (
+    <span
+      className="ms-2 px-2 py-1 rounded-pill"
+      style={{
+        backgroundColor: color.bg,
+        color: color.text,
+        fontSize: '0.75rem',
+        fontWeight: '500'
+      }}
+    >
+      {status}
+    </span>
+  );
+};
+
+const SearchResults = React.memo(({ results, onClose, router, isSearching }) => {
   const groupedResults = {
     customers: results.filter(r => r.type === 'customer'),
     workers: results.filter(r => r.type === 'worker'),
@@ -145,59 +172,72 @@ const SearchResults = React.memo(({ results, onClose, router }) => {
   return (
     <SimpleBar style={{ maxHeight: "400px" }}>
       <ListGroup variant="flush">
-        {Object.entries(groupedResults).map(([category, items]) => (
-          items.length > 0 && (
-            <div key={category}>
-              <div className="p-2 bg-light">
-                <strong className="text-capitalize d-flex align-items-center">
-                  {getCategoryIcon(category)}
-                  {category.replace(/([A-Z])/g, ' $1').trim()}
-                  <span className="ms-1 text-muted">({items.length})</span>
-                </strong>
+        {isSearching ? (
+          <ListGroup.Item className="text-center py-4">
+            <div className="text-muted">
+              <div className="spinner-border spinner-border-sm me-2" role="status">
+                <span className="visually-hidden">Loading...</span>
               </div>
-              {items.map((item) => (
-                <ListGroup.Item
-                  key={item.id}
-                  action
-                  onClick={() => handleItemClick(item.link)}
-                  className="py-2 px-3"
-                >
-                  <div className="d-flex flex-column">
-                    <div className="fw-medium mb-1">
-                      {renderHighlightedText(item.title)}
-                    </div>
-                    {item.subtitle && (
-                      <small className="text-muted">
-                        {renderHighlightedText(item.subtitle)}
-                      </small>
-                    )}
-                    {item.type === 'worker' && (
-                      <div className="d-flex align-items-center mt-1">
-                        <small className="text-primary">
-                          <i className="fe fe-mail me-1"></i>
-                          {renderHighlightedText(item.workerID)}
-                        </small>
-                        {item.role && (
-                          <small className="text-muted ms-3">
-                            <i className="fe fe-tag me-1"></i>
-                            {item.role}
-                          </small>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </ListGroup.Item>
-              ))}
+              Searching...
             </div>
-          )
-        ))}
-        {results.length === 0 && (
+          </ListGroup.Item>
+        ) : results.length === 0 ? (
           <ListGroup.Item className="text-center py-4">
             <div className="text-muted">
               <i className="fe fe-search h3 mb-2"></i>
               <p className="mb-0">No results found</p>
             </div>
           </ListGroup.Item>
+        ) : (
+          Object.entries(groupedResults).map(([category, items]) => (
+            items.length > 0 && (
+              <div key={category}>
+                <div className="p-2 bg-light">
+                  <strong className="text-capitalize d-flex align-items-center">
+                    {getCategoryIcon(category)}
+                    {category.replace(/([A-Z])/g, ' $1').trim()}
+                    <span className="ms-1 text-muted">({items.length})</span>
+                  </strong>
+                </div>
+                {items.map((item) => (
+                  <ListGroup.Item
+                    key={item.id}
+                    action
+                    onClick={() => handleItemClick(item.link)}
+                    className="py-2 px-3"
+                  >
+                    <div className="d-flex flex-column">
+                      <div className="d-flex align-items-center mb-1">
+                        <span className="fw-medium">
+                          {renderHighlightedText(item.title)}
+                        </span>
+                        {item.type === 'job' && item.status && getStatusTag(item.type, item.status)}
+                      </div>
+                      {item.subtitle && (
+                        <small className="text-muted">
+                          {renderHighlightedText(item.subtitle)}
+                        </small>
+                      )}
+                      {item.type === 'worker' && (
+                        <div className="d-flex align-items-center mt-1">
+                          <small className="text-primary">
+                            <i className="fe fe-mail me-1"></i>
+                            {renderHighlightedText(item.workerID)}
+                          </small>
+                          {item.role && (
+                            <small className="text-muted ms-3">
+                              <i className="fe fe-tag me-1"></i>
+                              {item.role}
+                            </small>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </ListGroup.Item>
+                ))}
+              </div>
+            )
+          ))
         )}
       </ListGroup>
     </SimpleBar>
@@ -310,6 +350,90 @@ const UserAvatar = React.memo(({ userDetails }) => {
   return prevProps.userDetails?.profilePicture === nextProps.userDetails?.profilePicture &&
          prevProps.userDetails?.fullName === nextProps.userDetails?.fullName;
 });
+
+const SearchBar = React.memo(({ value, onChange, onSubmit, onClear }) => {
+  return (
+    <div className="position-relative">
+      <div className="d-flex align-items-center">
+        <div className="position-relative" style={{ width: '300px' }}>
+          <InputGroup>
+            <input
+              type="text"
+              placeholder="Search jobs, status, etc..."
+              value={value}
+              onChange={onChange}
+              className="form-control border-end-0"
+              style={{
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px 0 0 8px',
+                padding: '0.6rem 1rem',
+                fontSize: '0.875rem',
+              }}
+            />
+            {value && (
+              <Button 
+                variant="link"
+                className="position-absolute top-50 translate-middle-y"
+                onClick={onClear}
+                style={{ 
+                  background: 'none', 
+                  border: 'none',
+                  zIndex: 5,
+                  right: '3.5rem',
+                  padding: '0',
+                  color: '#6c757d'
+                }}
+              >
+                <FaTimes size={12} />
+              </Button>
+            )}
+            <Button 
+              onClick={onSubmit}
+              variant="primary"
+              className="d-flex align-items-center justify-content-center"
+              disabled={!value.trim()}
+              style={{
+                borderRadius: '0 8px 8px 0',
+                padding: '0.6rem 1.2rem',
+                border: 'none',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <FaSearch size={14} />
+            </Button>
+          </InputGroup>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+SearchBar.displayName = 'SearchBar';
+
+// Add these constants before the QuickMenu component
+const DEFAULT_FILTERS = {
+  status: 'all',
+  type: 'all',
+  dateRange: { start: null, end: null }
+};
+
+const DEFAULT_STATE = {
+  userDetails: null,
+  unreadCount: 0,
+  notifications: [],
+  searchQuery: '',
+  searchResults: [],
+  isSearching: false,
+  showSearchResults: false,
+  followUps: [],
+  followUpCount: 0,
+  taskCount: 0,
+  taskCategories: {
+    followUps: [],
+    appointments: [],
+    reminders: []
+  }
+};
 
 const QuickMenu = ({ children }) => {
   const router = useRouter();
@@ -585,83 +709,88 @@ const QuickMenu = ({ children }) => {
     }
   };
 
-  // Update the search handler in QuickMenu.js
-  const handleSearchSubmit = async (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // Clear the quick search results immediately
-      setShowSearchResults(false);
-      setSearchResults([]);
-      
-      // Show initial toast immediately
-      toast.info(
-        <div style={{ fontFamily: 'Inter, sans-serif' }}>
-          <div className="fw-semibold" style={{ fontSize: '14px' }}>
-            Searching...
-          </div>
-        </div>,
-        {
-          position: "top-right",
-          autoClose: 1000,
-          hideProgressBar: true,
-          closeOnClick: true,
-          pauseOnHover: false,
-          draggable: true,
-          style: {
-            fontFamily: 'Inter, sans-serif',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          },
-          className: 'bg-white',
-          toastId: 'search-start'
-        }
-      );
-
-      // Navigate to search page immediately
-      router.push({
-        pathname: '/dashboard/search', 
-        query: { q: searchQuery.trim() }
-      });
-      
-      try {
-        // Perform the search asynchronously
-        performGlobalSearch(db, searchQuery.trim()).then(results => {
-          // Store the results in localStorage after they're ready
-          localStorage.setItem('searchResults', JSON.stringify(results));
-          localStorage.setItem('searchQuery', searchQuery.trim());
-        });
-        
-        // Clear the search input
-        setSearchQuery('');
-        
-      } catch (error) {
-        console.error('Search error:', error);
-        toast.error('An error occurred while searching. Please try again.');
+  // Add debounced search function
+  const debouncedSearch = useCallback(
+    debounce(async (value) => {
+      if (!value.trim()) {
+        setShowSearchResults(false);
+        setSearchResults([]);
+        return;
       }
-    }
-  };
 
-  // Update the search input change handler
-  const handleSearchInputChange = async (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    
-    if (value.trim()) {
       setIsSearching(true);
       try {
-        const results = await performQuickSearch(db, value);
+        const results = await globalQuickSearch(db, value, true);
         setSearchResults(results);
         setShowSearchResults(true);
       } catch (error) {
         console.error('Search error:', error);
+        // Show a more user-friendly error message
+        setSearchResults([]);
       } finally {
         setIsSearching(false);
       }
-    } else {
-      setShowSearchResults(false);
-      setSearchResults([]);
-    }
-  };
+    }, 300), // 300ms delay
+    [db]
+  );
+
+  // Memoize search handlers
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    debouncedSearch(value);
+  }, [debouncedSearch]);
+
+  const handleSearchSubmit = useCallback((e) => {
+    e?.preventDefault?.();
+    if (!searchQuery.trim()) return;
+
+    setShowSearchResults(false);
+    setSearchResults([]);
+    
+    toast.info('Searching...', {
+      position: "top-right",
+      autoClose: 1000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: true,
+      style: {
+        fontFamily: 'Inter, sans-serif',
+        borderRadius: '8px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+      },
+      className: 'bg-white',
+      toastId: 'search-start'
+    });
+
+    router.push({
+      pathname: '/dashboard/search', 
+      query: { q: searchQuery.trim() }
+    });
+  }, [searchQuery, router]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+  }, []);
+
+  // Add memoized search render
+  const renderSearch = useMemo(() => {
+    if (isOverviewPage) return null;
+    
+    return (
+      <li className="me-4">
+        <SearchBar 
+          value={searchQuery}
+          onChange={handleSearchChange}
+          onSubmit={handleSearchSubmit}
+          onClear={handleClearSearch}
+        />
+      </li>
+    );
+  }, [isOverviewPage, searchQuery, handleSearchChange, handleSearchSubmit, handleClearSearch]);
 
   // Optimize company logo fetch
   useEffect(() => {
@@ -952,170 +1081,7 @@ const QuickMenu = ({ children }) => {
         bsPrefix="navbar-nav"
         className="navbar-right-wrap ms-2 d-flex nav-top-wrap align-items-center"
       >
-        {/* Search Form - Only show if not on overview page */}
-        {!isOverviewPage && (
-          <li className="me-4">
-            <div className="position-relative">
-              <form onSubmit={handleSearchSubmit}>
-                <div className="d-flex align-items-center">
-                  <div className="position-relative" style={{ width: '300px' }}>
-                    <InputGroup>
-                      <Form.Control
-                        type="text"
-                        placeholder="Search jobs, status, etc..."
-                        value={searchQuery}
-                        onChange={handleSearchInputChange}
-                        className="border-end-0"
-                        style={{
-                          backgroundColor: '#f8f9fa',
-                       
-                          borderRadius: '8px 0 0 8px',
-                          padding: '0.6rem 1rem',
-                          fontSize: '0.875rem',
-                        }}
-                      />
-                      <Button 
-                        type="submit"
-                        variant="primary"
-                        className="d-flex align-items-center justify-content-center"
-                        disabled={!searchQuery.trim()}
-                        style={{
-                          borderRadius: '0 8px 8px 0',
-                          padding: '0.6rem 1.2rem',
-                          border: 'none',
-                          transition: 'all 0.2s ease',
-                        }}
-                      >
-                        <FaSearch size={14} />
-                      </Button>
-                    </InputGroup>
-                    {searchQuery && (
-                      <Button 
-                        variant="link"
-                        className="position-absolute top-50 end-0 translate-middle-y text-muted pe-5"
-                        onClick={clearSearch}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none',
-                          zIndex: 5
-                        }}
-                      >
-                        <FaTimes size={12} />
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Add Follow-up Filter here */}
-                  <div className="ms-3">
-                    <Dropdown>
-                      <Dropdown.Toggle variant="light" className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill">
-                        <FaFilter size={12} />
-                        <span>Follow-ups</span>
-                        {filters.status !== 'all' && <Badge bg="primary" className="ms-2">{followUpCount}</Badge>}
-                      </Dropdown.Toggle>
-
-                      <Dropdown.Menu align="end" className="mt-1 p-3" style={{ width: '300px' }}>
-                        <div className="mb-3">
-                          <small className="text-muted d-block mb-2">Status</small>
-                          <div className="d-flex gap-2 flex-wrap">
-                            {['all', 'Logged', 'In Progress', 'Closed', 'Cancelled'].map(status => (
-                              <Badge
-                                key={status}
-                                bg={filters.status === status ? 'primary' : 'light'}
-                                text={filters.status === status ? 'white' : 'dark'}
-                                className="px-3 py-2 cursor-pointer"
-                                onClick={() => handleFilterChange('status', status)}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                {status === 'all' ? 'All Status' : status}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <small className="text-muted d-block mb-2">Type</small>
-                          <div className="d-flex gap-2 flex-wrap">
-                            <Badge
-                              key="all"
-                              bg={filters.type === 'all' ? 'primary' : 'light'}
-                              text={filters.type === 'all' ? 'white' : 'dark'}
-                              className="px-3 py-2 cursor-pointer"
-                              onClick={() => handleFilterChange('type', 'all')}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              All Types
-                            </Badge>
-                            {followUpTypes.map(type => (
-                              <Badge
-                                key={type.id}
-                                bg={filters.type === type.name ? 'primary' : 'light'}
-                                text={filters.type === type.name ? 'white' : 'dark'}
-                                className="px-3 py-2 cursor-pointer"
-                                onClick={() => handleFilterChange('type', type.name)}
-                                style={{ 
-                                  cursor: 'pointer',
-                                  backgroundColor: filters.type === type.name ? 'primary' : type.color,
-                                  color: filters.type === type.name ? 'white' : 'black'
-                                }}
-                              >
-                                {type.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <small className="text-muted d-block mb-2">Date Range</small>
-                          <Form.Group>
-                            <Form.Control
-                              type="date"
-                              size="sm"
-                              className="mb-2"
-                              value={filters.dateRange.start || ''}
-                              onChange={e => handleFilterChange('dateRange', {
-                                ...filters.dateRange,
-                                start: e.target.value
-                              })}
-                            />
-                            <Form.Control
-                              type="date"
-                              size="sm"
-                              value={filters.dateRange.end || ''}
-                              onChange={e => handleFilterChange('dateRange', {
-                                ...filters.dateRange,
-                                end: e.target.value
-                              })}
-                            />
-                          </Form.Group>
-                        </div>
-
-                        <div className="border-top mt-3 pt-3">
-                          <Button
-                            variant="primary"
-                            className="w-100"
-                            onClick={() => router.push({
-                              pathname: '/dashboard/follow-ups',
-                              query: {
-                                status: filters.status,
-                                type: filters.type,
-                                startDate: filters.dateRange.start,
-                                endDate: filters.dateRange.end
-                              }
-                            })}
-                          >
-                            View All Follow-ups ({followUpCount})
-                          </Button>
-                        </div>
-                      </Dropdown.Menu>
-                    </Dropdown>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </li>
-        )}
-
+        {renderSearch}
 
         {/* Notification Dropdown */}
         {/* <Dropdown as="li">

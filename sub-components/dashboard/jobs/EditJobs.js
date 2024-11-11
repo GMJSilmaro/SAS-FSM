@@ -45,7 +45,7 @@ import { OverlayTrigger, Tooltip } from "react-bootstrap";
 import { FaAsterisk } from "react-icons/fa";
 import EditJobPage from "@/pages/dashboard/jobs/edit-jobs/[id]";
 import TaskList from "./TaskList";
-import EquipmentsUpdateTable from "../../../pages/dashboard/tables/datatable-equipments-update";
+import EquipmentsTableWithAddDelete from "../../../pages/dashboard/tables/datatable-equipments-update";
 import Cookies from "js-cookie"; // Assuming you're using js-cookie for cookie management
 
 const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
@@ -87,8 +87,11 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   const [jobNo, setJobNo] = useState("0000");
   const [retryCount, setRetryCount] = useState(0);
 
+  const [selectedEquipments, setSelectedEquipments] = useState([]);
+  const [originalEquipments, setOriginalEquipments] = useState([]);
+
   useEffect(() => {
-    console.log("Initial Job Data: ", initialJobData); // Log the data
+    // //console.log("Initial Job Data: ", initialJobData); // Log the data
     setTasks(initialJobData?.taskList || []);
   }, [initialJobData]);
 
@@ -178,10 +181,10 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   // Update the initial data loading effect
   useEffect(() => {
     if (initialJobData?.assignedWorkers) {
-      console.log(
-        "Initial assigned workers data:",
-        initialJobData.assignedWorkers
-      );
+      // //console.log(
+      //   "Initial assigned workers data:",
+      //   initialJobData.assignedWorkers
+      // );
 
       // First, wait for workers list to be loaded
       const mappedWorkers = initialJobData.assignedWorkers.map((worker) => {
@@ -194,7 +197,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
         };
       });
 
-      console.log("Mapped initial workers:", mappedWorkers);
+      ////console.log("Mapped initial workers:", mappedWorkers);
       setSelectedWorkers(mappedWorkers);
     }
   }, [initialJobData, workers]); // Add workers to dependency array
@@ -238,14 +241,47 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     }
   }, [router.isReady, router.query, workers]);
 
+  const fetchJobContactTypes = async () => {
+    try {
+      const jobContactTypeResponse = await fetch("/api/getJobContactType", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!jobContactTypeResponse.ok) {
+        const errorData = await jobContactTypeResponse.json();
+        throw new Error(
+          `Failed to fetch job contact types: ${
+            errorData.message || jobContactTypeResponse.statusText
+          }`
+        );
+      }
+
+      const jobContactTypeData = await jobContactTypeResponse.json();
+
+      const formattedJobContactTypes = jobContactTypeData.map((item) => ({
+        value: item.code,
+        label: item.name,
+      }));
+
+      setJobContactTypes(formattedJobContactTypes);
+    } catch (error) {
+      console.error("Error fetching job contact types:", error);
+      toast.error(`Failed to fetch job contact types: ${error.message}`);
+      setJobContactTypes([]);
+    }
+  };
+
   // Workers fetch useEffect
   // Add this useEffect near your other useEffect hooks
   useEffect(() => {
     const fetchCustomers = async () => {
-      console.log("🚀 Starting customer fetch...");
+      ////console.log("🚀 Starting customer fetch...");
 
       try {
-        console.log("📡 Making API request to /api/getCustomers");
+        // //console.log("📡 Making API request to /api/getCustomers");
         const response = await fetch("/api/getCustomers", {
           method: "GET",
           headers: {
@@ -253,22 +289,22 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
           },
         });
 
-        console.log(" Response received:", {
-          ok: response.ok,
-          status: response.status,
-          statusText: response.statusText,
-        });
+        // //console.log(" Response received:", {
+        //   ok: response.ok,
+        //   status: response.status,
+        //   statusText: response.statusText,
+        // });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch customers: ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log("✅ Parsed customer data:", {
-          count: data.length,
-          firstCustomer: data[0],
-          lastCustomer: data[data.length - 1],
-        });
+        // //console.log("✅ Parsed customer data:", {
+        //   count: data.length,
+        //   firstCustomer: data[0],
+        //   lastCustomer: data[data.length - 1],
+        // });
 
         const formattedCustomers = data.map((customer) => ({
           value: customer.cardCode,
@@ -277,31 +313,76 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
           cardName: customer.cardName,
         }));
 
-        console.log("🔄 Formatted customers:", {
-          count: formattedCustomers.length,
-          firstCustomer: formattedCustomers[0],
-          lastCustomer: formattedCustomers[formattedCustomers.length - 1],
-        });
+        // //console.log("🔄 Formatted customers:", {
+        //   count: formattedCustomers.length,
+        //   firstCustomer: formattedCustomers[0],
+        //   lastCustomer: formattedCustomers[formattedCustomers.length - 1],
+        // });
 
         setCustomers(formattedCustomers);
-        console.log("💾 Customers saved to state");
+        // //console.log("💾 Customers saved to state");
 
         // If we have initialJobData, set the initial customer selection
         if (initialJobData?.customerID) {
-          console.log(
-            "🔍 Looking for initial customer:",
-            initialJobData.customerID
-          );
+          // //console.log(
+          //   "🔍 Looking for initial customer:",
+          //   initialJobData.customerID
+          // );
           const initialCustomer = formattedCustomers.find(
             (c) => c.cardCode === initialJobData.customerID
           );
           if (initialCustomer) {
-            console.log("✨ Found initial customer:", initialCustomer);
+            // //console.log("✨ Found initial customer:", initialCustomer);
             setSelectedCustomer(initialCustomer);
             handleCustomerChange(initialCustomer);
           } else {
-            console.log("⚠️ Initial customer not found in data");
+            // //console.log("⚠️ Initial customer not found in data");
           }
+        }
+
+        // Fetch job contact types after selecting a customer
+        if (formattedCustomers.length > 0) {
+          const fetchJobContactTypes = async () => {
+            try {
+              const jobContactTypeResponse = await fetch(
+                "/api/getJobContactType",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+
+              if (!jobContactTypeResponse.ok) {
+                const errorData = await jobContactTypeResponse.json();
+                throw new Error(
+                  `Failed to fetch job contact types: ${
+                    errorData.message || jobContactTypeResponse.statusText
+                  }`
+                );
+              }
+
+              const jobContactTypeData = await jobContactTypeResponse.json();
+
+              const formattedJobContactTypes = jobContactTypeData.map(
+                (item) => ({
+                  value: item.code,
+                  label: item.name,
+                })
+              );
+
+              setJobContactTypes(formattedJobContactTypes);
+            } catch (error) {
+              console.error("Error fetching job contact types:", error);
+              toast.error(
+                `Failed to fetch job contact types: ${error.message}`
+              );
+              setJobContactTypes([]);
+            }
+          };
+
+          fetchJobContactTypes();
         }
       } catch (error) {
         console.error("❌ Error fetching customers:", {
@@ -320,7 +401,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       }
     };
 
-    console.log("🏁 Initiating customer fetch useEffect");
+    //console.log("🏁 Initiating customer fetch useEffect");
     fetchCustomers();
   }, []); // Empty dependency array means this runs once on component mount
 
@@ -329,13 +410,20 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     const fetchWorkers = async () => {
       try {
         const usersRef = collection(db, "users"); // Reference to the "users" collection
-        const snapshot = await getDocs(usersRef); // Fetch documents from the "users" collection
+
+        // Add the role filter to the query
+        const workersQuery = query(
+          usersRef,
+          where("role", "==", "Worker") // Only fetch users where role is "Worker"
+        );
+
+        const snapshot = await getDocs(workersQuery); // Fetch documents from the "users" collection
         const workersData = snapshot.docs.map((doc) => ({
           value: doc.id, // Use document ID as workerId
-          label: doc.data().fullName, // Assuming the worker's name is stored in the "name" field
+          label: doc.data().fullName, // Assuming the worker's name is stored in the "fullName" field
         }));
 
-        setWorkers(workersData);
+        setWorkers(workersData); // Set the workers state with filtered data
       } catch (error) {
         console.error("Error fetching workers:", error);
       }
@@ -346,7 +434,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
   // Update the worker selection handler
   const handleWorkersChange = (selected) => {
-    console.log("Worker selection changed:", selected);
+    //console.log("Worker selection changed:", selected);
     setSelectedWorkers(selected || []);
 
     const formattedWorkers = (selected || []).map((worker) => ({
@@ -363,7 +451,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   };
 
   const handleCustomerChange = async (selectedOption) => {
-    console.log("handleCustomerChange triggered with:", selectedOption);
+    //console.log("handleCustomerChange triggered with:", selectedOption);
 
     if (!selectedOption) {
       // Handle clearing the selection
@@ -408,7 +496,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       (option) => option.value === selectedOption.value
     );
 
-    console.log("Selected customer:", selectedCustomer);
+    //console.log("Selected customer:", selectedCustomer);
 
     setFormData((prevFormData) => ({
       ...prevFormData,
@@ -417,7 +505,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     }));
 
     try {
-      console.log("Fetching related data for customer:", selectedOption.value);
+      //console.log("Fetching related data for customer:", selectedOption.value);
 
       // Fetch contacts
       const contactsResponse = await fetch("/api/getContacts", {
@@ -428,7 +516,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
       if (!contactsResponse.ok) throw new Error("Failed to fetch contacts");
       const contactsData = await contactsResponse.json();
-      console.log("Fetched contacts:", contactsData);
+      //console.log("Fetched contacts:", contactsData);
 
       const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
@@ -446,7 +534,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
       if (!locationsResponse.ok) throw new Error("Failed to fetch locations");
       const locationsData = await locationsResponse.json();
-      console.log("Fetched locations:", locationsData);
+      //console.log("Fetched locations:", locationsData);
 
       const formattedLocations = locationsData.map((item) => ({
         value: item.siteId,
@@ -464,7 +552,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
       if (!equipmentsResponse.ok) throw new Error("Failed to fetch equipments");
       const equipmentsData = await equipmentsResponse.json();
-      console.log("Fetched equipments:", equipmentsData);
+      //console.log("Fetched equipments:", equipmentsData);
 
       const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
@@ -475,13 +563,13 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
         Brand: item.Brand,
         EquipmentLocation: item.EquipmentLocation,
         EquipmentType: item.EquipmentType,
-        ModelSeries: item.ModelSeries,
-        SerialNo: item.SerialNo,
+        modelSeries: item.ModelSeries,
+        serialNo: item.SerialNo,
         Notes: item.Notes,
         WarrantyStartDate: item.WarrantyStartDate,
         WarrantyEndDate: item.WarrantyEndDate,
       }));
-      console.log("Formatted equipments:", formattedEquipments);
+      //console.log("Formatted equipments:", formattedEquipments);
       setEquipments(formattedEquipments);
 
       // Fetch service calls
@@ -494,7 +582,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       if (!serviceCallResponse.ok)
         throw new Error("Failed to fetch service calls");
       const serviceCallsData = await serviceCallResponse.json();
-      console.log("Fetched service calls:", serviceCallsData);
+      //console.log("Fetched service calls:", serviceCallsData);
 
       const formattedServiceCalls = serviceCallsData.map((item) => ({
         value: item.serviceCallID,
@@ -672,13 +760,13 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
     if (selectedServiceCall) {
       try {
-        const response = await fetch("/api/getSalesOrders", {
+        const response = await fetch("/api/getSalesOrder", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            serviceCallId: selectedServiceCall.value,
+            serviceCallID: selectedServiceCall.value,
             cardCode: formData.customerID,
           }),
         });
@@ -688,13 +776,17 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
         }
 
         const data = await response.json();
-        const formattedSalesOrders = data.map((order) => ({
-          value: order.docNum,
-          label: `${order.docNum} - ${order.docDate}`,
-          ...order,
-        }));
+        //console.log("Fetched data:", data);
 
-        setSalesOrders(formattedSalesOrders);
+        if (data && Array.isArray(data.value)) {
+          const formattedSalesOrders = data.value.map((order) => ({
+            value: order.DocNum, // Unique value
+            label: `Order #${order.DocNum} - $${order.DocTotal}`, // User-friendly label
+          }));
+          setSalesOrders(formattedSalesOrders);
+        } else {
+          throw new Error("Unexpected data format");
+        }
       } catch (error) {
         console.error("Error fetching sales orders:", error);
         toast.error("Failed to fetch sales orders");
@@ -717,95 +809,41 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     return statusMap[status] || status;
   };
 
-  // Add this useEffect to initialize equipment data from initialJobData
-  useEffect(() => {
-    console.log(
-      "Initial Job Equipments:",
-      initialJobData?.equipments?.map((e) => ({
-        serialNo: e.serialNo,
-        modelSeries: e.modelSeries,
-      })) || []
-    );
-
-    console.log(
-      "Available Equipment List:",
-      equipments.map((e) => ({
-        serialNo: e.SerialNo,
-        modelSeries: e.ModelSeries,
-      }))
-    );
-
-    const syncedEquipments = (initialJobData?.equipments || [])
-      .map((equipment) => {
-        const matchingEquipment = equipments.find((e) => {
-          const isMatch =
-            e.SerialNo === equipment.serialNo &&
-            e.ModelSeries === equipment.modelSeries;
-
-          if (isMatch) {
-            console.log("Found matching equipment:", {
-              serialNo: equipment.serialNo,
-              modelSeries: equipment.modelSeries,
-            });
-          }
-
-          return isMatch;
-        });
-
-        if (!matchingEquipment) {
-          console.log("No match found for equipment:", {
-            serialNo: equipment.serialNo,
-            modelSeries: equipment.modelSeries,
-          });
-          return null;
-        }
-
-        return {
-          ...matchingEquipment,
-          serialNo: equipment.serialNo,
-          modelSeries: equipment.modelSeries,
-          notes: equipment.notes || matchingEquipment.Notes,
-          equipmentLocation:
-            equipment.equipmentLocation || matchingEquipment.EquipmentLocation,
-        };
-      })
-      .filter(Boolean);
-
-    console.log("Final synced equipments:", syncedEquipments);
-    setSelectedEquipments(syncedEquipments);
-  }, [equipments, initialJobData]);
-
-  // Update the equipment selection handler
-  const handleSelectedEquipmentsChange = (selected) => {
-    console.log("Equipment selection changed. New selection:", selected);
-    setSelectedEquipments(selected || []);
-
-    const formattedEquipments = (selected || []).map((equipment) => {
-      const formatted = {
+  // Equipment selection handler
+  const handleEquipmentSelection = useCallback(({ currentSelections, originalData }) => {
+    setSelectedEquipments(currentSelections);
+    setOriginalEquipments(originalData);
+    
+    // Update form data with selected equipment
+    setFormData(prev => ({
+      ...prev,
+      equipments: currentSelections.map(equipment => ({
         itemCode: equipment.ItemCode,
         itemName: equipment.ItemName,
         itemGroup: equipment.ItemGroup,
         brand: equipment.Brand,
         equipmentLocation: equipment.EquipmentLocation,
         equipmentType: equipment.EquipmentType,
-        modelSeries: equipment.ModelSeries,
-        serialNo: equipment.SerialNo,
-        notes: equipment.Notes,
-        warrantyStartDate: equipment.WarrantyStartDate,
-        warrantyEndDate: equipment.WarrantyEndDate,
-      };
-      console.log("Formatted equipment for form data:", formatted);
-      return formatted;
-    });
-
-    console.log("Final formatted equipments for form:", formattedEquipments);
-    setFormData((prev) => ({
-      ...prev,
-      equipments: formattedEquipments,
+        modelSeries: equipment.modelSeries,
+        serialNo: equipment.serialNo,
+        notes: equipment.Notes
+      }))
     }));
 
     setHasChanges(true);
-  };
+  }, []);
+
+  // Initialize equipment data from initialJobData
+  useEffect(() => {
+    if (initialJobData?.equipments) {
+      const syncedEquipments = initialJobData.equipments.map(equipment => ({
+        ...equipment,
+        originalData: { ...equipment }
+      }));
+      setSelectedEquipments(syncedEquipments);
+      setOriginalEquipments(syncedEquipments);
+    }
+  }, [initialJobData]);
 
   const handleNextClick = () => {
     if (activeKey === "summary") {
@@ -959,26 +997,26 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
         sessionExpiry: Cookies.get("B1SESSION_EXPIRY"), // Session expiry
       };
 
-      console.log("User Cookies:", userCookies); // Log user cookies for verification
+      //console.log("User Cookies:", userCookies); // Log user cookies for verification
 
       // Log all form data before submission
-      console.log("=== FORM SUBMISSION DATA ===");
-      console.log("Form Data:", {
-        ...formData,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
-      });
-      console.log("Selected Customer:", selectedCustomer);
-      console.log("Selected Contact:", selectedContact);
-      console.log("Selected Location:", selectedLocation);
-      console.log("Selected Service Call:", selectedServiceCall);
-      console.log("Selected Sales Order:", selectedSalesOrder);
-      console.log("Selected Workers:", selectedWorkers);
-      console.log("Tasks:", tasks);
-      console.log("Job Contact Type:", selectedJobContactType);
-      console.log("=== END FORM DATA ===");
+      //console.log("=== FORM SUBMISSION DATA ===");
+      // console.log("Form Data:", {
+      //   ...formData,
+      //   startDate: formData.startDate,
+      //   endDate: formData.endDate,
+      //   startTime: formData.startTime,
+      //   endTime: formData.endTime,
+      // });
+      //console.log("Selected Customer:", selectedCustomer);
+      //console.log("Selected Contact:", selectedContact);
+      //console.log("Selected Location:", selectedLocation);
+      //console.log("Selected Service Call:", selectedServiceCall);
+      //console.log("Selected Sales Order:", selectedSalesOrder);
+      //console.log("Selected Workers:", selectedWorkers);
+      //console.log("Tasks:", tasks);
+      //console.log("Job Contact Type:", selectedJobContactType);
+      //console.log("=== END FORM DATA ===");
 
       // Validation check
       const missingFields = [];
@@ -995,7 +1033,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       if (!selectedJobContactType) missingFields.push("Job Contact Type");
 
       if (missingFields.length > 0) {
-        console.log("Missing Required Fields:", missingFields);
+        //console.log("Missing Required Fields:", missingFields);
         toast.error(
           <div>
             <strong>Please fill in all required fields:</strong>
@@ -1022,7 +1060,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       setProgress(0);
       setIsSubmitting(true);
 
-      console.log("Starting submission process...");
+      //console.log("Starting submission process...");
       setProgress(20);
 
       // Format the workers data before submission
@@ -1052,6 +1090,8 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
         ...formData,
         assignedWorkers: formattedWorkers,
         updatedAt: Timestamp.now(),
+        salesOrderID: selectedSalesOrder?.value || null, // Ensure Sales Order ID is captured
+        serviceCallID: selectedServiceCall?.value || null, // Ensure Service Call ID is captured
         updatedBy: {
           workerId: userCookies.workerId, // Use the current user's UID
           fullName: await getUserDisplayName(userCookies.workerId), // Retrieve displayName from Firestore
@@ -1105,7 +1145,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       }
 
       // Format dates
-      console.log("Formatting dates and preparing form data...");
+      //console.log("Formatting dates and preparing form data...");
       setProgress(60);
       const formattedStartDateTime = formatDateTime(
         formData.startDate,
@@ -1124,11 +1164,12 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       };
 
       // Save to Firestore
-      console.log("Saving to Firestore...");
-      const jobRef = doc(db, "jobs", jobIdProp);
-      await updateDoc(jobRef, finalFormData);
+      //console.log("Form Datas", formData);
+      // //console.log("Saving to Firestore...");
+      // const jobRef = doc(db, "jobs", jobIdProp);
+      // await updateDoc(jobRef, finalFormData);
 
-      console.log("Successfully saved to Firestore");
+      //console.log("Successfully saved to Firestore");
       setProgress(100);
 
       // Update success message for edit mode
@@ -1444,37 +1485,6 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     setHasChanges(true);
   };
 
-  // Update the equipment selection state
-  const [selectedEquipments, setSelectedEquipments] = useState([]);
-  const isEquipmentChanging = useRef(false);
-
-  // Handle equipment selection changes
-  const handleEquipmentSelection = useCallback(({ currentSelections }) => {
-    // Simple update without checking previous state
-    setFormData((prev) => ({
-      ...prev,
-      equipments: currentSelections.map((equipment) => ({
-        itemCode: equipment.ItemCode,
-        itemName: equipment.ItemName,
-        itemGroup: equipment.ItemGroup,
-        modelSeries: equipment.ModelSeries,
-        serialNo: equipment.SerialNo,
-        brand: equipment.Brand,
-        notes: equipment.Notes,
-        equipmentType: equipment.EquipmentType,
-        equipmentLocation: equipment.EquipmentLocation,
-      })),
-    }));
-  }, []);
-
-  // Initialize equipment selections when component mounts
-  useEffect(() => {
-    if (initialJobData?.equipments) {
-      console.log("Initial job equipments:", initialJobData.equipments);
-      setSelectedEquipments(initialJobData.equipments);
-    }
-  }, [initialJobData]);
-
   return (
     <>
       <Tabs
@@ -1661,7 +1671,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                 <Row className="mb-3">
                   <Form.Group as={Col} md="4" controlId="jobLocation">
                     <Form.Label>
-                      <RequiredFieldWithTooltip label="Location" />
+                      <RequiredFieldWithTooltip label="Site / Location" />
                       <OverlayTrigger
                         placement="right"
                         overlay={
@@ -1678,7 +1688,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                         }
                       >
                         <i
-                          className="fe fe-help-circle text-muted"
+                          className="fe fe-help-circle text-muted ms-1"
                           style={{ cursor: "pointer" }}
                         ></i>
                       </OverlayTrigger>
@@ -1688,7 +1698,145 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                       options={locations}
                       value={selectedLocation}
                       onChange={handleLocationChange}
-                      placeholder="Select Location ID"
+                      placeholder="Select Site ID"
+                      isGrouped={true}
+                      formatGroupLabel={(data) => (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            fontSize: "0.9em",
+                            fontWeight: "bold",
+                            padding: "8px 0",
+                            color: "#2c3e50",
+                            borderBottom: "2px solid #eee",
+                            width: "100%",
+                          }}
+                        >
+                          <span>{data.label}</span>
+                          <span
+                            style={{
+                              background: "#e9ecef",
+                              borderRadius: "4px",
+                              padding: "2px 8px",
+                              fontSize: "0.8em",
+                            }}
+                          >
+                            {data.options.length}
+                          </span>
+                        </div>
+                      )}
+                      formatOptionLabel={(option) => (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                            padding: "4px 0",
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                fontWeight: "500",
+                                color: "#2c3e50",
+                                marginBottom: "2px",
+                              }}
+                            >
+                              {option.building
+                                ? `${String(option.building)} - `
+                                : ""}{" "}
+                              {String(option.address)}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.85em",
+                                color: "#666",
+                                lineHeight: "1.3",
+                              }}
+                            >
+                              {[
+                                String(option.zipCode),
+                                String(option.countryName),
+                              ]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "0.75em",
+                              padding: "3px 8px",
+                              borderRadius: "12px",
+                              background:
+                                option.addressType === "B"
+                                  ? "#e3f2fd"
+                                  : "#fff3e0",
+                              color:
+                                option.addressType === "B"
+                                  ? "#1976d2"
+                                  : "#f57c00",
+                              whiteSpace: "nowrap",
+                              alignSelf: "center",
+                            }}
+                          >
+                            {option.addressType === "B"
+                              ? "Billing"
+                              : "Shipping"}
+                          </div>
+                        </div>
+                      )}
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: "45px",
+                          borderColor: "#dee2e6",
+                          "&:hover": {
+                            borderColor: "#80bdff",
+                          },
+                        }),
+                        group: (base) => ({
+                          ...base,
+                          paddingTop: 8,
+                          paddingBottom: 8,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          padding: "8px 12px",
+                          borderBottom: "1px solid #f0f0f0",
+                          backgroundColor: state.isFocused
+                            ? "#f8f9fa"
+                            : "white",
+                          cursor: "pointer",
+                          "&:hover": {
+                            backgroundColor: "#f8f9fa",
+                          },
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          zIndex: 9999,
+                          boxShadow:
+                            "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+                        }),
+                        groupHeading: (base) => ({
+                          ...base,
+                          margin: "8px 0",
+                          fontSize: "0.9em",
+                          fontWeight: "bold",
+                        }),
+                      }}
+                      noOptionsMessage={() => (
+                        <div
+                          style={{
+                            padding: "8px",
+                            textAlign: "center",
+                            color: "#666",
+                          }}
+                        >
+                          No locations found for this customer
+                        </div>
+                      )}
                     />
                   </Form.Group>
                 </Row>
@@ -1795,7 +1943,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                 <p className="text-muted">Details about the Equipments.</p>
                 <Row className="mb-3">
                   {equipments.length > 0 ? (
-                    <EquipmentsUpdateTable
+                    <EquipmentsTableWithAddDelete
                       equipments={equipments}
                       initialSelected={initialJobData?.equipments}
                       onSelectionChange={handleEquipmentSelection}
@@ -1811,6 +1959,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                 </Row>
               </>
             )}
+
             <hr className="my-4" />
           </Form>
           <Row className="align-items-center">
@@ -1871,7 +2020,9 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                 >
                   <option value="custom">Custom</option>
                   <option value="morning">Morning (9:30am to 1:00pm)</option>
-                  <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
+                  <option value="afternoon">
+                    Afternoon (1:00pm to 5:30pm)
+                  </option>
                 </Form.Select>
               </Form.Group>
               <Form.Group as={Col} md="2" controlId="scheduleSession">
@@ -1884,11 +2035,14 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                 >
                   <option value="custom">Custom</option>
                   <option value="morning">Morning (9:30am to 1:00pm)</option>
-                  <option value="afternoon">Afternoon (1:00pm to 5:30pm)</option>
+                  <option value="afternoon">
+                    Afternoon (1:00pm to 5:30pm)
+                  </option>
                 </Form.Select>
               </Form.Group> */}
-              {/* <Form.Group as={Col} md="3" controlId="serviceCall">
-                <RequiredFieldWithTooltip label="Service Call" />
+
+              <Form.Group as={Col} md="3" controlId="serviceCall">
+                <Form.Label>Service Call</Form.Label>
                 <Select
                   instanceId="service-call-select"
                   options={serviceCalls}
@@ -1900,7 +2054,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
               </Form.Group>
 
               <Form.Group as={Col} md="3" controlId="salesOrder">
-                <RequiredFieldWithTooltip label="Sales Order" />
+                <Form.Label>Sales Orders</Form.Label>
                 <Select
                   instanceId="sales-order-select"
                   options={salesOrders}
@@ -1930,7 +2084,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                   value={selectedJobContactType}
                   onChange={handleJobContactTypeChange}
                   placeholder="Select Contact Type"
-                  isDisabled={!selectedServiceCall || salesOrders.length === 0}
+                  //isDisabled={!selectedServiceCall || salesOrders.length === 0}
                   isClearable
                   noOptionsMessage={() => "No contact types available"}
                 />
@@ -1939,7 +2093,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                     No contact types available
                   </small>
                 )}
-              </Form.Group> */}
+              </Form.Group>
             </Row>
 
             <Row className="mb-3">
@@ -2049,7 +2203,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                 />
               </Form.Group>
               <Form.Group as={Col} md="4" controlId="scheduleSession">
-                <RequiredFieldWithTooltip label="Schedule Session" />
+                <Form.Label>Schedule Session</Form.Label>
                 <Form.Select
                   name="scheduleSession"
                   value={formData.scheduleSession}

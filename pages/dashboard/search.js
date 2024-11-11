@@ -1,20 +1,24 @@
-import { Fragment, useEffect } from 'react';
+import React, { Fragment, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { Row, Col, Card } from 'react-bootstrap';
 import { GeeksSEO } from "widgets";
 import Link from 'next/link';
 import { GKTippy } from "widgets";
-import { performGlobalSearch } from '../../utils/searchUtils';
+import { globalQuickSearch } from '../../utils/searchUtils';
 import { db } from '../../firebase';
+import { doc as firestoreDoc, getDoc } from 'firebase/firestore';
 import { ChevronRight, Mail, Search, WifiOff } from 'lucide-react';
 
 const SearchPage = () => {
   const router = useRouter();
   const { q: searchQuery } = router.query;
-  const [searchResults, setSearchResults] = useState(null);
+  const [searchResults, setSearchResults] = useState({ results: [], totalCount: 0, counts: {} });
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
+  const [legendItems, setLegendItems] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   const categoryConfig = {
     customer: {
@@ -66,6 +70,35 @@ const SearchPage = () => {
     return categoryConfig[type]?.label || type;
   };
 
+  const getStatusTag = (status) => {
+    // Find matching legend item (case-insensitive)
+    const legendItem = legendItems.find(item => 
+      item.status.toLowerCase() === status.toLowerCase()
+    );
+    
+    // Use legend color if found, otherwise use default colors
+    const style = legendItem ? {
+      backgroundColor: legendItem.color,
+      color: '#FFFFFF'
+    } : {
+      backgroundColor: '#9e9e9e',
+      color: '#FFFFFF'
+    };
+
+    return (
+      <span
+        className="ms-2 px-2 py-1 rounded-pill"
+        style={{
+          ...style,
+          fontSize: '0.75rem',
+          fontWeight: '500'
+        }}
+      >
+        {status}
+      </span>
+    );
+  };
+
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
@@ -81,21 +114,57 @@ const SearchPage = () => {
   }, []);
 
   useEffect(() => {
+    const fetchLegendItems = async () => {
+      try {
+        const legendRef = firestoreDoc(db, 'settings', 'jobStatuses');
+        const legendDoc = await getDoc(legendRef);
+        if (legendDoc.exists()) {
+          setLegendItems(legendDoc.data().items || []);
+        }
+      } catch (error) {
+        console.error('Error fetching legend items:', error);
+      }
+    };
+
+    fetchLegendItems();
+  }, []);
+
+  useEffect(() => {
     const fetchSearchResults = async () => {
-      if (!searchQuery) {
-        setSearchResults({ results: [], totalCount: 0 });
+      setIsOffline(false);
+      setCurrentPage(1); // Reset to first page on new search
+      
+      if (!searchQuery?.trim()) {
+        setSearchResults({ results: [], totalCount: 0, counts: {} });
         setIsLoading(false);
         return;
       }
 
       try {
         setIsLoading(true);
-        const results = await performGlobalSearch(db, searchQuery);
-        setSearchResults(results);
+        
+        // Try to get cached results first
+        const cachedQuery = localStorage.getItem('searchQuery');
+        const cachedResults = localStorage.getItem('searchResults');
+        
+        if (cachedQuery === searchQuery && cachedResults) {
+          setSearchResults(JSON.parse(cachedResults));
+          setIsLoading(false);
+          
+          // Refresh results in background
+          const freshResults = await globalQuickSearch(db, searchQuery, false);
+          setSearchResults(freshResults);
+          localStorage.setItem('searchResults', JSON.stringify(freshResults));
+        } else {
+          const results = await globalQuickSearch(db, searchQuery, false);
+          setSearchResults(results);
+          localStorage.setItem('searchResults', JSON.stringify(results));
+          localStorage.setItem('searchQuery', searchQuery);
+        }
       } catch (error) {
         console.error('Search error:', error);
-        setSearchResults({ results: [], totalCount: 0 });
-        if (error.message.includes('offline')) {
+        setSearchResults({ results: [], totalCount: 0, counts: {} });
+        if (!navigator.onLine) {
           setIsOffline(true);
         }
       } finally {
@@ -106,33 +175,92 @@ const SearchPage = () => {
     fetchSearchResults();
   }, [searchQuery]);
 
-
-  const renderHighlightedText = (text, type) => {
+  const renderHighlightedText = (text) => {
     if (!text) return '';
-    const config = getCategoryConfig(type);
     
-    // If the text already contains HTML styling, extract just the text content
-    if (text.includes('style=')) {
-      // Create a temporary div to parse the HTML
-      const temp = document.createElement('div');
-      temp.innerHTML = text;
-      text = temp.textContent || temp.innerText;
-    }
+    // Clean up any remaining [[HIGHLIGHT]] tags
+    text = text.replace(/\[\[HIGHLIGHT\]\]|\[\[\/HIGHLIGHT\]\]/g, '');
     
-    // Then apply the highlight styling
-    return text.replace(
-      /\[\[HIGHLIGHT\]\](.*?)\[\[\/HIGHLIGHT\]\]/g,
-      (_, match) => `<span style="background-color: ${config.highlightBg}; color: ${config.highlightText}; padding: 0.1rem 0.3rem; border-radius: 0.2rem;">${match}</span>`
+    return (
+      <span dangerouslySetInnerHTML={{ __html: text }} />
     );
   };
-  
+
+  const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="d-flex justify-content-between align-items-center p-3 border-top">
+        <div className="text-muted small">
+          Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to{' '}
+          {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
+        </div>
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter(page => {
+              // Show first page, last page, current page, and pages around current
+              return (
+                page === 1 ||
+                page === totalPages ||
+                Math.abs(currentPage - page) <= 1
+              );
+            })
+            .map((page, index, array) => (
+              <React.Fragment key={page}>
+                {index > 0 && array[index - 1] !== page - 1 && (
+                  <span className="btn btn-sm disabled">...</span>
+                )}
+                <button
+                  className={`btn btn-sm ${
+                    currentPage === page
+                      ? 'btn-primary'
+                      : 'btn-outline-primary'
+                  }`}
+                  onClick={() => onPageChange(page)}
+                >
+                  {page}
+                </button>
+              </React.Fragment>
+            ))}
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Calculate current items to display
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = searchResults.results.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Handle page change
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo(0, 0); // Scroll to top when page changes
+  };
+
   return (
     <Fragment>
       <GeeksSEO title={`Search Results for "${searchQuery}" | SAS&ME - SAP B1 | Portal`} />
 
       {/* Header */}
       <div className="mb-4">
-        <h3 className="mb-2">Search Results</h3>
+        <h3 className="mb-2">Search</h3>
         <div className="d-flex align-items-center text-muted mb-4">
           <Link 
             href="/dashboard"
@@ -188,6 +316,20 @@ const SearchPage = () => {
         )}
       </div>
 
+      {/* Add this section right after the breadcrumb and before the results */}
+      <div className="mb-4">
+        <h4 className="mb-3">Search Results for "{searchQuery}"</h4>
+        {searchResults?.results?.length > 0 ? (
+          <p className="text-muted">
+            Found {searchResults.totalCount} results matching your search
+          </p>
+        ) : !isLoading && (
+          <p className="text-muted">
+            No results found for this search term. Try different keywords.
+          </p>
+        )}
+      </div>
+
       {/* Results */}
       <Card className="mt-4">
         <Card.Body className="p-0">
@@ -205,12 +347,12 @@ const SearchPage = () => {
                 <span className="visually-hidden">Loading...</span>
               </div>
               <p className="text-muted mb-0">
-                Searching far and wide for "{searchQuery}"...
+                Searching far and wide for "{searchQuery} keywords"...
               </p>
             </div>
           ) : (
             <>
-              {searchResults?.results?.map((result, index) => {
+              {currentItems.map((result, index) => {
                 const normalizedType = result.type.toLowerCase().replace(/s$/, '');
                 const config = categoryConfig[normalizedType] || {
                   color: '#6b7280',
@@ -245,18 +387,27 @@ const SearchPage = () => {
 
                         {/* Content */}
                         <div className="flex-grow-1">
-                          <h5 className="mb-1" dangerouslySetInnerHTML={{
-                            __html: renderHighlightedText(result.title, result.type)
-                          }} />
+                          <div className="d-flex align-items-center">
+                            <h5 className="mb-1">
+                              <span dangerouslySetInnerHTML={{
+                                __html: typeof result.title === 'string' ? result.title : 'Untitled'
+                              }} />
+                            </h5>
+                            {result.type === 'job' && result.status && getStatusTag(result.status)}
+                          </div>
                           <div className="text-muted mb-2">
-                            {result.id} | {result.phone || 'No Phone'}
+                            {result.subtitle}
                           </div>
                           {result.email && (
                             <div className="small text-muted">
                               <Mail size={16} className="me-2" />
-                              <span dangerouslySetInnerHTML={{
-                                __html: renderHighlightedText(result.email, result.type)
-                              }} />
+                              <span>{result.email}</span>
+                            </div>
+                          )}
+                          {result.address && (
+                            <div className="small text-muted mt-1">
+                              <i className="fe fe-map-pin me-2"></i>
+                              <span>{result.address}</span>
                             </div>
                           )}
                         </div>
@@ -267,12 +418,19 @@ const SearchPage = () => {
                         </div>
                       </div>
                     </div>
-                    {index < searchResults.results.length - 1 && (
+                    {index < currentItems.length - 1 && (
                       <div style={{ borderBottom: '1px solid #E5E7EB' }}></div>
                     )}
                   </Fragment>
                 );
               })}
+
+              <Pagination
+                totalItems={searchResults.results.length}
+                itemsPerPage={itemsPerPage}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+              />
 
               {searchResults.results.length === 0 && (
                 <div className="text-center p-5">
