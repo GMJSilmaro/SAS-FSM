@@ -1172,10 +1172,10 @@ const AddNewJobs = ({ validateJobForm }) => {
   };
 
   const handleSelectedServiceCallChange = async (selectedServiceCall) => {
-    console.log(
-      "handleSelectedServiceCallChange called with:",
-      selectedServiceCall
-    );
+    // console.log(
+    //   "handleSelectedServiceCallChange called with:",
+    //   selectedServiceCall
+    // );
     setSelectedServiceCall(selectedServiceCall);
     setSelectedSalesOrder(null); // Reset sales order selection
 

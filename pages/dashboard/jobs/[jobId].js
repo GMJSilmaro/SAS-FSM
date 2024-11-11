@@ -229,6 +229,27 @@ const getPriorityColor = (priority) => {
   }
 };
 
+// Add this helper function near the top with other helpers
+const geocodeAddress = async (address) => {
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        address
+      )}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+    );
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.results[0]) {
+      const { lat, lng } = data.results[0].geometry.location;
+      return { lat, lng };
+    }
+    return null;
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return null;
+  }
+};
+
 const JobDetails = () => {
   // Move all useState declarations to the top
   const router = useRouter();
@@ -360,32 +381,41 @@ const JobDetails = () => {
             setJob(jobData);
             setEditedDescription(jobData.jobDescription || '');
 
-            // Extract worker IDs from assignedWorkers array
+            // Extract worker IDs and fetch worker details
             const assignedWorkers = jobData.assignedWorkers || [];
             if (Array.isArray(assignedWorkers)) {
-              const workerIds = assignedWorkers.map(
-                (worker) => worker.workerId
-              );
+              const workerIds = assignedWorkers.map(worker => worker.workerId);
               const workerData = await fetchWorkerDetails(workerIds);
               setWorkers(workerData);
-            } else {
-              console.error("assignedWorkers is not an array");
             }
 
-            // Use coordinates directly from the location object
-            if (jobData.location?.coordinates) {
-              const { latitude, longitude } = jobData.location.coordinates;
-              setLocation({ lat: latitude, lng: longitude });
-              setMapKey((prevKey) => prevKey + 1); // Force map re-render
+            // Get coordinates from street address if not available
+            if (!jobData.location?.coordinates?.latitude || !jobData.location?.coordinates?.longitude) {
+              const address = jobData.location?.address?.streetAddress;
+              if (address) {
+                const coordinates = await geocodeAddress(address);
+                if (coordinates) {
+                  setLocation(coordinates);
+                  // Optionally update the job document with the new coordinates
+                  await updateDoc(doc(db, "jobs", jobId), {
+                    'location.coordinates': {
+                      latitude: coordinates.lat.toString(),
+                      longitude: coordinates.lng.toString()
+                    }
+                  });
+                }
+              }
             } else {
-              console.log("No coordinates found for this job");
+              // Use existing coordinates if available
+              setLocation({
+                lat: parseFloat(jobData.location.coordinates.latitude),
+                lng: parseFloat(jobData.location.coordinates.longitude)
+              });
             }
 
             setTechnicianNotes(jobData.technicianNotes || []);
             setWorkerComments(jobData.workerComments || []);
             setImages(jobData.images || []);
-          } else {
-            console.error("Job not found");
           }
         } catch (error) {
           console.error("Error fetching job:", error);

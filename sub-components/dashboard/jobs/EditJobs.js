@@ -59,8 +59,61 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   const [activeKey, setActiveKey] = useState("summary");
 
   // Form state
-  const [formData, setFormData] = useState(initialJobData || {});
-  const [originalData, setOriginalData] = useState(initialJobData || {});
+  //const [formData, setFormData] = useState(initialJobData || {});
+  const [formData, setFormData] = useState({
+    ...initialJobData,
+    // Provide default values for all form fields
+    jobID: initialJobData?.jobID || '',
+    jobNo: initialJobData?.jobNo || '',
+    jobName: initialJobData?.jobName || '',
+    jobDescription: initialJobData?.jobDescription || '',
+    startDate: initialJobData?.startDate || '',
+    endDate: initialJobData?.endDate || '',
+    startTime: initialJobData?.startTime || '',
+    endTime: initialJobData?.endTime || '',
+    priority: initialJobData?.priority || '',
+    jobStatus: initialJobData?.jobStatus || 'Created',
+    scheduleSession: initialJobData?.scheduleSession || '',
+    estimatedDurationHours: initialJobData?.estimatedDurationHours || '',
+    estimatedDurationMinutes: initialJobData?.estimatedDurationMinutes || '',
+    contact: {
+      contactID: initialJobData?.contact?.contactID || '',
+      contactFullname: initialJobData?.contact?.contactFullname || '',
+      firstName: initialJobData?.contact?.firstName || '',
+      middleName: initialJobData?.contact?.middleName || '',
+      lastName: initialJobData?.contact?.lastName || '',
+      email: initialJobData?.contact?.email || '',
+      mobilePhone: initialJobData?.contact?.mobilePhone || '',
+      phoneNumber: initialJobData?.contact?.phoneNumber || '',
+      notification: {
+        notifyCustomer: initialJobData?.contact?.notification?.notifyCustomer || false
+      }
+    },
+    location: {
+      locationName: initialJobData?.location?.locationName || '',
+      address: {
+        streetNo: initialJobData?.location?.address?.streetNo || '',
+        streetAddress: initialJobData?.location?.address?.streetAddress || '',
+        block: initialJobData?.location?.address?.block || '',
+        buildingNo: initialJobData?.location?.address?.buildingNo || '',
+        city: initialJobData?.location?.address?.city || '',
+        stateProvince: initialJobData?.location?.address?.stateProvince || '',
+        postalCode: initialJobData?.location?.address?.postalCode || '',
+        country: initialJobData?.location?.address?.country || ''
+      },
+      coordinates: {
+        latitude: initialJobData?.location?.coordinates?.latitude || '',
+        longitude: initialJobData?.location?.coordinates?.longitude || ''
+      }
+    }
+  });
+  const [originalData, setOriginalData] = useState({
+    startDate: initialJobData?.startDate || '',
+    endDate: initialJobData?.endDate || '',
+    startTime: initialJobData?.startTime || '',
+    endTime: initialJobData?.endTime || '',
+    assignedWorkers: initialJobData?.assignedWorkers || []
+  });
 
   // Selection states
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -93,6 +146,37 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   useEffect(() => {
     // //console.log("Initial Job Data: ", initialJobData); // Log the data
     setTasks(initialJobData?.taskList || []);
+  }, [initialJobData]);
+
+  useEffect(() => {
+    if (initialJobData?.equipments) {
+      // Format the initial equipment data
+      const formattedEquipments = initialJobData.equipments.map(equipment => ({
+        brand: equipment.brand || equipment.Brand,
+        equipmentLocation: equipment.equipmentLocation || equipment.EquipmentLocation || null,
+        equipmentType: equipment.equipmentType || equipment.EquipmentType || '',
+        itemCode: equipment.itemCode || equipment.ItemCode || '',
+        itemGroup: equipment.itemGroup || equipment.ItemGroup || 'Equipment',
+        itemName: equipment.itemName || equipment.ItemName,
+        modelSeries: equipment.modelSeries || equipment.ModelSeries,
+        notes: equipment.notes || equipment.Notes || '',
+        serialNo: equipment.serialNo || equipment.SerialNo
+      }));
+
+      setOriginalEquipments(formattedEquipments);
+      setSelectedEquipments(formattedEquipments);
+      
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        equipments: formattedEquipments
+      }));
+
+      console.log('Initialized Equipment State:', {
+        originalCount: formattedEquipments.length,
+        equipments: formattedEquipments
+      });
+    }
   }, [initialJobData]);
 
   // Task Management Functions
@@ -158,6 +242,95 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   const toggleEquipments = () => {
     setShowEquipments(!showEquipments);
   };
+
+  // Modify the useEffect for initial data loading
+useEffect(() => {
+  const initializeFormData = async () => {
+    if (initialJobData) {
+      console.log('Initializing form with data:', initialJobData);
+
+      // Set initial customer and immediately update form data
+      const initialCustomer = {
+        value: initialJobData.customerID,
+        label: `${initialJobData.customerID} - ${initialJobData.customerName}`,
+        cardCode: initialJobData.customerID,
+        cardName: initialJobData.customerName
+      };
+      setSelectedCustomer(initialCustomer);
+
+      // Immediately set initial contact and location in form data
+      if (initialJobData.contact) {
+        setSelectedContact({
+          value: initialJobData.contact.contactID,
+          label: initialJobData.contact.contactID,
+          ...initialJobData.contact
+        });
+        console.log("Selected contact during intialization:", selectedContact);
+        
+        setFormData(prev => ({
+          ...prev,
+          contact: initialJobData.contact
+        }));
+      }
+
+      if (initialJobData.location) {
+        setSelectedLocation({
+          value: initialJobData.location.locationName,
+          label: initialJobData.location.locationName,
+          ...initialJobData.location
+        });
+        
+        setFormData(prev => ({
+          ...prev,
+          location: initialJobData.location
+        }));
+      }
+
+      try {
+        // Fetch contacts and locations for the customer
+        const [contactsResponse, locationsResponse] = await Promise.all([
+          fetch("/api/getContacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cardCode: initialJobData.customerID }),
+          }),
+          fetch("/api/getLocation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cardCode: initialJobData.customerID }),
+          })
+        ]);
+
+        if (contactsResponse.ok && locationsResponse.ok) {
+          const [contactsData, locationsData] = await Promise.all([
+            contactsResponse.json(),
+            locationsResponse.json()
+          ]);
+
+          // Format and set contacts and locations lists
+          const formattedContacts = contactsData.map(contact => ({
+            value: contact.contactId,
+            label: contact.contactId,
+            ...contact
+          }));
+          setContacts(formattedContacts);
+
+          const formattedLocations = locationsData.map(location => ({
+            value: location.siteId,
+            label: location.siteId,
+            ...location
+          }));
+          setLocations(formattedLocations);
+        }
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        toast.error('Error loading contact and location data');
+      }
+    }
+  };
+
+  initializeFormData();
+}, [initialJobData]);
 
   // Add useEffect to handle initial customer selection
   useEffect(() => {
@@ -451,7 +624,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   };
 
   const handleCustomerChange = async (selectedOption) => {
-    //console.log("handleCustomerChange triggered with:", selectedOption);
+    console.log("handleCustomerChange triggered with:", selectedOption);
 
     if (!selectedOption) {
       // Handle clearing the selection
@@ -467,8 +640,8 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       setSalesOrders([]);
       setFormData((prev) => ({
         ...prev,
-        customerID: "",
-        customerName: "",
+        customerID: selectedOption.cardCode,
+        customerName: selectedOption.cardName,
         contact: {
           contactID: "",
           contactFullname: "",
@@ -486,23 +659,25 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       return;
     }
 
-    setSelectedContact(null);
-    setSelectedLocation(null);
+    // setSelectedLocation(null);
     setSelectedCustomer(selectedOption);
-    setSelectedServiceCall(null);
-    setSelectedSalesOrder(null);
+    // setSelectedServiceCall(null);
+    // setSelectedSalesOrder(null);
 
-    const selectedCustomer = customers.find(
-      (option) => option.value === selectedOption.value
-    );
+    // const selectedCustomer = customers.find(
+    //   (option) => option.value === selectedOption.value
+    // );
 
-    //console.log("Selected customer:", selectedCustomer);
+   //console.log("Selected customer:", selectedCustomer);
 
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      customerID: selectedCustomer ? selectedCustomer.cardCode : "",
-      customerName: selectedCustomer ? selectedCustomer.cardName : "",
-    }));
+    // setFormData((prevFormData) => ({
+    //   ...prevFormData,
+    //   customerID: selectedCustomer ? selectedCustomer.cardCode : "",
+    //   customerName: selectedCustomer ? selectedCustomer.cardName : "",
+    // }));
+
+    // Start loading state
+  setIsLoading(true);
 
     try {
       //console.log("Fetching related data for customer:", selectedOption.value);
@@ -555,19 +730,17 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
       //console.log("Fetched equipments:", equipmentsData);
 
       const formattedEquipments = equipmentsData.map((item) => ({
-        value: item.ItemCode,
-        label: `${item.ItemCode} - ${item.ItemName}`,
-        ItemCode: item.ItemCode,
-        ItemName: item.ItemName,
-        ItemGroup: item.ItemGroup,
-        Brand: item.Brand,
-        EquipmentLocation: item.EquipmentLocation,
-        EquipmentType: item.EquipmentType,
+        brand: item.Brand,
+        equipmentLocation: item.EquipmentLocation || null,
+        equipmentType: item.EquipmentType || '',
+        itemCode: item.ItemCode || '',
+        itemGroup: item.ItemGroup || 'Equipment',
+        itemName: item.ItemName,
         modelSeries: item.ModelSeries,
+        notes: item.Notes || '',
         serialNo: item.SerialNo,
-        Notes: item.Notes,
-        WarrantyStartDate: item.WarrantyStartDate,
-        WarrantyEndDate: item.WarrantyEndDate,
+        warrantyStartDate: item.WarrantyStartDate,
+        warrantyEndDate: item.WarrantyEndDate
       }));
       //console.log("Formatted equipments:", formattedEquipments);
       setEquipments(formattedEquipments);
@@ -680,10 +853,12 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
     setSelectedContact(selectedOption);
 
+    console.log("Selected contact:", selectedOption);
+
     setFormData((prevFormData) => ({
       ...prevFormData,
       contact: {
-        ...prevFormData.contact, // Ensure you don't overwrite other fields like notification
+        ...prevFormData.contact, 
         contactID: selectedOption.value || "",
         contactFullname: fullName,
         firstName: selectedOption.firstName || "",
@@ -698,105 +873,115 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   };
 
   const handleLocationChange = (selectedOption) => {
+    if (!selectedOption) {
+      // Handle clearing the selection
+      setSelectedLocation(null);
+      setFormData(prev => ({
+        ...prev,
+        location: {
+          locationName: '',
+          address: {
+            streetNo: '',
+            streetAddress: '',
+            block: '',
+            buildingNo: '',
+            city: '',
+            stateProvince: '',
+            postalCode: '',
+            country: '',
+          },
+          coordinates: {
+            latitude: '',
+            longitude: '',
+          }
+        }
+      }));
+      return;
+    }
+
     const selectedLocation = locations.find(
       (location) => location.value === selectedOption.value
     );
 
     setSelectedLocation(selectedLocation);
 
-    // Update nested `location` and `address` in `formData`
-    setFormData((prevFormData) => ({
-      ...prevFormData,
+    // Update form data with the new location
+    setFormData(prev => ({
+      ...prev,
       location: {
-        ...prevFormData.location, // Spread existing location object
-        locationName: selectedLocation.label || "",
+        locationName: selectedLocation.label || '',
         address: {
-          ...prevFormData.location.address,
-          streetNo: selectedLocation.streetNo || "",
-          streetAddress: selectedLocation.street || "",
-          block: selectedLocation.block || "",
-          buildingNo: selectedLocation.building || "",
-          country: selectedLocation.countryName || "",
-          stateProvince: selectedLocation.stateProvince || "",
-          city: selectedLocation.city || "",
-          postalCode: selectedLocation.zipCode || "",
+          streetNo: selectedLocation.streetNo || '',
+          streetAddress: selectedLocation.street || '',
+          block: selectedLocation.block || '',
+          buildingNo: selectedLocation.building || '',
+          country: selectedLocation.countryName || '',
+          stateProvince: selectedLocation.stateProvince || '',
+          city: selectedLocation.city || '',
+          postalCode: selectedLocation.zipCode || '',
         },
         coordinates: {
-          latitude: selectedLocation.latitude || 0,
-          longitude: selectedLocation.longitude || 0,
+          latitude: selectedLocation.latitude || '',
+          longitude: selectedLocation.longitude || '',
         },
-      },
+      }
     }));
 
-    try {
-      // No external fetch required; data is updated synchronously.
-    } catch (error) {
-      console.error("Error handling location change:", error);
-      toast.error(`Error: ${error.message}`, {
-        duration: 5000,
-        style: {
-          background: "#fff",
-          color: "#dc3545",
-          padding: "16px",
-          borderLeft: "6px solid #dc3545",
-        },
-        iconTheme: {
-          primary: "#dc3545",
-          secondary: "#fff",
-        },
-      });
-
-      // Reset related state on error
-      setContacts([]);
-      setLocations([]);
-      setEquipments([]);
-      setServiceCalls([]);
-      setSalesOrders([]);
-    }
+    // Set flag to indicate changes
+    setHasChanges(true);
   };
 
   const handleSelectedServiceCallChange = async (selectedServiceCall) => {
     setSelectedServiceCall(selectedServiceCall);
+    setSelectedSalesOrder(null); // Reset sales order when service call changes
 
-    if (selectedServiceCall) {
-      try {
-        const response = await fetch("/api/getSalesOrder", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            serviceCallID: selectedServiceCall.value,
-            cardCode: formData.customerID,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch sales orders");
-        }
-
-        const data = await response.json();
-        //console.log("Fetched data:", data);
-
-        if (data && Array.isArray(data.value)) {
-          const formattedSalesOrders = data.value.map((order) => ({
-            value: order.DocNum, // Unique value
-            label: `Order #${order.DocNum} - $${order.DocTotal}`, // User-friendly label
-          }));
-          setSalesOrders(formattedSalesOrders);
-        } else {
-          throw new Error("Unexpected data format");
-        }
-      } catch (error) {
-        console.error("Error fetching sales orders:", error);
-        toast.error("Failed to fetch sales orders");
-        setSalesOrders([]);
-      }
-    } else {
+    if (!selectedServiceCall) {
       setSalesOrders([]);
-      setSelectedSalesOrder(null);
+      return;
     }
-    setHasChanges(true);
+
+    try {
+      // Log the request payload for debugging
+      const requestPayload = {
+        serviceCallID: selectedServiceCall.value,
+        cardCode: formData.customerID
+      };
+      console.log('Fetching sales orders with payload:', requestPayload);
+
+      const response = await fetch("/api/getSalesOrder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch sales orders');
+      }
+
+      const data = await response.json();
+      console.log("Sales orders response:", data);
+
+      if (data && Array.isArray(data.value)) {
+        const formattedSalesOrders = data.value.map((order) => ({
+          value: order.DocNum.toString(),
+          label: `${order.DocNum} - ${getStatusText(order.DocStatus)}`,
+          docTotal: order.DocTotal,
+          docStatus: order.DocStatus,
+        }));
+
+        setSalesOrders(formattedSalesOrders);
+      } else {
+        setSalesOrders([]);
+        console.warn('No sales orders found or invalid data format:', data);
+      }
+    } catch (error) {
+      console.error("Error fetching sales orders:", error);
+      toast.error(`Failed to fetch sales orders: ${error.message}`);
+      setSalesOrders([]);
+    }
   };
 
   // Helper function to convert status codes to readable text
@@ -809,41 +994,22 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     return statusMap[status] || status;
   };
 
-  // Equipment selection handler
-  const handleEquipmentSelection = useCallback(({ currentSelections, originalData }) => {
-    setSelectedEquipments(currentSelections);
-    setOriginalEquipments(originalData);
+  // Add a new function to handle equipment selection changes
+  const handleEquipmentSelection = useCallback(({ currentSelections, added, removed }) => {
+    console.log('Equipment Selection Changed:', { currentSelections, added, removed });
     
-    // Update form data with selected equipment
+    // Update the selected equipments state
+    setSelectedEquipments(currentSelections);
+    
+    // Update form data with the new equipment selections
     setFormData(prev => ({
       ...prev,
-      equipments: currentSelections.map(equipment => ({
-        itemCode: equipment.ItemCode,
-        itemName: equipment.ItemName,
-        itemGroup: equipment.ItemGroup,
-        brand: equipment.Brand,
-        equipmentLocation: equipment.EquipmentLocation,
-        equipmentType: equipment.EquipmentType,
-        modelSeries: equipment.modelSeries,
-        serialNo: equipment.serialNo,
-        notes: equipment.Notes
-      }))
+      equipments: currentSelections
     }));
 
+    // Set flag to indicate changes
     setHasChanges(true);
   }, []);
-
-  // Initialize equipment data from initialJobData
-  useEffect(() => {
-    if (initialJobData?.equipments) {
-      const syncedEquipments = initialJobData.equipments.map(equipment => ({
-        ...equipment,
-        originalData: { ...equipment }
-      }));
-      setSelectedEquipments(syncedEquipments);
-      setOriginalEquipments(syncedEquipments);
-    }
-  }, [initialJobData]);
 
   const handleNextClick = () => {
     if (activeKey === "summary") {
@@ -902,21 +1068,26 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
         return { hasConflicts: false, conflicts: [] };
       }
 
+      // Check if the schedule hasn't changed from the original
+      if (
+        jobData.startDate === originalData.startDate &&
+        jobData.endDate === originalData.endDate &&
+        jobData.startTime === originalData.startTime &&
+        jobData.endTime === originalData.endTime &&
+        JSON.stringify(selectedWorkers.map(w => w.value).sort()) === 
+        JSON.stringify(originalData.assignedWorkers?.map(w => w.workerId).sort())
+      ) {
+        return { hasConflicts: false, conflicts: [] };
+      }
+
       const conflicts = [];
-      const startDateTime = new Date(
-        `${jobData.startDate}T${jobData.startTime}`
-      );
+      const startDateTime = new Date(`${jobData.startDate}T${jobData.startTime}`);
       const endDateTime = new Date(`${jobData.endDate}T${jobData.endTime}`);
 
-      // Use selectedWorkers instead of jobData.assignedWorkers
       for (const worker of selectedWorkers) {
-        // Ensure worker has required properties
-        if (!worker || !worker.label) {
-          continue;
-        }
+        if (!worker?.value || !worker?.label) continue;
 
         try {
-          // Query using worker.value (worker ID) instead of workerName
           const jobsQuery = query(
             collection(db, "jobs"),
             where("assignedWorkers", "array-contains", {
@@ -943,21 +1114,12 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
             ) {
               conflicts.push({
                 worker: worker.label,
-                conflictingJob: {
-                  jobNo: job.jobNo,
-                  startDate: job.startDate,
-                  endDate: job.endDate,
-                  startTime: job.startTime,
-                  endTime: job.endTime,
-                },
+                message: `${worker.label} has a scheduling conflict with Job #${job.jobNo} (${job.startDate} ${job.startTime} - ${job.endTime})`
               });
             }
           });
         } catch (error) {
-          console.error(
-            `Error checking conflicts for worker ${worker.label}:`,
-            error
-          );
+          console.error(`Error checking conflicts for worker ${worker.label}:`, error);
         }
       }
 
@@ -985,258 +1147,73 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
   // Updated handleSubmitClick for editing
 
   const handleSubmitClick = async () => {
-    const auth = getAuth();
-
     try {
-      // Get cookies related to the current user
-      const userCookies = {
-        email: Cookies.get("email"), // Email stored in cookie
-        uid: Cookies.get("uid"), // User ID stored in cookie
-        workerId: Cookies.get("workerId"), // Worker ID stored in cookie
-        isAdmin: Cookies.get("isAdmin") === "true", // Convert string to boolean
-        sessionExpiry: Cookies.get("B1SESSION_EXPIRY"), // Session expiry
-      };
+      setIsSubmitting(true);
+      setProgress(10);
 
-      //console.log("User Cookies:", userCookies); // Log user cookies for verification
-
-      // Log all form data before submission
-      //console.log("=== FORM SUBMISSION DATA ===");
-      // console.log("Form Data:", {
-      //   ...formData,
-      //   startDate: formData.startDate,
-      //   endDate: formData.endDate,
-      //   startTime: formData.startTime,
-      //   endTime: formData.endTime,
-      // });
-      //console.log("Selected Customer:", selectedCustomer);
-      //console.log("Selected Contact:", selectedContact);
-      //console.log("Selected Location:", selectedLocation);
-      //console.log("Selected Service Call:", selectedServiceCall);
-      //console.log("Selected Sales Order:", selectedSalesOrder);
-      //console.log("Selected Workers:", selectedWorkers);
-      //console.log("Tasks:", tasks);
-      //console.log("Job Contact Type:", selectedJobContactType);
-      //console.log("=== END FORM DATA ===");
-
-      // Validation check
-      const missingFields = [];
-      if (!selectedCustomer) missingFields.push("Customer");
-      if (!selectedContact) missingFields.push("Contact");
-      if (!selectedLocation) missingFields.push("Location");
-      if (!selectedWorkers.length) missingFields.push("Assigned Workers");
-      if (!formData.startDate) missingFields.push("Start Date");
-      if (!formData.endDate) missingFields.push("End Date");
-      if (!formData.startTime) missingFields.push("Start Time");
-      if (!formData.endTime) missingFields.push("End Time");
-      if (!formData.jobName) missingFields.push("Job Name");
-      if (!formData.priority) missingFields.push("Priority");
-      if (!selectedJobContactType) missingFields.push("Job Contact Type");
-
-      if (missingFields.length > 0) {
-        //console.log("Missing Required Fields:", missingFields);
-        toast.error(
-          <div>
-            <strong>Please fill in all required fields:</strong>
-            <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
-              {missingFields.map((field, index) => (
-                <li key={index}>{field}</li>
-              ))}
-            </ul>
-          </div>,
-          {
-            duration: 5000,
-            style: {
-              background: "#fff",
-              color: "#dc3545",
-              padding: "16px",
-              borderLeft: "6px solid #dc3545",
-              maxWidth: "500px",
-            },
-          }
-        );
+      // Validate form data
+      if (!validateJobForm(formData)) {
+        setIsSubmitting(false);
         return;
       }
 
-      setProgress(0);
-      setIsSubmitting(true);
-
-      //console.log("Starting submission process...");
-      setProgress(20);
-
-      // Format the workers data before submission
-      const formattedWorkers = selectedWorkers.map((worker) => ({
-        workerId: worker.value,
-        workerName: worker.label,
-      }));
-
-      async function getUserDisplayName(workerId) {
-        try {
-          const userRef = doc(db, "users", workerId); // Reference to the user's document using workerId
-          const userDoc = await getDoc(userRef); // Get the document
-
-          if (userDoc.exists()) {
-            return userDoc.data().fullName || "Anonymous"; // Return the displayName or default to "Anonymous"
-          } else {
-            console.error("User not found");
-            return "Anonymous"; // Default if no user is found
-          }
-        } catch (error) {
-          console.error("Error getting user displayName:", error);
-          return "Anonymous"; // Default in case of error
-        }
-      }
-      // Create the initial form data with worker information
-      const updatedFormData = {
+      const jobRef = doc(db, "jobs", jobIdProp);
+      
+      // Prepare the update data
+      const updateData = {
         ...formData,
-        assignedWorkers: formattedWorkers,
-        updatedAt: Timestamp.now(),
-        salesOrderID: selectedSalesOrder?.value || null, // Ensure Sales Order ID is captured
-        serviceCallID: selectedServiceCall?.value || null, // Ensure Service Call ID is captured
-        updatedBy: {
-          workerId: userCookies.workerId, // Use the current user's UID
-          fullName: await getUserDisplayName(userCookies.workerId), // Retrieve displayName from Firestore
-          timestamp: Timestamp.now(),
-        },
-      };
-
-      // Check for conflicts with the formatted data
-      const conflicts = await checkForOverlappingJobs(
-        updatedFormData,
-        jobIdProp
-      );
-
-      if (conflicts.hasConflicts) {
-        // Create a formatted message showing all conflicts
-        const conflictMessage = conflicts.conflicts
-          .map(
-            (conflict) =>
-              `• ${conflict.worker} has a scheduling conflict with Job #${conflict.conflictingJob.jobNo} (${conflict.conflictingJob.startDate} ${conflict.conflictingJob.startTime} - ${conflict.conflictingJob.endTime})`
-          )
-          .join("\n");
-
-        const result = await Swal.fire({
-          title: "Schedule Conflicts Detected",
-          html: `
-        <div class="text-start">
-          <p class="mb-3">The following scheduling conflicts were found:</p>
-          <div class="alert alert-warning">
-            ${conflicts.conflicts
-              .map((c) => `<p class="mb-2">${c.message}</p>`)
-              .join("")}
-          </div>
-          <p class="mt-3">Do you want to proceed with creating this job anyway?</p>
-        </div>
-      `,
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonText: "Yes, proceed anyway",
-          cancelButtonText: "No, let me adjust the schedule",
-          confirmButtonColor: "#28a745",
-          cancelButtonColor: "#dc3545",
-          customClass: {
-            htmlContainer: "text-start",
+        lastModifiedAt: Timestamp.now(),
+        equipments: selectedEquipments, // Use the selected equipments
+        location: {
+          locationName: formData.location?.locationName || '',
+          address: {
+            streetNo: formData.location?.address?.streetNo || '',
+            streetAddress: formData.location?.address?.streetAddress || '',
+            block: formData.location?.address?.block || '',
+            buildingNo: formData.location?.address?.buildingNo || '',
+            city: formData.location?.address?.city || '',
+            stateProvince: formData.location?.address?.stateProvince || '',
+            postalCode: formData.location?.address?.postalCode || '',
+            country: formData.location?.address?.country || '',
           },
-        });
-
-        if (!result.isConfirmed) {
-          setIsSubmitting(false);
-          return;
+          coordinates: {
+            latitude: formData.location?.coordinates?.latitude || '',
+            longitude: formData.location?.coordinates?.longitude || '',
+          }
+        },
+        contact: {
+          contactID: formData.contact?.contactID || '',
+          contactFullname: formData.contact?.contactFullname || '',
+          firstName: formData.contact?.firstName || '',
+          middleName: formData.contact?.middleName || '',
+          lastName: formData.contact?.lastName || '',
+          email: formData.contact?.email || '',
+          mobilePhone: formData.contact?.mobilePhone || '',
+          phoneNumber: formData.contact?.phoneNumber || '',
+          notification: {
+            notifyCustomer: formData.contact?.notification?.notifyCustomer || false,
+          }
         }
-      }
-
-      // Format dates
-      //console.log("Formatting dates and preparing form data...");
-      setProgress(60);
-      const formattedStartDateTime = formatDateTime(
-        formData.startDate,
-        formData.startTime
-      );
-      const formattedEndDateTime = formatDateTime(
-        formData.endDate,
-        formData.endTime
-      );
-
-      // Update the form data with formatted dates
-      const finalFormData = {
-        ...updatedFormData,
-        formattedStartDateTime,
-        formattedEndDateTime,
       };
 
-      // Save to Firestore
-      //console.log("Form Datas", formData);
-      // //console.log("Saving to Firestore...");
-      // const jobRef = doc(db, "jobs", jobIdProp);
-      // await updateDoc(jobRef, finalFormData);
+      setProgress(50);
 
-      //console.log("Successfully saved to Firestore");
+      // Update the document in Firebase
+      await updateDoc(jobRef, updateData);
+
       setProgress(100);
-
-      // Update success message for edit mode
-      const handleSubmitSuccess = async (jobDetails) => {
-        const result = await Swal.fire({
-          title:
-            '<div class="d-flex align-items-center justify-content-center gap-2">' +
-            "<span>Job Updated Successfully!</span>" +
-            '<span class="animate__animated animate__bounceIn">✅</span>' +
-            "</div>",
-          html: `
-        <div class="text-start">
-          <div class="card border-success mb-3">
-            <div class="card-header bg-success text-white">
-              <i class="fas fa-info-circle me-2"></i>Updated Job Details
-            </div>
-            <div class="card-body">
-              <ul class="list-group list-group-flush">
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-hashtag me-2 text-primary"></i>Job No:</span>
-                  <span class="badge bg-primary">${jobIdProp}</span>
-                </li>
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-building me-2 text-info"></i>Customer:</span>
-                  <span class="text-truncate ms-2" style="max-width: 200px;">${
-                    selectedCustomer?.label || ""
-                  }</span>
-                </li>
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-calendar me-2 text-warning"></i>Schedule:</span>
-                  <span>${formData.startDate} ${formData.startTime}</span>
-                </li>
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-users me-2 text-success"></i>Workers:</span>
-                  <span class="badge bg-success">${
-                    selectedWorkers.length
-                  }</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      `,
-          icon: "success",
-          showConfirmButton: true,
-          confirmButtonText: '<i class="fas fa-list me-2"></i>View Jobs List',
-          showCancelButton: true,
-          cancelButtonText: '<i class="fas fa-edit me-2"></i>Continue Editing',
-          confirmButtonColor: "#28a745",
-          cancelButtonColor: "#17a2b8",
-        });
-
-        if (result.isConfirmed) {
-          router.push("/dashboard/jobs/list-jobs");
-        }
-      };
-
-      handleSubmitSuccess(finalFormData);
+      toast.success('Job updated successfully!');
+      
+      // Reset states
       setHasChanges(false);
+      setOriginalEquipments(selectedEquipments);
+      
+      // Optionally refresh the data
+      router.push('/jobs');
+
     } catch (error) {
-      console.error("Error in submission:", error);
-      toast.error(`Error: ${error.message}`);
-      await Swal.fire({
-        title: "Error!",
-        text: error.message || "An error occurred while updating the job.",
-        icon: "error",
-      });
+      console.error('Error updating job:', error);
+      toast.error(`Failed to update job: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1282,6 +1259,11 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
         if (jobSnap.exists()) {
           const jobData = jobSnap.data();
+
+          if (jobData.equipments) {
+            setOriginalEquipments(jobData.equipments);
+            setSelectedEquipments(jobData.equipments);
+          }
 
           // Store original data for comparison
           setOriginalData(jobData);
@@ -1354,7 +1336,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
           if (jobData.contact) {
             setSelectedContact({
               value: jobData.contact.contactID,
-              label: jobData.contact.contactFullname,
+              label: jobData.contact.contactID,
               ...jobData.contact,
             });
           }
@@ -1423,6 +1405,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
 
     fetchJobData();
   }, [jobIdProp]);
+
 
   // Add this component for fields that need tooltips
   const RequiredFieldWithTooltip = ({ label }) => (
@@ -1525,13 +1508,21 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                   options={customers}
                   value={selectedCustomer}
                   onChange={handleCustomerChange}
-                  placeholder={
-                    isLoading ? "Loading customers..." : "Enter Customer Name"
-                  }
-                  isDisabled={isLoading}
-                  noOptionsMessage={() =>
-                    isLoading ? "Loading..." : "No customers found"
-                  }
+                  placeholder={isLoading ? "Loading customers..." : "Enter Customer Name"}
+                  isDisabled={true} // Changed from disabled to isDisabled for react-select
+                  noOptionsMessage={() => isLoading ? "Loading..." : "No customers found"}
+                  styles={{
+                    // Optional: Add custom styles to make it visually clear that it's disabled
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: '#e9ecef',
+                      cursor: 'not-allowed'
+                    }),
+                    singleValue: (base) => ({
+                      ...base,
+                      color: '#6c757d'
+                    })
+                  }}
                 />
               </Form.Group>
             </Row>
@@ -1566,12 +1557,21 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                   </OverlayTrigger>
                 </Form.Label>
                 <Select
-                  instanceId="contact-select"
-                  options={contacts}
-                  value={selectedContact}
-                  onChange={handleContactChange}
-                  placeholder="Select Contact ID"
-                />
+  instanceId="contact-select"
+  options={contacts}
+  value={selectedContact}
+  onChange={handleContactChange}
+  placeholder="Select Contact ID"
+  isDisabled={!selectedCustomer}
+  defaultValue={selectedContact}
+  key={`contact-${selectedCustomer?.value}`} // Add customer dependency
+  isLoading={contacts.length === 0 && selectedCustomer !== null}
+  noOptionsMessage={() => 
+    selectedCustomer 
+      ? "No contacts found for this customer" 
+      : "Please select a customer first"
+  }
+/>
               </Form.Group>
             </Row>
 
@@ -1699,144 +1699,15 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                       value={selectedLocation}
                       onChange={handleLocationChange}
                       placeholder="Select Site ID"
-                      isGrouped={true}
-                      formatGroupLabel={(data) => (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            fontSize: "0.9em",
-                            fontWeight: "bold",
-                            padding: "8px 0",
-                            color: "#2c3e50",
-                            borderBottom: "2px solid #eee",
-                            width: "100%",
-                          }}
-                        >
-                          <span>{data.label}</span>
-                          <span
-                            style={{
-                              background: "#e9ecef",
-                              borderRadius: "4px",
-                              padding: "2px 8px",
-                              fontSize: "0.8em",
-                            }}
-                          >
-                            {data.options.length}
-                          </span>
-                        </div>
-                      )}
-                      formatOptionLabel={(option) => (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "10px",
-                            padding: "4px 0",
-                          }}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div
-                              style={{
-                                fontWeight: "500",
-                                color: "#2c3e50",
-                                marginBottom: "2px",
-                              }}
-                            >
-                              {option.building
-                                ? `${String(option.building)} - `
-                                : ""}{" "}
-                              {String(option.address)}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.85em",
-                                color: "#666",
-                                lineHeight: "1.3",
-                              }}
-                            >
-                              {[
-                                String(option.zipCode),
-                                String(option.countryName),
-                              ]
-                                .filter(Boolean)
-                                .join(", ")}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "0.75em",
-                              padding: "3px 8px",
-                              borderRadius: "12px",
-                              background:
-                                option.addressType === "B"
-                                  ? "#e3f2fd"
-                                  : "#fff3e0",
-                              color:
-                                option.addressType === "B"
-                                  ? "#1976d2"
-                                  : "#f57c00",
-                              whiteSpace: "nowrap",
-                              alignSelf: "center",
-                            }}
-                          >
-                            {option.addressType === "B"
-                              ? "Billing"
-                              : "Shipping"}
-                          </div>
-                        </div>
-                      )}
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          minHeight: "45px",
-                          borderColor: "#dee2e6",
-                          "&:hover": {
-                            borderColor: "#80bdff",
-                          },
-                        }),
-                        group: (base) => ({
-                          ...base,
-                          paddingTop: 8,
-                          paddingBottom: 8,
-                        }),
-                        option: (base, state) => ({
-                          ...base,
-                          padding: "8px 12px",
-                          borderBottom: "1px solid #f0f0f0",
-                          backgroundColor: state.isFocused
-                            ? "#f8f9fa"
-                            : "white",
-                          cursor: "pointer",
-                          "&:hover": {
-                            backgroundColor: "#f8f9fa",
-                          },
-                        }),
-                        menu: (base) => ({
-                          ...base,
-                          zIndex: 9999,
-                          boxShadow:
-                            "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
-                        }),
-                        groupHeading: (base) => ({
-                          ...base,
-                          margin: "8px 0",
-                          fontSize: "0.9em",
-                          fontWeight: "bold",
-                        }),
-                      }}
-                      noOptionsMessage={() => (
-                        <div
-                          style={{
-                            padding: "8px",
-                            textAlign: "center",
-                            color: "#666",
-                          }}
-                        >
-                          No locations found for this customer
-                        </div>
-                      )}
+                      isDisabled={!selectedCustomer}
+                      defaultValue={selectedLocation}
+                      key={`location-${selectedCustomer?.value}`} // Add customer dependency
+                      isLoading={locations.length === 0 && selectedCustomer !== null}
+                      noOptionsMessage={() => 
+                        selectedCustomer 
+                          ? "No locations found for this customer" 
+                          : "Please select a customer first"
+                      }
                     />
                   </Form.Group>
                 </Row>
@@ -1945,15 +1816,12 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                   {equipments.length > 0 ? (
                     <EquipmentsTableWithAddDelete
                       equipments={equipments}
-                      initialSelected={initialJobData?.equipments}
+                      initialSelected={originalEquipments}
                       onSelectionChange={handleEquipmentSelection}
                     />
                   ) : (
                     <div className="text-center py-4">
-                      <p>
-                        No equipment data available. Please select a customer
-                        first.
-                      </p>
+                      <p>No equipment data available. Please select a customer first.</p>
                     </div>
                   )}
                 </Row>
@@ -2250,7 +2118,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
                     type="number"
                     name="estimatedDurationHours"
                     value={formData.estimatedDurationHours}
-                    onChange={handleInputChange}
+                    onChange={calculateDuration}
                     placeholder="Hours"
                     readOnly={
                       formData.scheduleSession !== "custom" ||
@@ -2283,13 +2151,13 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
             <hr className="my-4" />
             <Row className="mb-3">
               <Form.Group as={Col} controlId="jobName" className="mb-3">
-                <RequiredFieldWithTooltip label="Job Name" />
+                <RequiredFieldWithTooltip label="Subject Name" />
                 <Form.Control
                   type="text"
                   name="jobName"
                   value={formData.jobName}
                   onChange={handleInputChange}
-                  placeholder="Enter Job Name"
+                  placeholder="Enter Subject Name"
                 />
               </Form.Group>
               <Form.Group controlId="description" className="mb-3">

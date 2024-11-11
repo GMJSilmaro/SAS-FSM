@@ -28,7 +28,7 @@ const TaskList = ({ workers, jobNo }) => {
       (docSnapshot) => {
         if (docSnapshot.exists()) {
           const jobData = docSnapshot.data();
-          console.log("Real-time Job Data:", jobData);
+          //console.log("Real-time Job Data:", jobData);
 
           // Ensure taskList is an array and handle errors gracefully
           if (Array.isArray(jobData.taskList)) {

@@ -1,313 +1,302 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Col, Row, Card, Button, Form } from "react-bootstrap";
-import DataTable from "react-data-table-component";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Table, Form, Button } from 'react-bootstrap';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  flexRender,
+  getFilteredRowModel,
+} from '@tanstack/react-table';
 
 const EquipmentsTableWithAddDelete = ({
   equipments = [],
   initialSelected = [],
   onSelectionChange,
 }) => {
-  const [editableEquipments, setEditableEquipments] = useState([]);
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [filteredEquipments, setFilteredEquipments] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [rowSelection, setRowSelection] = useState({});
+  const [sorting, setSorting] = useState([]);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [data, setData] = useState([]);
+  const [updatedEquipments, setUpdatedEquipments] = useState([]);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     if (equipments.length > 0) {
-      // Create deep clones of equipment data
-      const equipmentClone = equipments.map(equipment => ({
+      // Mark items that are from DB (initially selected)
+      const preparedData = equipments.map(equipment => ({
         ...equipment,
-        isSelected: false,
-        originalData: { ...equipment } // Keep original data for reference
+        fromDB: initialSelected.some(dbItem => 
+          dbItem.serialNo === equipment.serialNo && 
+          dbItem.modelSeries === equipment.modelSeries
+        )
       }));
-
-      // Mark initially selected equipment
-      if (initialSelected) {
-        equipmentClone.forEach(equipment => {
-          const isInitiallySelected = initialSelected.some(
-            selected => 
-              equipment.SerialNo === (selected.serialNo || selected.SerialNo) &&
-              equipment.ModelSeries === (selected.modelSeries || selected.ModelSeries)
-          );
-          equipment.isSelected = isInitiallySelected;
-        });
-      }
-
-      setEditableEquipments(equipmentClone);
-      
-      // Set initial selections
-      const initialSelectedRows = equipmentClone.filter(eq => eq.isSelected);
-      setSelectedRows(initialSelectedRows);
-      setFilteredEquipments(equipmentClone);
+  
+      // Sort to show DB items first
+      const sortedData = [
+        ...preparedData.filter(item => item.fromDB),
+        ...preparedData.filter(item => !item.fromDB)
+      ];
+  
+      setData(sortedData);
+  
+      // Set initial selection state for DB items
+      const initialSelectionState = {};
+      sortedData.forEach((item, index) => {
+        if (item.fromDB) {
+          initialSelectionState[index] = true;
+        }
+      });
+  
+      // Debug initial state
+      console.log('Initial State:', {
+        data: sortedData.length,
+        initialSelected: initialSelected.length,
+        selectionState: initialSelectionState
+      });
+  
+      setRowSelection(initialSelectionState);
+      setUpdatedEquipments(initialSelected);
     }
   }, [equipments, initialSelected]);
 
-  const handleSelectionChange = useCallback(({ selectedRows: newSelectedRows }) => {
-    setSelectedRows(newSelectedRows);
-
-    // Update editable equipment states
-    const updatedEquipments = editableEquipments.map(equipment => ({
-      ...equipment,
-      isSelected: newSelectedRows.some(
-        selected => 
-          selected.SerialNo === equipment.SerialNo &&
-          selected.ModelSeries === equipment.ModelSeries
-      )
+  // Handle selection changes
+  const handleSelectionChange = useCallback((updatedSelection) => {
+    // If updatedSelection is a function, get the actual value
+    const newSelection = typeof updatedSelection === 'function' 
+      ? updatedSelection(rowSelection) 
+      : updatedSelection;
+    
+    setRowSelection(newSelection);
+    
+    // Get currently selected equipments
+    const selectedEquipments = data.filter((_, index) => newSelection[index]).map(equipment => ({
+      brand: equipment.brand || equipment.Brand,
+      equipmentLocation: equipment.equipmentLocation || equipment.EquipmentLocation || null,
+      equipmentType: equipment.equipmentType || '',
+      itemCode: equipment.itemCode || '',
+      itemGroup: equipment.itemGroup || 'Equipment',
+      itemName: equipment.itemName || equipment.ItemName,
+      modelSeries: equipment.modelSeries,
+      notes: equipment.notes || equipment.Notes || '',
+      serialNo: equipment.serialNo,
+      fromDB: equipment.fromDB
     }));
 
-    setEditableEquipments(updatedEquipments);
-    
-    // Notify parent with both current selections and original data
+    // Debug the actual selection
+    console.log('Actual Selection:', {
+      newSelection,
+      selectedEquipments,
+      selectedIndices: Object.keys(newSelection).filter(key => newSelection[key])
+    });
+
+    // Separate DB items and new selections
+    const selectedDBItems = selectedEquipments.filter(item => item.fromDB);
+    const selectedNewItems = selectedEquipments.filter(item => !item.fromDB);
+
+    // Calculate added and removed items
+    const addedEquipments = selectedNewItems;
+    const removedEquipments = initialSelected.filter(
+      dbItem => !selectedDBItems.some(selected => 
+        dbItem.serialNo === selected.serialNo && 
+        dbItem.modelSeries === selected.modelSeries
+      )
+    );
+
+    // Update the equipment list
+    setUpdatedEquipments(selectedEquipments);
+
     onSelectionChange({
-      currentSelections: newSelectedRows,
-      originalData: newSelectedRows.map(row => row.originalData)
+      currentSelections: selectedEquipments,
+      added: addedEquipments,
+      removed: removedEquipments,
+      originalData: initialSelected
     });
-  }, [editableEquipments, onSelectionChange]);
+  }, [data, initialSelected, onSelectionChange, rowSelection]);
 
-  const handleSearchChange = (e) => {
-    const term = e.target.value;
-    setSearchTerm(term);
-    console.log("Search term:", term);
+  // Update the display counts
+  const selectedCount = Object.keys(rowSelection).filter(key => rowSelection[key]).length;
+  const addedCount = Object.keys(rowSelection).filter(key => rowSelection[key] && !data[key]?.fromDB).length;
+  const selectedDBCount = Object.keys(rowSelection).filter(key => rowSelection[key] && data[key]?.fromDB).length;
+  const removedCount = initialSelected.length - selectedDBCount;
 
-    const filtered = equipments.filter((equipment) => {
-      return equipment.ItemName.toLowerCase().includes(term.toLowerCase());
-      // equipment.modelSeries.toLowerCase().includes(term.toLowerCase())
-    });
-
-    //console.log("Filtered equipment:", filtered);
-    setFilteredEquipments(filtered);
-    setCurrentPage(1); // Reset to the first page whenever search changes
-  };
-
-  const handleAddEquipment = (equipment) => {
-    console.log("Adding equipment:", equipment);
-    if (!selectedRows.find((item) => item.serialNo === equipment.serialNo)) {
-      const updatedSelected = [...selectedRows, equipment];
-      setSelectedRows(updatedSelected);
-      console.log("Updated selected rows after adding:", updatedSelected);
-      onSelectionChange({ currentSelections: updatedSelected });
-    }
-  };
-
-  const handleDeleteEquipment = (serialNo) => {
-    console.log("Deleting equipment with SerialNo:", serialNo);
-    // Only delete the specific equipment by SerialNo
-    const updatedRows = selectedRows.filter((row) => row.serialNo !== serialNo);
-    setSelectedRows(updatedRows);
-    console.log("Updated selected rows after deleting:", updatedRows);
-    onSelectionChange({ currentSelections: updatedRows });
-  };
-
-  // Define the columns to be used in both the "Selected" and "Available" tables
-  const columns = [
+  const columns = useMemo(() => [
     {
-      name: "Item Name",
-      selector: (row) => row.ItemName,
-      sortable: true,
-    },
-    {
-      name: "Serial No",
-      selector: (row) => row.serialNo,
-      sortable: true,
-    },
-    {
-      name: "Model Series",
-      selector: (row) => row.modelSeries,
-      sortable: true,
-    },
-    {
-      name: "Brand",
-      selector: (row) => row.Brand,
-      sortable: true,
-    },
-
-    {
-      name: "Equipment Location",
-      selector: (row) => row.equipmentLocation || "N/A",
-      sortable: true,
-    },
-    {
-      name: "Notes",
-      selector: (row) => row.notes || "No Notes",
-      sortable: true,
-    },
-    {
-      name: "Actions",
-      cell: (row) => (
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() => handleDeleteEquipment(row.serialNo)}
-        >
-          Delete
-        </Button>
+      id: 'select',
+      header: ({ table }) => (
+        <div className="px-1">
+          <Form.Check
+            type="checkbox"
+            checked={table.getIsAllRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate = table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
+              }
+            }}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="px-1">
+          <Form.Check
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            className={row.original.fromDB ? 'text-primary' : ''}
+          />
+        </div>
       ),
     },
-  ];
+    {
+      header: 'Item Name',
+      accessorKey: 'itemName',
+      cell: ({ row }) => row.original.ItemName || row.original.itemName,
+    },
+    {
+      header: 'Serial No',
+      accessorKey: 'serialNo',
+    },
+    {
+      header: 'Model Series',
+      accessorKey: 'modelSeries',
+    },
+    {
+      header: 'Brand',
+      accessorKey: 'brand',
+      cell: ({ row }) => row.original.Brand || row.original.brand,
+    },
+    {
+      header: 'Equipment Location',
+      accessorKey: 'equipmentLocation',
+      cell: ({ getValue }) => getValue() || 'N/A',
+    },
+    {
+      header: 'Notes',
+      accessorKey: 'notes',
+      cell: ({ row }) => row.original.Notes || row.original.notes,
+    },
+  ], []);
 
-  const customStyles = {
-    headRow: {
-      style: {
-        backgroundColor: "#f8f9fa",
-        borderTopStyle: "solid",
-        borderTopWidth: "1px",
-        borderTopColor: "#dee2e6",
+  // Table configuration
+  const table = useReactTable({
+    data,
+    columns,
+    state: {
+      sorting,
+      globalFilter,
+      rowSelection,
+    },
+    enableRowSelection: true,
+    onRowSelectionChange: handleSelectionChange,
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
       },
     },
-    headCells: {
-      style: {
-        fontSize: "14px",
-        fontWeight: "bold",
-      },
-    },
-  };
+  });
 
-  // Pagination Logic for Available Equipment List
-  const indexOfLastEquipment = currentPage * itemsPerPage;
-  const indexOfFirstEquipment = indexOfLastEquipment - itemsPerPage;
-  const currentEquipments = filteredEquipments.slice(
-    indexOfFirstEquipment,
-    indexOfLastEquipment
-  );
-
-  // console.log("Current page:", currentPage);
-  // console.log("Current Equipments (paginated):", currentEquipments);
-
-  const paginate = (pageNumber) => {
-    //console.log("Changing page to:", pageNumber);
-    setCurrentPage(pageNumber);
-  };
 
   return (
-    <Row>
-      <Col xs={12}>
-        <Card>
-          <Card.Header>
-            <h4 className="mb-1">Equipment List</h4>
-            <p className="text-muted mb-0">
-              Showing {selectedRows.length} selected equipment(s)
+    <div className="my-4">
+      <div className="mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h6 className="mb-0">
+              Showing {selectedCount} selected equipment(s)
+            </h6>
+            <p className="text-muted small mb-0">
+              Original DB items: {initialSelected.length} | Added: {addedCount} | Removed: {removedCount}
             </p>
-          </Card.Header>
-          <Card.Body className="p-0">
-            <Form></Form>
+          </div>
+          <Form.Control
+            type="text"
+            value={globalFilter ?? ''}
+            onChange={e => setGlobalFilter(e.target.value)}
+            placeholder="Search equipments..."
+            className="w-auto"
+          />
+        </div>
+      </div>
 
-            {/* Display selected rows in DataTable */}
-            <h5 className="pt-4">Selected Equipment</h5>
-            <DataTable
-              columns={columns}
-              data={selectedRows} // Display the selected equipment
-              pagination
-              paginationPerPage={5}
-              customStyles={customStyles}
-              onSelectedRowsChange={handleSelectionChange}
-            />
-
-            <Form.Group>
-              <Form.Label>Search Equipment To (Add/Remove) </Form.Label>
-              <Form.Control
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Enter Serial No or Model Series"
-              />
-            </Form.Group>
-            <div className="mt-3">
-              <h5>Available Equipment (Add more)</h5>
-              <DataTable
-                columns={[
-                  {
-                    name: "Item Name",
-                    selector: (row) => row.ItemName,
-                    sortable: true,
-                  },
-                  {
-                    name: "Serial No",
-                    selector: (row) => row.serialNo,
-                    sortable: true,
-                  },
-                  {
-                    name: "Model Series",
-                    selector: (row) => row.modelSeries,
-                    sortable: true,
-                  },
-                  {
-                    name: "Brand",
-                    selector: (row) => row.Brand,
-                    sortable: true,
-                  },
-                  {
-                    name: "Equipment Location",
-                    selector: (row) => row.equipmentLocation || "N/A",
-                    sortable: true,
-                  },
-                  {
-                    name: "Notes",
-                    selector: (row) => row.notes || "No Notes",
-                    sortable: true,
-                  },
-                  {
-                    name: "Actions",
-                    cell: (row) => (
-                      <Button
-                        variant={
-                          selectedRows.find(
-                            (item) => item.serialNo === row.serialNo
-                          )
-                            ? "danger"
-                            : "primary"
-                        }
-                        size="sm"
-                        onClick={() =>
-                          selectedRows.find(
-                            (item) => item.serialNo === row.serialNo
-                          )
-                            ? handleDeleteEquipment(row.serialNo)
-                            : handleAddEquipment(row)
-                        }
-                      >
-                        {selectedRows.find(
-                          (item) => item.serialNo === row.serialNo
-                        )
-                          ? "Remove"
-                          : "Add"}
-                      </Button>
-                    ),
-                  },
-                ]}
-                data={currentEquipments} // Display only available equipment
-                pagination
-                paginationPerPage={5}
-                customStyles={customStyles}
-              />
-            </div>
-
-            <div className="mt-3 d-flex justify-content-center">
-              <Button
-                variant="link"
-                onClick={() => paginate(currentPage - 1)}
-                disabled={currentPage === 1}
+      <div className="table-responsive">
+        <Table>
+          <thead>
+            {table.getHeaderGroups().map(headerGroup => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map(header => (
+                  <th 
+                    key={header.id}
+                    className="text-nowrap"
+                    style={{
+                      cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                      userSelect: 'none'
+                    }}
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map(row => (
+              <tr 
+                key={row.id}
+                className={`
+                  ${row.getIsSelected() ? 'table-primary' : ''}
+                  ${row.original.fromDB ? 'border-start border-primary border-3' : ''}
+                `}
               >
-                Previous
-              </Button>
-              <span className="mx-2">
-                Page {currentPage} of{" "}
-                {Math.ceil(filteredEquipments.length / itemsPerPage)}
-              </span>
-              <Button
-                variant="link"
-                onClick={() => paginate(currentPage + 1)}
-                disabled={
-                  currentPage ===
-                  Math.ceil(filteredEquipments.length / itemsPerPage)
-                }
-              >
-                Next
-              </Button>
-            </div>
-          </Card.Body>
-        </Card>
-      </Col>
-    </Row>
+                {row.getVisibleCells().map(cell => (
+                  <td key={cell.id}>
+                    {flexRender(
+                      cell.column.columnDef.cell,
+                      cell.getContext()
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <div className="d-flex gap-2">
+          <Button
+            variant="outline-secondary"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            size="sm"
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline-secondary"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            size="sm"
+          >
+            Next
+          </Button>
+        </div>
+        <span className="text-muted">
+          Page {table.getState().pagination.pageIndex + 1} of{' '}
+          {table.getPageCount()}
+        </span>
+      </div>
+    </div>
   );
 };
 
