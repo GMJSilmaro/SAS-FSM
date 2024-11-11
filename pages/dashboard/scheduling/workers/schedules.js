@@ -28,7 +28,6 @@ import {
 import { ClipLoader } from "react-spinners";
 import { toast, ToastContainer } from "react-toastify";
 import { onAuthStateChanged } from "firebase/auth";
-import { ChevronDown } from "lucide-react";
 import { extend } from "@syncfusion/ej2-base";
 import { DropDownListComponent } from "@syncfusion/ej2-react-dropdowns";
 import { DateTimePickerComponent } from "@syncfusion/ej2-react-calendars";
@@ -44,16 +43,22 @@ import {
   Breadcrumb,
   ListGroup,
   Form,
+  Button,
   InputGroup,
+  Badge,
 } from "react-bootstrap";
 import { faLessThanEqual } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from 'next/router';
 import Swal from 'sweetalert2';
 import quickInfoStyles from '../jobs/calendar.module.css';  // Adjust the path based on your file structure
-import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX, BsArrowRight,BsCalendar } from "react-icons/bs"; 
+import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX, BsArrowRight,BsCalendar, BsFillPersonBadgeFill, BsCode, BsCircleFill, BsBriefcase, BsGear, BsPlus } from "react-icons/bs"; 
 import Link from 'next/link';
 import 'react-toastify/dist/ReactToastify.css';
 import { initializeSessionRenewalCheck, validateSession } from 'utils/middlewareClient';
+import { FilterCircle, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Collapse } from 'react-bootstrap';
+import SchedulerFilterPanel from './SchedulerFilterPanel';
+import { useQuery } from 'react-query';
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
@@ -123,19 +128,66 @@ const calculateDuration = (startTime, endTime) => {
 };
 
 const generatePastelColor = () => {
-  const mix = 0.8;
-  const red = Math.floor((Math.random() * 256 * (1 - mix)) + (255 * mix));
-  const green = Math.floor((Math.random() * 256 * (1 - mix)) + (255 * mix));
-  const blue = Math.floor((Math.random() * 256 * (1 - mix)) + (255 * mix));
-  return `rgb(${red}, ${green}, ${blue})`;
+  const hue = Math.floor(Math.random() * 360);
+  return `hsl(${hue}, 70%, 80%)`; // Saturation 70%, Lightness 80% for pastel look
+};
+
+// Define a larger set of predefined colors
+const WORKER_COLORS = {
+  'W-001': '#B8B5FF', // Gilbert
+  'W-002': '#B5FFB8', // Devin
+  'W-003': '#FFB5B8', // Pixel Care
+  // Add more predefined colors
+  'W-004': '#FFE4B5', // Light Orange
+  'W-005': '#98FB98', // Pale Green
+  'W-006': '#DDA0DD', // Plum
+  'W-007': '#87CEEB', // Sky Blue
+  'W-008': '#F0E68C', // Khaki
+  'W-009': '#E6E6FA', // Lavender
+  'W-010': '#FFDAB9', // Peach
+};
+
+// Add a function to generate a deterministic color based on workerId
+const getWorkerColor = (workerId) => {
+  // First check if there's a predefined color
+  if (WORKER_COLORS[workerId]) {
+    return WORKER_COLORS[workerId];
+  }
+
+  // If no predefined color, generate a deterministic color based on workerId
+  const colorPalette = [
+    '#FFB5B5', // Light Red
+    '#B5FFB5', // Light Green
+    '#B5B5FF', // Light Blue
+    '#FFE4B5', // Light Orange
+    '#98FB98', // Pale Green
+    '#DDA0DD', // Plum
+    '#87CEEB', // Sky Blue
+    '#F0E68C', // Khaki
+    '#E6E6FA', // Lavender
+    '#FFDAB9', // Peach
+    '#B5E4FF', // Light Azure
+    '#FFB5E4', // Light Pink
+    '#E4FFB5', // Light Lime
+  ];
+
+  // Use the workerId string to generate a consistent index
+  const hash = workerId.split('').reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+
+  // Use the hash to pick a color from the palette
+  const index = Math.abs(hash) % colorPalette.length;
+  return colorPalette[index];
 };
 
 const processWorkers = (workers) => {
   return workers.map(worker => ({
     ...worker,
-    color: generatePastelColor(),
-    text: worker.text || `${worker.firstName} ${worker.lastName}`,
-    id: worker.id
+    color: getWorkerColor(worker.workerId || worker.id),
+    text: worker.fullName || worker.text || `${worker.firstName} ${worker.lastName}`,
+    id: worker.workerId || worker.id,
+    workerId: worker.workerId
   }));
 };
 
@@ -145,7 +197,15 @@ const FieldServiceSchedules = () => {
   const [scheduleData, setScheduleData] = useState([]);
   const [searchFilter, setSearchFilter] = useState('');
   const scheduleRef = useRef(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const today = new Date();
+    // If it's after 6 PM, show tomorrow's schedule
+    if (today.getHours() >= 18) {
+      today.setDate(today.getDate() + 1);
+    }
+    today.setHours(0, 0, 0, 0);
+    return today;
+  });
   const router = useRouter();
 
   // Add stats state
@@ -190,53 +250,86 @@ const FieldServiceSchedules = () => {
 
   // Then define setupWorkerJobsListener
   const setupWorkerJobsListener = useCallback((worker) => {
-    console.log(`Setting up jobs listener for worker: ${worker.text} (${worker.id})`);
+    console.log(`Setting up jobs listener for worker: ${worker.text} (${worker.workerId})`);
     
-    const jobsQuery = query(
-      collection(db, "jobs"),
-      where("assignedWorkers", "array-contains", { workerId: worker.id })
-    );
+    const jobsQuery = query(collection(db, "jobs"));
 
     return onSnapshot(jobsQuery, (snapshot) => {
-      console.log(`Found ${snapshot.docs.length} jobs for worker ${worker.text}`);
-      
-      const workerJobs = snapshot.docs.map(doc => {
+      const allJobs = snapshot.docs.map(doc => {
         const jobData = doc.data();
-        console.log('Job data:', jobData);
-
-        // Handle date conversion
-        const startDate = jobData.startDate instanceof Timestamp 
-          ? jobData.startDate.toDate() 
-          : new Date(jobData.startDate);
         
-        const endDate = jobData.endDate instanceof Timestamp 
-          ? jobData.endDate.toDate() 
-          : new Date(jobData.endDate);
+        // Log assigned workers for debugging
+        console.log('Job assignments check:', {
+          jobId: doc.id,
+          jobName: jobData.jobName,
+          assignedWorkers: jobData.assignedWorkers?.map(w => ({
+            workerId: w.workerId,
+            workerName: w.workerName
+          })),
+          currentWorker: {
+            id: worker.id,
+            workerId: worker.workerId,
+            text: worker.text
+          }
+        });
+
+        // Check if this worker is assigned to this job
+        const isAssigned = jobData.assignedWorkers?.some(assignedWorker => 
+          assignedWorker.workerId === worker.workerId
+        );
+
+        if (!isAssigned) return null;
+
+        // Parse dates properly
+        let startDateTime, endDateTime;
+        
+        try {
+          if (jobData.startDate.includes('T')) {
+            startDateTime = new Date(jobData.startDate);
+            endDateTime = new Date(jobData.endDate);
+          } else {
+            startDateTime = new Date(`${jobData.startDate}T${jobData.startTime}`);
+            endDateTime = new Date(`${jobData.endDate}T${jobData.endTime}`);
+          }
+        } catch (error) {
+          console.error('Error parsing dates for job:', doc.id, error);
+          return null;
+        }
 
         return {
           Id: doc.id,
-          WorkerId: worker.id,
-          Subject: jobData.jobName || "Untitled Job",
-          StartTime: startDate,
-          EndTime: endDate,
-          Description: jobData.jobDescription || "",
-          JobStatus: jobData.jobStatus || "Pending",
-          Customer: jobData.customerName || "No Customer",
-          ServiceLocation: jobData.location?.locationName || "No Location",
-          Equipment: jobData.equipments?.[0]?.itemName || "No Equipment",
-          ServiceCall: jobData.serviceCallID || "N/A",
-          Priority: jobData.priority || "Normal",
-          Category: jobData.category || "General",
+          WorkerId: worker.workerId,
+          Subject: jobData.jobName,
+          StartTime: startDateTime,
+          EndTime: endDateTime,
+          Description: jobData.jobDescription?.replace(/<[^>]*>/g, '') || "",
+          JobStatus: jobData.jobStatus,
+          Customer: jobData.customerName,
+          ServiceLocation: jobData.location?.locationName,
+          Priority: jobData.priority,
+          Category: "General",
           IsAllDay: false,
-          Status: jobData.jobStatus || "Pending"
+          Status: jobData.jobStatus,
+          AssignedWorkers: jobData.assignedWorkers,
+          Color: worker.color,
+          TextColor: '#FFFFFF'
         };
+      }).filter(Boolean);
+
+      console.log('Processed jobs for worker:', {
+        worker: worker.text,
+        workerId: worker.workerId,
+        jobCount: allJobs.length,
+        jobs: allJobs.map(j => ({
+          id: j.Id,
+          subject: j.Subject,
+          start: j.StartTime.toLocaleString()
+        }))
       });
 
       setScheduleData(prevData => {
-        const filteredData = prevData.filter(job => job.WorkerId !== worker.id);
-        const newData = [...filteredData, ...workerJobs];
-        updateStats(null, newData); // Update only job count
-        return newData;
+        const filteredData = prevData.filter(job => job.WorkerId !== worker.workerId);
+        return [...filteredData, ...allJobs];
       });
     });
   }, [updateStats]);
@@ -246,8 +339,7 @@ const FieldServiceSchedules = () => {
     console.log("Setting up workers listener");
     const workersQuery = query(
       collection(db, "users"),
-      where("role", "==", "Worker"),
-      where("isActive", "==", true)
+      where("role", "==", "Worker")
     );
 
     return onSnapshot(workersQuery, (snapshot) => {
@@ -255,12 +347,19 @@ const FieldServiceSchedules = () => {
         const data = doc.data();
         return {
           id: doc.id,
+          workerId: data.workerId || doc.id,
           text: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
-          color: data.color || '#1a73e8'
+          color: WORKER_COLORS[data.workerId] || '#B8B5FF', // Use predefined color or default
+          role: data.role || 'Worker',
+          ...data
         };
       });
       
-      console.log('Fetched workers:', workers);
+      console.log('Workers with colors:', workers.map(w => ({
+        name: w.text,
+        color: w.color
+      })));
+
       setFieldWorkers(workers);
       setFilteredWorkers(workers);
       updateStats(workers, null);
@@ -486,9 +585,17 @@ const FieldServiceSchedules = () => {
   }, [filteredWorkers, router]);
 
   // Calculate filtered schedule data
-  const filteredScheduleData = scheduleData.filter(event => 
-    filteredWorkers.some(worker => worker.id === event.WorkerId)
-  );
+  const filteredScheduleData = useMemo(() => {
+    const filtered = scheduleData.filter(event => 
+      filteredWorkers.some(worker => worker.id === event.WorkerId)
+    );
+    console.log('Filtered schedule data calculation:', {
+      allData: scheduleData,
+      filteredWorkers,
+      result: filtered
+    });
+    return filtered;
+  }, [scheduleData, filteredWorkers]);
 
   // Add this effect for page refresh
   useEffect(() => {
@@ -576,6 +683,222 @@ const FieldServiceSchedules = () => {
       args.element.style.backgroundColor = eventColors[colorIndex];
     }
   }, []); // Empty dependency array since eventColors is defined outside
+
+  useEffect(() => {
+    console.log('Current schedule data:', scheduleData);
+    console.log('Filtered schedule data:', filteredScheduleData);
+  }, [scheduleData, filteredScheduleData]);
+
+  useEffect(() => {
+    console.log('Schedule initialization:', {
+      currentDate: currentDate,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      browserLocale: navigator.language,
+      sampleDate: new Date('2024-11-12T01:30:00').toLocaleString()
+    });
+  }, [currentDate]);
+
+  // Add this debug function to check the data structure
+  const debugScheduleData = (data) => {
+    console.log('Schedule Data Debug:', {
+      data,
+      firstItem: data[0] ? {
+        ...data[0],
+        startTime: data[0].StartTime.toISOString(),
+        endTime: data[0].EndTime.toISOString()
+      } : null,
+      currentDate: new Date().toISOString()
+    });
+  };
+
+  // Add this to your component before the return statement
+  useEffect(() => {
+    debugScheduleData(filteredScheduleData);
+  }, [filteredScheduleData]);
+
+  // Add a date navigation handler
+  const onNavigating = useCallback((args) => {
+    console.log('Navigating to date:', args.currentDate);
+    setCurrentDate(args.currentDate);
+  }, []);
+
+  useEffect(() => {
+    const dates = [...new Set(scheduleData.map(job => job.StartTime.toDateString()))];
+    console.log('Available job dates:', {
+      dates,
+      jobs: scheduleData.map(job => ({
+        date: job.StartTime.toDateString(),
+        name: job.Subject,
+        worker: job.WorkerId
+      }))
+    });
+  }, [scheduleData]);
+
+  // // Also add a debug component to show assignments
+  // const DebugAssignments = () => (
+  //   <div className="mb-3 p-3 bg-light">
+  //     <h6>Debug Info - Job Assignments</h6>
+  //     <div>
+  //       {scheduleData.map(job => (
+  //         <div key={job.Id} className="mb-2">
+  //           <strong>{job.Subject}</strong>
+  //           <div>Worker: {job.WorkerId}</div>
+  //           <div>All Assigned Workers: {
+  //             job.AssignedWorkers?.map(w => w.workerId).join(', ') || 'None'
+  //           }</div>
+  //           <div>Time: {job.StartTime.toLocaleString()} - {job.EndTime.toLocaleString()}</div>
+  //         </div>
+  //       ))}
+  //     </div>
+  //   </div>
+  // );
+
+  // Add custom CSS for the scheduler
+  const schedulerStyles = {
+    '.e-schedule .e-vertical-view .e-work-cells': {
+      backgroundColor: '#ffffff',
+    },
+    '.e-schedule .e-vertical-view .e-work-cells.e-work-hours': {
+      backgroundColor: '#fafafa',
+    }
+  };
+
+  // Create a function to get the appropriate icon based on role
+  const getWorkerIcon = (role) => {
+    switch (role?.toLowerCase()) {
+      case 'technician':
+        return <BsTools size={16} />;
+      case 'developer':
+        return <BsCode size={16} />;
+      default:
+        return <BsFillPersonBadgeFill size={16} />;
+    }
+  };
+
+  const customStyles = `
+    .custom-scheduler .e-schedule .e-timeline-view .e-work-cells {
+      min-height: 50px !important;
+      background-color: #f8f9fa !important; /* Light background for empty cells */
+      border: 1px solid #e9ecef !important;
+      cursor: pointer !important;
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view .e-work-cells:hover {
+      background-color: #e9ecef !important; /* Lighter background on hover */
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view .e-resource-left-td {
+      width: 250px !important;
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view .e-resource-cells {
+      height: auto !important;
+      vertical-align: middle;
+      padding: 4px !important;
+    }
+
+    .custom-scheduler .e-schedule .e-content-wrap {
+      height: 100% !important;
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view .e-resource-column {
+      height: 100% !important;
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view .e-date-header-wrap table {
+      height: 100% !important;
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view .e-content-wrap table {
+      height: 100% !important;
+    }
+
+    .custom-scheduler .e-schedule .e-timeline-view tr {
+      height: 100% !important;
+    }
+
+    /* Add alternating row colors for better visibility */
+    .custom-scheduler .e-schedule .e-timeline-view .e-work-cells:nth-child(odd) {
+      background-color: #fafafa !important;
+    }
+
+    /* Add subtle grid lines */
+    .custom-scheduler .e-schedule .e-timeline-view .e-work-cells {
+      border: 1px solid #e0e0e0 !important;
+    }
+
+    /* Add visual feedback for clickable areas */
+    .custom-scheduler .e-schedule .e-timeline-view .e-work-cells:hover {
+      background-color: #f0f0f0 !important;
+      transition: background-color 0.2s ease;
+    }
+  `;
+
+  // Add these new states for filtering
+  const [filters, setFilters] = useState({
+    workerId: '',
+    workerName: '',
+    role: '',
+    status: ''
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  const handleSearch = useCallback(async () => {
+    try {
+      setLoading(true); // You should already have this state
+      
+      // Filter workers based on the name filter
+      const filteredWorkersList = fieldWorkers.filter(worker => {
+        const nameMatch = worker.text.toLowerCase().includes(filters.workerName.toLowerCase());
+        return nameMatch;
+      });
+
+      // Update the filtered workers state
+      setFilteredWorkers(filteredWorkersList);
+
+      // Filter schedule data based on the filtered workers
+      const filteredJobs = scheduleData.filter(event => 
+        filteredWorkersList.some(worker => worker.id === event.WorkerId)
+      );
+
+      // Update the filtered schedule data
+      setScheduleData(prevData => {
+        const updatedData = [...prevData];
+        return filteredJobs;
+      });
+
+      toast.success('Search completed successfully');
+    } catch (error) {
+      console.error('Error searching workers:', error);
+      toast.error('Error searching workers');
+    } finally {
+      setLoading(false);
+    }
+  }, [fieldWorkers, filters.workerName, scheduleData]);
+
+  const handleClearFilters = useCallback(() => {
+    // Clear filters
+    setFilters({
+      workerId: '',
+      workerName: '',
+      role: '',
+      status: ''
+    });
+
+    // Reset to show all workers
+    setFilteredWorkers(fieldWorkers);
+    
+    // Reset schedule data to show all events
+    setScheduleData(prevData => {
+      const allJobs = prevData.filter(event => 
+        fieldWorkers.some(worker => worker.id === event.WorkerId)
+      );
+      return allJobs;
+    });
+
+    toast.info('Filters cleared');
+  }, [fieldWorkers]);
 
   return (
     <div>
@@ -777,54 +1100,214 @@ const FieldServiceSchedules = () => {
         <ToastContainer position="top-right" autoClose={5000} />
         <div className="col-lg-12 control-section">
           <div className="control-wrapper">
-            <Row className="mb-3">
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>Search Workers</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Search by worker name"
-                    value={searchFilter}
-                    onChange={(e) => setSearchFilter(e.target.value)}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+           
+
+            {/* {process.env.NODE_ENV === 'development' && (
+              <div className="mb-3 p-3 bg-light">
+                <h6>Debug Info</h6>
+                <div>Current Date: {currentDate.toLocaleString()}</div>
+                <div>Jobs for current view:</div>
+                <ul>
+                  {filteredScheduleData.map(job => (
+                    <li key={job.Id}>
+                      {job.Subject} - {job.StartTime.toLocaleString()} to {job.EndTime.toLocaleString()}
+                      (Worker: {job.WorkerId})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )} */}
+
+            <SchedulerFilterPanel 
+              filters={filters}
+              setFilters={setFilters}
+              onClear={handleClearFilters}
+              loading={loading}
+              handleSearch={handleSearch}
+            />
 
             <ScheduleComponent
               ref={scheduleRef}
-              cssClass="timeline-resource-grouping"
+              cssClass="custom-scheduler"
               width="100%"
               height="650px"
               currentView="TimelineDay"
               selectedDate={currentDate}
-              startHour="06:00"
-              endHour="21:00"
+              startHour="00:00"
+              endHour="24:00"
               workDays={workDays}
               popupOpen={onPopupOpen}
               eventRendered={onEventRendered}
+              rowAutoHeight={false}
+              timezone="Asia/Taipei"
               eventSettings={{
                 dataSource: filteredScheduleData,
-                fields: {
-                  id: 'Id',
-                  subject: { name: 'Subject', title: 'Job Name' },
-                  startTime: { name: 'StartTime' },
-                  endTime: { name: 'EndTime' },
-                  description: { name: 'Description' },
-                  workerId: { name: 'WorkerId' },
-                  status: { name: 'Status' }
-                },
                 enableTooltip: true,
-                allowEditing: false,
-                enableQuickInfoPopup: false
+                template: props => {
+                  const workerColor = getWorkerColor(props.WorkerId);
+                  console.log('Worker ID:', props.WorkerId, 'Color:', workerColor);
+                  
+                  return (
+                    <div className="custom-event" style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: workerColor,
+                      padding: '4px 8px',
+                      color: '#000000',
+                    }}>
+                      <div style={{ fontWeight: '500' }}>{props.Subject}</div>
+                      <div style={{ fontSize: '0.85em' }}>
+                        {new Date(props.StartTime).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })} 
+                        {' - '}
+                        {new Date(props.EndTime).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
               }}
-              group={{ resources: ["Workers"] }}
+              group={{ 
+                byGroupID: false,
+                resources: ['Workers'],
+                headerHeight: 'auto', // Allows header to adjust height
+                allowGroupDragAndDrop: false
+              }}
               quickInfoTemplates={{
                 header: headerTemplate,
                 content: contentTemplate,
                 footer: footerTemplate,
               }}
               cellDoubleClick={handleCellDoubleClick}
+              timeScale={{ 
+                enable: true, 
+                interval: 60, 
+                slotCount: 2 
+              }}
+              workHours={{
+                highlight: true,
+                start: '00:00',
+                end: '24:00'
+              }}
+              cellTemplate={(props) => {
+                return (
+                  <div className="template-wrap" style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '50px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}>
+                 
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#999',
+                      display: props.elementType === 'emptyCells' ? 'flex' : 'none',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <BsPlus size={14} />
+                      <span>Add Job</span>
+                    </div>
+                  </div>
+                );
+              }}
+              navigating={onNavigating}
+              resourceHeaderTemplate={props => (
+                <div className="worker-header" style={{ 
+                  backgroundColor: getWorkerColor(props.resourceData.workerId),
+                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  color: '#000000',
+                  width: '100%',
+                  height: '100%',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: '100%'
+                }}>
+                  {/* Worker Name */}
+                  <div style={{ 
+                    fontWeight: '600',
+                    fontSize: '0.9em',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    marginBottom: '2px'
+                  }}>
+                    {props.resourceData.text}
+                  </div>
+
+                  {/* Role and Status Row */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '4px',
+                    fontSize: '0.75em'
+                  }}>
+                    {/* Role */}
+                    <div style={{ 
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.5)',
+                      padding: '2px 6px',
+                      borderRadius: '12px',
+                      maxWidth: '40%'
+                    }}>
+                      <span style={{
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {props.resourceData.role || 'Worker'}
+                      </span>
+                    </div>
+
+                    {/* Status and Tasks */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: 'rgba(0,0,0,0.6)',
+                      fontSize: '0.9em'
+                    }}>
+                      {/* Status Dot */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        <BsCircleFill size={6} color={props.resourceData.isActive ? '#4CAF50' : '#757575'} />
+                        <span style={{ whiteSpace: 'nowrap' }}>
+                          {props.resourceData.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+
+                      {/* Tasks Count */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        <span style={{ whiteSpace: 'nowrap' }}>
+                          {`${props.resourceData.taskCount || 0} tasks`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             >
               <ResourcesDirective>
                 <ResourceDirective

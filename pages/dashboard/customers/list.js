@@ -42,6 +42,7 @@ import { TABLE_CONFIG } from 'constants/tableConfig';
 import Link from 'next/link';
 import { FaPlus } from 'react-icons/fa';
 
+
 // Define flag components for each country
 const SGFlag = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28.35 18.9" style={{ width: '16px', height: '11px' }}>
@@ -384,27 +385,27 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
             )}
           </div>
 
-          <div>
-            <Button 
-              variant="outline-danger" 
+          <div className="d-flex justify-content-end align-items-center gap-2">
+            <Button
+              variant="danger"
               size="sm"
               onClick={onClear}
-              className="me-2"
               disabled={loading}
-              style={{ fontSize: '0.9rem' }}
+              className="clear-btn d-flex align-items-center"
             >
               <FeatherX size={14} className="me-1" />
               Clear
             </Button>
-            
-            <Button 
-              variant="primary" 
+
+            <Button
+              variant="primary"
               size="sm"
               onClick={handleSearch}
               disabled={loading}
+              className="search-btn d-flex align-items-center"
             >
               <Search size={14} className="me-1" />
-              Search
+              {loading ? 'Searching...' : 'Search'}
             </Button>
           </div>
         </div>
@@ -592,6 +593,177 @@ const FilterPanel = ({ filters, setFilters, onClear, loading, loadData }) => {
           </Row>
         </div>
       </Card.Body>
+      <style jsx global>{`
+        .clear-btn, .search-btn {
+          padding: 6px 12px !important;
+          font-size: 14px !important;
+          border-radius: 4px !important;
+          transition: all 0.2s ease-in-out !important;
+          border: none !important;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .clear-btn {
+          background-color: #FEE2E2 !important;
+          color: #DC2626 !important;
+        }
+
+        .search-btn {
+          background-color: #3B82F6 !important;
+          color: white !important;
+        }
+
+        /* Hover animations */
+        .clear-btn:hover, .search-btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .clear-btn:hover {
+          background-color: #FEE2E2 !important;
+          opacity: 0.9;
+        }
+
+        .search-btn:hover {
+          background-color: #2563EB !important;
+        }
+
+        /* Active state animations */
+        .clear-btn:active, .search-btn:active {
+          transform: translateY(0);
+        }
+
+        /* Ripple effect */
+        .clear-btn::after, .search-btn::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 120%;
+          height: 120%;
+          background: rgba(255, 255, 255, 0.2);
+          transform: translate(-50%, -50%) scale(0);
+          border-radius: 50%;
+          transition: transform 0.3s ease;
+        }
+
+        .clear-btn:active::after, .search-btn:active::after {
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 0;
+        }
+
+        /* Disabled state */
+        .clear-btn:disabled, .search-btn:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+          transform: none !important;
+        }
+
+        /* Icon animations */
+        .clear-btn svg, .search-btn svg {
+          transition: transform 0.2s ease;
+        }
+
+        .clear-btn:hover svg {
+          transform: rotate(90deg);
+        }
+
+        .search-btn:hover svg {
+          transform: translateX(-2px);
+        }
+          /* Primary Button Style */
+  .btn-primary.btn-icon-text {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary.btn-icon-text:hover {
+    background-color: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+    color: white;
+    text-decoration: none;
+  }
+
+  .btn-primary.btn-icon-text:hover .icon-left {
+    transform: translateX(-2px);
+  }
+
+  .btn-primary.btn-icon-text .icon-left {
+    transition: transform 0.2s ease;
+  }
+
+  /* Small button variant */
+  .btn-sm.btn-icon-text {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.812rem;
+  }
+
+  /* Ripple effect */
+  .btn-icon-text {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-icon-text::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 120%;
+    height: 120%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%) scale(0);
+    border-radius: 50%;
+    transition: transform 0.5s ease;
+  }
+
+  .btn-icon-text:active::after {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+    .Toaster {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+          }
+          
+          /* Custom toast styles */
+          .toast-custom {
+            background: white;
+            color: black;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+          }
+          
+          .toast-custom.success {
+            border-left: 4px solid #10B981;
+          }
+          
+          .toast-custom.error {
+            border-left: 4px solid #EF4444;
+          }
+          
+          .toast-custom.loading {
+            border-left: 4px solid #3B82F6;
+          }
+      `}</style>
     </Card>
   );
 };
@@ -721,9 +893,10 @@ const AddressesModal = ({ show, onHide, addresses, defaultAddress, billtoDefault
                     <div className="text-wrap" style={{ maxWidth: '200px' }}>
                       <HouseFill className="me-2 text-muted" size={14} />
                       {[
-                        address.BuildingFloorRoom,
+                        address.BuildingFloorRoom && address.BuildingFloorRoom !== address.AddressName ? address.BuildingFloorRoom : null,
                         address.Street,
-                        address.ZipCode
+                        address.ZipCode,
+                        address.Country === 'SG' ? 'Singapore' : address.Country
                       ].filter(Boolean).join(', ')}
                     </div>
                   </td>
@@ -1336,28 +1509,27 @@ const ViewCustomers = () => {
     columnHelper.accessor(() => null, {
       id: 'actions',
       header: 'Actions',
-      size: 100,
+      size: 130,
       cell: info => (
-        <Button 
-          variant="primary" 
-          size="sm"
-          onClick={() => handleViewDetails(info.row.original)}
-          style={{
-            borderRadius: '8px',
-            padding: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: '500',
-            background: 'linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)',
-            border: 'none',
-            boxShadow: '0 2px 4px rgba(65, 113, 245, 0.15)'
-          }}
-        >
-          <Eye size={14} />
-          <span>View</span>
-        </Button>
+        <div className="d-flex gap-2">
+          <OverlayTrigger
+            placement="left"
+            overlay={
+              <Tooltip>
+                View complete details for customer #{info.row.original.CardCode}
+              </Tooltip>
+            }
+          >
+            <Link
+              href={`/customers/view/${info.row.original.CardCode}`}
+              className="btn btn-primary btn-icon-text btn-sm"
+              style={{ textDecoration: "none" }}
+            >
+              <Eye size={14} className="icon-left" />
+              View
+            </Link>
+          </OverlayTrigger>
+        </div>
       )
     }),
   ]
@@ -1441,7 +1613,7 @@ const ViewCustomers = () => {
   const handleViewDetails = (customer) => {
     console.log('Viewing customer:', customer); // Debug log
     localStorage.setItem('viewCustomerToast', customer.CardName);
-    router.push(`/dashboard/customers/${customer.CardCode}`);
+    router.push(`/customers/view/${customer.CardCode}`);
   };
 
   const handlePerRowsChange = async (newPerPage) => {
@@ -1804,44 +1976,25 @@ const ViewCustomers = () => {
                   size="sm"
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  className="me-2"
-                  style={{
-                    borderRadius: '8px',
-                    padding: '8px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    border: '1px solid #E5E7EB'
-                  }}
+                  className="me-2 prev-btn d-flex align-items-center"
                 >
                   <ChevronLeft size={14} />
                   <span>Previous</span>
                 </Button>
+
                 <div className="mx-3 d-flex align-items-center">
                   <Calendar size={14} className="me-2 text-primary" />
                   <span style={{ fontSize: '14px', color: '#6B7280' }}>
                     Page {currentPage} of {Math.ceil(totalRows / perPage)}
                   </span>
                 </div>
+
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  style={{
-                    borderRadius: '8px',
-                    padding: '8px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    background: 'linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)',
-                    border: 'none',
-                    boxShadow: '0 2px 4px rgba(65, 113, 245, 0.15)'
-                  }}
+                  className="next-btn d-flex align-items-center"
                 >
                   <span>Next</span>
                   <ChevronRight size={14} />
@@ -1852,39 +2005,7 @@ const ViewCustomers = () => {
         </Col>
       </Row>
       <div className="Toaster">
-        <style jsx global>{`
-          .Toaster {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 9999;
-          }
-          
-          /* Custom toast styles */
-          .toast-custom {
-            background: white;
-            color: black;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-          }
-          
-          .toast-custom.success {
-            border-left: 4px solid #10B981;
-          }
-          
-          .toast-custom.error {
-            border-left: 4px solid #EF4444;
-          }
-          
-          .toast-custom.loading {
-            border-left: 4px solid #3B82F6;
-          }
-        `}</style>
+        
       </div>
     </Fragment>
   )
@@ -1892,7 +2013,6 @@ const ViewCustomers = () => {
 
 export default ViewCustomers
 
-// Helper function to format SAP address
 // Helper function to format SAP address
 const formatSAPAddress = (address) => {
     if (!address) return '-';
@@ -1970,9 +2090,6 @@ const validateEmailSearch = (email) => {
   const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]{2,}$/;
   return emailRegex.test(email);
 };
-
-// Add this with other constants at the top of the file
-const PAGE_SIZE_OPTIONS = [100, 150, 200, 250, 300];
 
 // Add these toast style constants at the top of your file
 const TOAST_STYLES = {

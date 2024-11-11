@@ -733,7 +733,7 @@ const QuickMenu = ({ children }) => {
 
         querySnapshot.docs.forEach(doc => {
           const jobData = doc.data();
-          console.log('Job Data:', jobData); // Debug log
+          // console.log('Job Data:', jobData); // Debug log
           
           // Process taskList if it exists
           if (jobData.taskList && Array.isArray(jobData.taskList)) {
@@ -763,7 +763,7 @@ const QuickMenu = ({ children }) => {
           }
         });
 
-        console.log('Processed Tasks:', tasks); // Debug log
+        // console.log('Processed Tasks:', tasks); // Debug log
 
         setTaskCategories(tasks);
         const totalTasks = Object.values(tasks).reduce((acc, arr) => acc + arr.length, 0);
@@ -814,25 +814,22 @@ const QuickMenu = ({ children }) => {
           orderBy("lastFollowUp", "desc")
         );
 
-        console.log('Starting follow-ups fetch...'); // Debug log 1
+        // console.log('Starting follow-ups fetch...'); // Debug log 1
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-          console.log('Jobs snapshot received:', snapshot.size, 'documents'); // Debug log 2
+          // console.log('Jobs snapshot received:', snapshot.size, 'documents'); // Debug log 2
           
           let allFollowUps = [];
 
           snapshot.docs.forEach(doc => {
             const jobData = doc.data();
-            console.log('Processing job:', jobData.jobID); // Debug log 3
-            console.log('Job followUps:', jobData.followUps); // Debug log 4
+            // console.log('Processing job:', jobData.jobID); // Debug log 3
+            // console.log('Job followUps:', jobData.followUps); // Debug log 4
             
-            // Check if job has followUps
             if (jobData.followUps) {
-              // Convert followUps object to array and add job context
               Object.entries(jobData.followUps).forEach(([followUpId, followUp]) => {
-                console.log('Processing followUp:', followUpId, followUp); // Debug log 5
+                // console.log('Processing followUp:', followUpId, followUp); // Debug log 5
 
-                // Apply filters
                 const statusMatch = filters.status === 'all' || followUp.status === filters.status;
                 const typeMatch = filters.type === 'all' || followUp.type === filters.type;
                 
@@ -844,15 +841,15 @@ const QuickMenu = ({ children }) => {
                   dateMatch = followUpDate >= startDate && followUpDate <= endDate;
                 }
 
-                console.log('Filter matches:', { // Debug log 6
-                  statusMatch,
-                  typeMatch,
-                  dateMatch,
-                  currentFilters: filters,
-                  followUpStatus: followUp.status,
-                  followUpType: followUp.type,
-                  followUpDate: followUp.createdAt
-                });
+                // console.log('Filter matches:', { // Debug log 6
+                //   statusMatch,
+                //   typeMatch,
+                //   dateMatch,
+                //   currentFilters: filters,
+                //   followUpStatus: followUp.status,
+                //   followUpType: followUp.type,
+                //   followUpDate: followUp.createdAt
+                // });
 
                 if (statusMatch && typeMatch && dateMatch) {
                   allFollowUps.push({
@@ -868,7 +865,7 @@ const QuickMenu = ({ children }) => {
             }
           });
 
-          console.log('Final filtered follow-ups:', allFollowUps); // Debug log 7
+          // console.log('Final filtered follow-ups:', allFollowUps); // Debug log 7
           setFollowUps(allFollowUps);
           setFollowUpCount(allFollowUps.length);
         });
@@ -883,31 +880,15 @@ const QuickMenu = ({ children }) => {
     fetchFollowUps();
   }, [workerId, filters]); // Add filters as dependency
 
-  // Add this debug log in your render to check filter state changes
-  useEffect(() => {
-    console.log('Current Filters:', filters);
-  }, [filters]);
-
- 
-
-  // Add this effect to monitor filters changes
-  useEffect(() => {
-    console.log('Filters changed:', {
-      status: filters.status,
-      type: filters.type,
-      dateRange: filters.dateRange
-    });
-  }, [filters]);
-
   // Update the filter change handler with logging
   const handleFilterChange = (type, value) => {
-    console.log('Filter change:', { type, value });
+    // console.log('Filter change:', { type, value });
     setFilters(prev => {
       const newFilters = {
         ...prev,
         [type]: value
       };
-      console.log('New filters state:', newFilters);
+      // console.log('New filters state:', newFilters);
       return newFilters;
     });
   };
@@ -921,7 +902,7 @@ const QuickMenu = ({ children }) => {
       const settingsRef = doc(db, 'settings', 'followUp');
       const settingsDoc = await getDoc(settingsRef);
       
-      console.log('Raw followUp settings:', settingsDoc.data());
+      // console.log('Raw followUp settings:', settingsDoc.data());
       
       if (settingsDoc.exists() && settingsDoc.data().types) {
         const types = settingsDoc.data().types;
@@ -929,7 +910,7 @@ const QuickMenu = ({ children }) => {
           id,
           ...type
         }));
-        console.log('Processed follow-up types:', processedTypes);
+        // console.log('Processed follow-up types:', processedTypes);
         setFollowUpTypes(processedTypes);
       }
     } catch (error) {

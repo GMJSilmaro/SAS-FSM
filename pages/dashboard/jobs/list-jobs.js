@@ -198,7 +198,7 @@ const FilterPanel = ({
               </Form.Group>
 
               <Form.Group className="mb-2">
-                <Form.Label className="small mb-1">Job Name:</Form.Label>
+                <Form.Label className="small mb-1">Subject Name:</Form.Label>
                 <Form.Control
                   size="sm"
                   type="text"
@@ -206,7 +206,7 @@ const FilterPanel = ({
                   onChange={(e) =>
                     setFilters((prev) => ({ ...prev, jobName: e.target.value }))
                   }
-                  placeholder="Search by job name..."
+                  placeholder="Search by subject name..."
                   onKeyPress={handleKeyPress}
                   style={{ fontSize: "0.9rem", padding: "0.5rem 0.75rem" }}
                 />
@@ -488,7 +488,7 @@ const ViewJobs = () => {
       ),
     }),
     columnHelper.accessor("jobName", {
-      header: "Job Name",
+      header: "Subject Name",
       size: 150,
       cell: (info) => (
         <OverlayTrigger
