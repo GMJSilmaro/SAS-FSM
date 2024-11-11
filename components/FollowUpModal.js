@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Form, Button } from 'react-bootstrap';
 import { db } from "../firebase";
-import { doc, updateDoc, serverTimestamp, increment } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, increment, getDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import { collection, getDocs } from "firebase/firestore";
 
 const FollowUpModal = ({ 
   show, 
@@ -19,6 +20,34 @@ const FollowUpModal = ({
   const [priority, setPriority] = useState('Normal');
   const [dueDate, setDueDate] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [followUpTypes, setFollowUpTypes] = useState([]);
+
+  useEffect(() => {
+    const fetchFollowUpTypes = async () => {
+      try {
+        console.log("Fetching follow-up types...");
+        const settingsRef = doc(db, 'settings', 'followUp');
+        const settingsDoc = await getDoc(settingsRef);
+        
+        console.log('Raw followUp settings:', settingsDoc.data());
+        
+        if (settingsDoc.exists() && settingsDoc.data().types) {
+          const types = settingsDoc.data().types;
+          const processedTypes = Object.entries(types).map(([id, type]) => ({
+            id,
+            ...type
+          }));
+          console.log('Processed follow-up types:', processedTypes);
+          setFollowUpTypes(processedTypes);
+        }
+      } catch (error) {
+        console.error('Error fetching follow-up types:', error);
+        toast.error("Failed to load follow-up types");
+      }
+    };
+
+    fetchFollowUpTypes();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,10 +113,15 @@ const FollowUpModal = ({
               required
             >
               <option value="">Select Type</option>
-              <option value="Appointment">Appointment</option>
-              <option value="Repair">Repair</option>
-              <option value="Contract">Contract</option>
-              <option value="Verify Customer">Verify Customer</option>
+              {followUpTypes.map((type) => (
+                <option 
+                  key={type.id}
+                  value={type.name}
+                  style={{ color: type.color }}
+                >
+                  {type.name}
+                </option>
+              ))}
             </Form.Select>
           </Form.Group>
 
