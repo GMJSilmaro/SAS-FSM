@@ -215,14 +215,32 @@ const FieldServiceSchedules = () => {
     lastFetchTime: null
   });
 
-  // Define updateStats first
+  // Calculate filtered schedule data
+  const filteredScheduleData = useMemo(() => {
+    const filtered = scheduleData.filter(event => 
+      filteredWorkers.some(worker => worker.id === event.WorkerId)
+    );
+    console.log('Filtered schedule data calculation:', {
+      allData: scheduleData,
+      filteredWorkers,
+      result: filtered
+    });
+    return filtered;
+  }, [scheduleData, filteredWorkers]);
+
+  // Define updateStats after filteredScheduleData is defined
   const updateStats = useCallback((workers, jobs) => {
     setStats(prevStats => ({
       totalWorkers: workers?.length || prevStats.totalWorkers,
-      activeJobs: jobs?.length || prevStats.activeJobs,
+      activeJobs: jobs?.length || 0,
       lastFetchTime: Date.now()
     }));
   }, []);
+
+  // Add effect to update stats when filtered data changes
+  useEffect(() => {
+    updateStats(fieldWorkers, filteredScheduleData);
+  }, [fieldWorkers, filteredScheduleData, updateStats]);
 
   // Add workDays definition - this sets Monday to Saturday as work days
   const workDays = [1, 2, 3, 4, 5, 6]; // 0 = Sunday, 1 = Monday, etc.
@@ -329,10 +347,11 @@ const FieldServiceSchedules = () => {
 
       setScheduleData(prevData => {
         const filteredData = prevData.filter(job => job.WorkerId !== worker.workerId);
-        return [...filteredData, ...allJobs];
+        const newData = [...filteredData, ...allJobs];
+        return newData;
       });
     });
-  }, [updateStats]);
+  }, []);
 
   // Then define setupWorkersListener
   const setupWorkersListener = useCallback(() => {
@@ -584,80 +603,6 @@ const FieldServiceSchedules = () => {
     }
   }, [filteredWorkers, router]);
 
-  // Calculate filtered schedule data
-  const filteredScheduleData = useMemo(() => {
-    const filtered = scheduleData.filter(event => 
-      filteredWorkers.some(worker => worker.id === event.WorkerId)
-    );
-    console.log('Filtered schedule data calculation:', {
-      allData: scheduleData,
-      filteredWorkers,
-      result: filtered
-    });
-    return filtered;
-  }, [scheduleData, filteredWorkers]);
-
-  // Add this effect for page refresh
-  useEffect(() => {
-    // Function to handle route change complete
-    const handleRouteChangeComplete = (url) => {
-      if (url === '/schedule') {
-        console.log('Schedule page visited - refreshing...');
-        window.location.reload();
-      }
-    };
-
-    // Subscribe to router events
-    router.events.on('routeChangeComplete', handleRouteChangeComplete);
-
-    // Cleanup subscription
-    return () => {
-      router.events.off('routeChangeComplete', handleRouteChangeComplete);
-    };
-  }, [router]);
-
-  // Handle popup opening
-  const onPopupOpen = (args) => {
-    console.log('Popup Open Event:', args);
-    
-    // Always cancel for empty cells or non-appointment elements
-    if (!args.data || 
-        args.target.classList.contains('e-work-cells') || 
-        args.target.classList.contains('e-alternate-cells')) {
-      console.log('Empty cell, canceling popup');
-      args.cancel = true;
-      return;
-    }
-    
-    // Only allow quick info for appointments
-    if (args.type === 'QuickInfo' && 
-        (args.target.classList.contains('e-appointment') || 
-         args.target.closest('.e-appointment'))) {
-      console.log('Has event data, showing custom popup');
-      return;
-    }
-    
-    // Cancel all other popups
-    args.cancel = true;
-  };
-
-  // Handle cell clicking
-  const onCellClick = (args) => {
-    console.log('Cell Click Event:', args);
-    console.log('Element Classes:', args.element.classList);
-    
-    if (args.element.classList.contains('e-appointment')) {
-      console.log('Clicked on appointment');
-      const eventData = scheduleRef.current.getEventDetails(args.element);
-      console.log('Event Data:', eventData);
-      
-      if (eventData) {
-        console.log('Opening Quick Info for event');
-        scheduleRef.current.openEditor(eventData, 'QuickInfo');
-      }
-    }
-  };
-
   // Define colors outside of the component to avoid recreation
   const eventColors = [
     '#FF9999', // Light Red
@@ -899,6 +844,29 @@ const FieldServiceSchedules = () => {
 
     toast.info('Filters cleared');
   }, [fieldWorkers]);
+
+  // Add this function before the return statement
+  const onPopupOpen = useCallback((args) => {
+    // Prevent default popup for drag/resize/more events
+    if (args.type === 'Editor' || args.type === 'QuickInfo') {
+      console.log('Popup opening:', args);
+      
+      // If it's a new event being created
+      if (args.type === 'Editor' && !args.data.Id) {
+        args.cancel = true; // Prevent default editor
+        if (scheduleRef.current) {
+          scheduleRef.current.closeEditor();
+        }
+        return;
+      }
+
+      // For existing events
+      if (args.type === 'QuickInfo') {
+        // You can customize what happens when clicking an existing event
+        console.log('QuickInfo popup for event:', args.data);
+      }
+    }
+  }, []);
 
   return (
     <div>
