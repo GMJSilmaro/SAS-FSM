@@ -1724,10 +1724,7 @@ const ViewJobs = () => {
       </Row>
       <Row>
         <Col md={12} xs={12} className="mb-5">
-          <Card className="border-0 shadow-sm">
-            <Card.Body className="p-4">
-              {error && <div className="alert alert-danger mb-4">{error}</div>}
-              <FilterPanel
+        <FilterPanel
                 filters={filters}
                 setFilters={setFilters}
                 onClear={handleClearFilters}
@@ -1735,6 +1732,10 @@ const ViewJobs = () => {
                 handleSearch={handleSearch}
               />
 
+          <Card className="border-0 shadow-sm">
+            <Card.Body className="p-4">
+              {error && <div className="alert alert-danger mb-4">{error}</div>}
+              
               <div className="table-responsive">
                 <table className="table table-hover">
                   <thead>
@@ -2026,6 +2027,66 @@ const ViewJobs = () => {
           display: inline-flex;
           alignItems: "center",
           gap: "4px"
+        }
+
+        /* Create Button Style */
+        .create-job-button {
+          background-color: #ffffff;
+          color: #4171F5;
+          transition: all 0.2s ease;
+        }
+
+        .create-job-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .create-job-button:active {
+          transform: translateY(0);
+        }
+
+        /* Card Animations */
+        .card {
+          transition: all 0.2s ease;
+        }
+
+        .card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Table Row Hover Effects */
+        .table-row-hover:hover {
+          background-color: #f1f5f9;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* View Button Hover Effects */
+        .btn-icon-text:hover {
+          background-color: #2563eb !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2) !important;
+          color: white !important;
+          text-decoration: none;
+        }
+
+        .btn-icon-text:hover .icon-left {
+          transform: translateX(-2px);
+        }
+
+        /* Tooltip Styles */
+        .tooltip-inner {
+          max-width: 300px;
+          padding: 8px 12px;
+          background-color: #1e293b;
+          border-radius: 6px;
+          font-size: 12px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .tooltip.show {
+          opacity: 1;
         }
       `}</style>
     </Fragment>

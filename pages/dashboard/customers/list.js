@@ -1724,6 +1724,68 @@ const ViewCustomers = () => {
     loadData(1, true);
   };
 
+  // Add this customStyles object near the top of your file
+  const customStyles = {
+    table: {
+      style: {
+        backgroundColor: "#ffffff",
+        borderRadius: "8px",
+        width: "100%",
+        tableLayout: "fixed",
+      },
+    },
+    headRow: {
+      style: {
+        backgroundColor: "#f8fafc",
+        borderTopLeftRadius: "8px",
+        borderTopRightRadius: "8px",
+        borderBottom: "1px solid #e2e8f0",
+        minHeight: "52px",
+      },
+    },
+    headCells: {
+      style: {
+        fontSize: "13px",
+        fontWeight: "600",
+        color: "#475569",
+        paddingLeft: "16px",
+        paddingRight: "16px",
+      },
+    },
+    cells: {
+      style: {
+        fontSize: "14px",
+        color: "#64748b",
+        paddingLeft: "16px",
+        paddingRight: "16px",
+        paddingTop: "12px",
+        paddingBottom: "12px",
+      },
+    },
+    rows: {
+      style: {
+        minHeight: "60px",
+        "&:hover": {
+          backgroundColor: "#f1f5f9",
+          cursor: "pointer",
+          transition: "all 0.2s",
+        },
+      },
+    },
+    pagination: {
+      style: {
+        borderTop: "1px solid #e2e8f0",
+        minHeight: "56px",
+      },
+      pageButtonsStyle: {
+        borderRadius: "4px",
+        height: "32px",
+        padding: "4px 8px",
+        margin: "0 4px",
+      },
+    },
+  };
+
   return (
     <Fragment>
       <GeeksSEO title="View Customers | SAS&ME - SAP B1 | Portal" />
@@ -1874,17 +1936,19 @@ const ViewCustomers = () => {
         </Col>
       </Row>
       <Row>
+        
         <Col md={12} xs={12} className="mb-5">
-          <Card className="border-0 shadow-sm">
-            <Card.Body className="p-4">
-              {error && <div className="alert alert-danger mb-4">{error}</div>}
-              <FilterPanel 
+        <FilterPanel 
                 filters={filters}
                 setFilters={setFilters}
                 onClear={handleClearFilters}
                 loading={loading}
                 loadData={loadData}
               />
+          <Card className="border-0 shadow-sm">
+            <Card.Body className="p-4">
+              {error && <div className="alert alert-danger mb-4">{error}</div>}
+              
               
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div className="d-flex align-items-center">
@@ -2007,6 +2071,118 @@ const ViewCustomers = () => {
       <div className="Toaster">
         
       </div>
+      <style jsx global>{`
+      /* Button Base Styles */
+      .btn-icon-text {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        padding: 0.5rem 0.875rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+      }
+
+      .btn-icon-text .icon-left {
+        transition: transform 0.2s ease;
+      }
+
+      /* Soft Variant Styles */
+      .btn-soft-danger {
+        background-color: #fee2e2;
+        color: #dc2626;
+        border: 1px solid transparent;
+      }
+
+      .btn-soft-danger:hover {
+        background-color: #dc2626;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.15);
+      }
+
+      .btn-soft-danger:hover .icon-left {
+        transform: rotate(90deg);
+      }
+
+      /* Create Button Style */
+      .create-customer-button {
+        background-color: #ffffff;
+        color: #4171F5;
+        transition: all 0.2s ease;
+      }
+
+      .create-customer-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .create-customer-button:active {
+        transform: translateY(0);
+      }
+
+      /* Card Animations */
+      .card {
+        transition: all 0.2s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Table Row Hover Effects */
+      .table-row-hover:hover {
+        background-color: #f1f5f9;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      /* View Button Hover Effects */
+      .btn-icon-text:hover {
+        background-color: #2563eb !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2) !important;
+        color: white !important;
+        text-decoration: none;
+      }
+
+      .btn-icon-text:hover .icon-left {
+        transform: translateX(-2px);
+      }
+
+      /* Tooltip Styles */
+      .tooltip-inner {
+        max-width: 300px;
+        padding: 8px 12px;
+        background-color: #1e293b;
+        border-radius: 6px;
+        font-size: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .tooltip.show {
+        opacity: 1;
+      }
+
+      /* Navigation Button Styles */
+      .prev-btn,
+      .next-btn {
+        transition: all 0.2s ease;
+      }
+
+      .prev-btn:hover,
+      .next-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .prev-btn:active,
+      .next-btn:active {
+        transform: translateY(0);
+      }
+    `}</style>
     </Fragment>
   )
 }

@@ -1648,9 +1648,8 @@ const FieldServiceSchedules = () => {
                 <ViewDirective option="TimelineWeek" />
                 <ViewDirective option="TimelineWorkWeek" />
                 <ViewDirective option="TimelineMonth" />
-                <ViewDirective option="Agenda" />
               </ViewsDirective>
-              <Inject services={[TimelineViews, TimelineMonth, Agenda]} />
+              <Inject services={[TimelineViews, TimelineMonth]} />
             </ScheduleComponent>
           </div>
         </div>
