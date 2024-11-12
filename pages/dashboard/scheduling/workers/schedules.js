@@ -860,10 +860,13 @@ const FieldServiceSchedules = () => {
         return;
       }
 
-      // For existing events
       if (args.type === 'QuickInfo') {
-        // You can customize what happens when clicking an existing event
-        console.log('QuickInfo popup for event:', args.data);
+        args.cancel = true; // Prevent default editor
+        if (scheduleRef.current) {
+          scheduleRef.current.closeEditor();
+        }
+        return;
+ 
       }
     }
   }, []);
