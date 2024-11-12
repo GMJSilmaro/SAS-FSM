@@ -450,7 +450,7 @@ const WorkersListItems = () => {
   const [isEditing, setIsEditing] = useState(false);
   const router = useRouter();
   const [selectedRows, setSelectedRows] = useState([]);
-  const [users, setUsers] = useState(workers);
+  const [users, setUsers] = useState([]);
   const [filteredWorkers, setFilteredWorkers] = useState([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -1089,6 +1089,11 @@ const WorkersListItems = () => {
     }
   }, [workers]);
 
+  // Add effect to run search when filters change
+  useEffect(() => {
+    handleSearch();
+  }, [handleSearch, filters]);
+
   return (
     <Fragment>
       {isEditing && (
@@ -1218,7 +1223,7 @@ const WorkersListItems = () => {
                   placement="left"
                   overlay={<Tooltip>Add a new worker</Tooltip>}
                 >
-                  <Link href="/dashboard/workers/create-worker" passHref>
+                  <Link href="/workers/create" passHref>
                     <Button
                       variant="light"
                       className="create-worker-button"

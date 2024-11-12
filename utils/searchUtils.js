@@ -366,7 +366,7 @@ const getLinkForType = (type, id, data) => {
     case 'customer':
       return `/dashboard/customers/${data.CardCode || id}`;
     case 'worker':
-      return `/dashboard/workers/${data.workerId || id}`;
+      return `/workers/view/${data.workerId || id}`;
     case 'job':
       return `/dashboard/jobs/${data.jobID || id}`;
     case 'followUp':

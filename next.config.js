@@ -101,8 +101,8 @@ const nextConfig = {
         destination: "/dashboard/workers/list",
       },
       {
-        source: "/workers/view/:workerId",
-        destination: "/dashboard/workers/:workerId",
+        source: "/workers/view/:id",
+        destination: "/dashboard/workers/view/:id",
       },
       {
         source: "/workers/edit-worker/:workerId",
