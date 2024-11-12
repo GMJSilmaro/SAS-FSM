@@ -47,18 +47,14 @@ import {
   InputGroup,
   Badge,
 } from "react-bootstrap";
-import { faLessThanEqual } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from 'next/router';
 import Swal from 'sweetalert2';
-import quickInfoStyles from '../jobs/calendar.module.css';  // Adjust the path based on your file structure
-import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX, BsArrowRight,BsCalendar, BsFillPersonBadgeFill, BsCode, BsCircleFill, BsBriefcase, BsGear, BsPlus } from "react-icons/bs"; 
+import { BsClock, BsFillPersonFill, BsGeoAlt, BsCalendarCheck, BsBuilding, BsTools, BsX, BsArrowRight,BsCalendar, BsFillPersonBadgeFill, BsCode, BsBriefcase, BsGear, BsPlus, BsCircleFill, BsFlag, BsEye } from "react-icons/bs"; 
 import Link from 'next/link';
 import 'react-toastify/dist/ReactToastify.css';
 import { initializeSessionRenewalCheck, validateSession } from 'utils/middlewareClient';
-import { FilterCircle, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
-import { Collapse } from 'react-bootstrap';
 import SchedulerFilterPanel from './SchedulerFilterPanel';
-import { useQuery } from 'react-query';
+import { format, parseISO, isValid } from 'date-fns';
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
@@ -191,6 +187,16 @@ const processWorkers = (workers) => {
   }));
 };
 
+const formatDate = (date) => {
+  if (!date) return '';
+  try {
+    return date.toLocaleString();
+  } catch (error) {
+    console.warn('Error formatting date:', error);
+    return '';
+  }
+};
+
 const FieldServiceSchedules = () => {
   const [fieldWorkers, setFieldWorkers] = useState([]);
   const [filteredWorkers, setFilteredWorkers] = useState([]);
@@ -266,73 +272,153 @@ const FieldServiceSchedules = () => {
     });
   }, [fieldWorkers, filteredWorkers, scheduleData]);
 
-  // Then define setupWorkerJobsListener
-  const setupWorkerJobsListener = useCallback((worker) => {
-    console.log(`Setting up jobs listener for worker: ${worker.text} (${worker.workerId})`);
+  // Helper function to safely get date fields from job data
+  const getJobDates = (job) => {
+    const data = job?.data || {};
+    return {
+      startDate: data.startDate || null,
+      startTime: data.startTime || null,
+      endDate: data.endDate || null,
+      endTime: data.endTime || null
+    };
+  };
+
+  // Updated parseDate function with null checks
+  const parseDate = (dateStr, timeStr) => {
+    if (!dateStr) return null;
     
+    try {
+      // If dateStr already includes time information, use it directly
+      if (dateStr.includes('T')) {
+        const date = parseISO(dateStr);
+        if (!isValid(date)) {
+          throw new Error(`Invalid date: ${dateStr}`);
+        }
+        return date;
+      }
+
+      // Combine date and time
+      const timeString = timeStr || '00:00';
+      const combinedStr = `${dateStr}T${timeString}`;
+      const date = parseISO(combinedStr);
+      
+      if (!isValid(date)) {
+        throw new Error(`Invalid date: ${combinedStr}`);
+      }
+      
+      return date;
+    } catch (error) {
+      console.warn('Date parsing error:', error);
+      return null;
+    }
+  };
+
+  // Updated processJobDates function
+  const processJobDates = (job) => {
+    const dates = getJobDates(job);
+    console.log('Processing dates for job', job.id, ':', dates);
+    
+    try {
+      const start = parseDate(dates.startDate, dates.startTime);
+      const end = parseDate(dates.endDate, dates.endTime);
+      
+      return {
+        start,
+        end,
+        isValid: Boolean(start && end)
+      };
+    } catch (error) {
+      console.log('Error processing dates for job', job.id, ':', error);
+      return {
+        start: null,
+        end: null,
+        isValid: false
+      };
+    }
+  };
+
+  // Then define setupJobsListener
+  const setupJobsListener = useCallback((worker) => {
+    console.log("Setting up jobs listener for worker:", {
+      worker,
+      workerId: worker.workerId,
+      workerName: worker.text
+    });
+
     const jobsQuery = query(collection(db, "jobs"));
 
     return onSnapshot(jobsQuery, (snapshot) => {
-      const allJobs = snapshot.docs.map(doc => {
-        const jobData = doc.data();
-        
-        // Log assigned workers for debugging
-        console.log('Job assignments check:', {
-          jobId: doc.id,
-          jobName: jobData.jobName,
-          assignedWorkers: jobData.assignedWorkers?.map(w => ({
-            workerId: w.workerId,
-            workerName: w.workerName
-          })),
-          currentWorker: {
-            id: worker.id,
-            workerId: worker.workerId,
-            text: worker.text
-          }
-        });
-
-        // Check if this worker is assigned to this job
-        const isAssigned = jobData.assignedWorkers?.some(assignedWorker => 
-          assignedWorker.workerId === worker.workerId
-        );
-
-        if (!isAssigned) return null;
-
-        // Parse dates properly
-        let startDateTime, endDateTime;
-        
+      console.log("Jobs snapshot received:", snapshot.size, "documents");
+      
+      const allJobs = snapshot.docs.map((doc) => {
         try {
-          if (jobData.startDate.includes('T')) {
-            startDateTime = new Date(jobData.startDate);
-            endDateTime = new Date(jobData.endDate);
-          } else {
-            startDateTime = new Date(`${jobData.startDate}T${jobData.startTime}`);
-            endDateTime = new Date(`${jobData.endDate}T${jobData.endTime}`);
+          const jobData = doc.data();
+          console.log("Processing job:", { id: doc.id, data: jobData });
+      
+          // Check if this job is assigned to the current worker
+          const isAssigned = jobData.assignedWorkers?.some(
+            (assigned) => assigned.workerId === worker.workerId
+          );
+      
+          console.log("Job assignments check:", {
+            jobId: doc.id,
+            jobName: jobData.jobName,
+            assignedWorkers: jobData.assignedWorkers,
+            currentWorker: worker
+          });
+      
+          if (!isAssigned) return null;
+      
+          // Process the job dates
+          const processedJob = processJobDates({ id: doc.id, data: jobData });
+          if (!processedJob || !processedJob.start || !processedJob.end) {
+            console.warn('Invalid dates for job:', doc.id);
+            return null;
           }
+      
+          // Create the job object with validated dates
+          const jobObject = {
+            Id: doc.id,
+            WorkerId: worker.workerId,
+            Subject: jobData.jobName || 'Untitled Job',
+            StartTime: processedJob.start,
+            EndTime: processedJob.end,
+            Description: jobData.jobDescription?.replace(/<[^>]*>/g, '') || "",
+            JobStatus: jobData.jobStatus || 'Pending',
+            Customer: jobData.customerName || 'No Customer',
+            ServiceLocation: jobData.location?.locationName || 'No Location',
+            Priority: jobData.priority || 'Medium',
+            Category: "General",
+            IsAllDay: false,
+            Status: jobData.jobStatus || 'Pending',
+            AssignedWorkers: jobData.assignedWorkers || [],
+            Color: worker.color || '#B8B5FF',
+            TextColor: '#FFFFFF'
+          };
+      
+          // Validate the job object before returning
+          if (!(jobObject.StartTime instanceof Date) || !(jobObject.EndTime instanceof Date)) {
+            console.warn('Invalid date objects in job:', doc.id);
+            return null;
+          }
+      
+          return jobObject;
         } catch (error) {
-          console.error('Error parsing dates for job:', doc.id, error);
+          console.error('Error processing job:', doc.id, error);
           return null;
         }
-
-        return {
-          Id: doc.id,
-          WorkerId: worker.workerId,
-          Subject: jobData.jobName,
-          StartTime: startDateTime,
-          EndTime: endDateTime,
-          Description: jobData.jobDescription?.replace(/<[^>]*>/g, '') || "",
-          JobStatus: jobData.jobStatus,
-          Customer: jobData.customerName,
-          ServiceLocation: jobData.location?.locationName,
-          Priority: jobData.priority,
-          Category: "General",
-          IsAllDay: false,
-          Status: jobData.jobStatus,
-          AssignedWorkers: jobData.assignedWorkers,
-          Color: worker.color,
-          TextColor: '#FFFFFF'
-        };
-      }).filter(Boolean);
+      }).filter(Boolean); // Remove null entries
+      
+      // Update the schedule data with proper error handling
+      try {
+        setScheduleData(prevData => {
+          const filteredData = prevData.filter(job => job.WorkerId !== worker.workerId);
+          return [...filteredData, ...allJobs];
+        });
+      } catch (error) {
+        console.error('Error updating schedule data:', error);
+        toast.error('Error updating schedule');
+      }
 
       console.log('Processed jobs for worker:', {
         worker: worker.text,
@@ -341,7 +427,7 @@ const FieldServiceSchedules = () => {
         jobs: allJobs.map(j => ({
           id: j.Id,
           subject: j.Subject,
-          start: j.StartTime.toLocaleString()
+          start: j.StartTime instanceof Date ? j.StartTime.toLocaleString() : 'Invalid Date'
         }))
       });
 
@@ -384,10 +470,10 @@ const FieldServiceSchedules = () => {
       updateStats(workers, null);
 
       workers.forEach(worker => {
-        setupWorkerJobsListener(worker);
+        setupJobsListener(worker);
       });
     });
-  }, [updateStats, setupWorkerJobsListener]);
+  }, [updateStats, setupJobsListener]);
 
   // Initialize listeners
   useEffect(() => {
@@ -420,11 +506,40 @@ const FieldServiceSchedules = () => {
   };
 
   const contentTemplate = (props) => {
-    // Check if this is an empty cell
+    console.log('contentTemplate rendered with props:', props);
+    const [isEditing, setIsEditing] = useState(false);
     const isEmptyCell = !props.Subject;
 
+    const handleSaveInTemplate = async (updatedEvent) => {
+      console.log('handleSaveInTemplate called with:', updatedEvent);
+      try {
+        // Update the schedule data immediately
+        setScheduleData(prevData => {
+          console.log('Previous schedule data:', prevData);
+          const newData = prevData.map(item => 
+            item.Id === updatedEvent.Id ? updatedEvent : item
+          );
+          console.log('New schedule data:', newData);
+          return newData;
+        });
+
+        // Force refresh the scheduler
+        if (scheduleRef.current) {
+          console.log('Refreshing scheduler');
+          scheduleRef.current.refreshEvents();
+        }
+
+        setIsEditing(false);
+        if (scheduleRef.current) {
+          scheduleRef.current.closeQuickInfoPopup();
+        }
+      } catch (error) {
+        console.error('Error saving changes:', error);
+        toast.error('Failed to save changes');
+      }
+    };
+
     if (isEmptyCell) {
-      // Get the worker info based on the cell's resource
       const workerId = props.GroupIndex !== undefined ? filteredWorkers[props.GroupIndex]?.id : null;
       const workerName = filteredWorkers[props.GroupIndex]?.text || 'Unknown Worker';
       
@@ -436,10 +551,10 @@ const FieldServiceSchedules = () => {
             <BsClock className={styles.icon} />
             <span>Time:</span>
             <div className={styles.infoValue}>
-              {props.startTime?.toLocaleTimeString()} - {props.endTime?.toLocaleTimeString()}
+              {formatDate(props.startTime)} - {formatDate(props.endTime)}
             </div>
           </div>
-
+  
           <div className={styles.infoRow}>
             <BsFillPersonFill className={styles.icon} />
             <span>Worker:</span>
@@ -447,67 +562,118 @@ const FieldServiceSchedules = () => {
               {workerName}
             </div>
           </div>
-
+  
           <div className={styles.emptyMessage}>
+            <BsPlus size={20} className="me-2" />
             Double-click to create a new job assignment
           </div>
         </div>
       );
     }
 
-    // Original template for existing events
+    if (isEditing) {
+      return (
+        <QuickEditForm 
+          data={props} 
+          onSave={handleSaveInTemplate}
+          onCancel={() => setIsEditing(false)}
+        />
+      );
+    }
+
     return (
       <div className={styles.quickInfoContent}>
-        <h2 className={styles.title}>{props.Subject}</h2>
+        <div className={styles.headerRow}>
+          <h2 className={styles.title}>{props.Subject}</h2>
+          <Button 
+            variant="link" 
+            className={styles.editLink}
+            onClick={() => setIsEditing(true)}
+          >
+            <BsGear size={14} className="me-1" />
+            Quick Edit
+          </Button>
+        </div>
         
-        <div className={`${styles.priorityBadge} ${styles.high}`}>
-          High
+        <div className={styles.statusSection}>
+          <div className={`${styles.statusBadge} ${styles[props.JobStatus?.toLowerCase() || 'pending']}`}>
+            <BsCircleFill size={8} className="me-1" />
+            {props.JobStatus || 'Pending'}
+          </div>
+          
+          <div className={styles.priorityBadge}>
+            <BsFlag size={12} className="me-1" />
+            {props.Priority || 'Medium'} Priority
+          </div>
         </div>
 
         <div className={styles.infoRow}>
           <BsClock className={styles.icon} />
-          <span>0 hours</span>
+          <span>Duration:</span>
+          <div className={styles.infoValue}>
+            {calculateDuration(props.StartTime, props.EndTime)}
+          </div>
         </div>
 
         <div className={styles.infoRow}>
           <BsGeoAlt className={styles.icon} />
-          <span>Location</span>
+          <span>Location:</span>
           <div className={styles.infoValue}>
-            {props.ServiceLocation}
+            {props.ServiceLocation || 'Not specified'}
           </div>
         </div>
 
         <div className={styles.infoRow}>
           <BsBuilding className={styles.icon} />
-          <span>Customer</span>
+          <span>Customer:</span>
           <div className={styles.infoValue}>
-            {props.Customer}
+            {props.Customer || 'Not specified'}
           </div>
         </div>
 
-        <div className={styles.infoRow}>
-          <BsTools className={styles.icon} />
-          <span>Equipment</span>
-          <div className={styles.infoValue}>
-            {props.Equipment}
+        {props.Description && (
+          <div className={styles.descriptionSection}>
+            <h6 className={styles.sectionTitle}>Description</h6>
+            <p className={styles.description}>{props.Description}</p>
           </div>
+        )}
+
+        <div className={styles.actionsRow}>
+          <Button 
+            variant="primary" 
+            size="sm" 
+            className={styles.actionButton}
+            onClick={() => router.push(`/jobs/edit-jobs/${props.Id}`)}
+          >
+            <BsGear size={14} className="me-1" />
+            Full Edit
+          </Button>
+
+          <Button 
+            variant="outline-primary" 
+            size="sm"
+            className={styles.actionButton}
+            onClick={() => router.push(`/jobs/view/${props.Id}`)}
+          >
+            <BsEye size={14} className="me-1" />
+            View Details
+          </Button>
         </div>
 
-        <div className={styles.infoRow}>
-          <BsCalendarCheck className={styles.icon} />
-          <span>Service Call</span>
-          <div className={styles.infoValue}>
-            {props.ServiceCall || 'N/A'}
-          </div>
+        <div className={styles.metaInfo}>
+          <small className={styles.timestamp}>
+            Last updated: {new Date(props.StartTime).toLocaleString()}
+          </small>
         </div>
       </div>
     );
   };
+  
 
+  // Update footer template to match new design
   const footerTemplate = (props) => {
-    // Check if this is an empty cell
     const isEmptyCell = !props.Subject;
-
+  
     if (isEmptyCell) {
       return (
         <div className={styles.quickInfoFooter}>
@@ -521,24 +687,14 @@ const FieldServiceSchedules = () => {
         </div>
       );
     }
-
-    // Original footer for existing events
+  
+    // Footer for existing events
     return (
       <div className={styles.quickInfoFooter}>
-        <button 
-          className={styles.viewDetailsButton}
-          onClick={() => router.push(`/jobs/view/${props.Id}`)}
-        >
-          View Details
-          <BsArrowRight size={16} />
-        </button>
-        <div className={styles.actionButtons}>
-          {/* <button className={styles.editButton}>
-            Edit
-          </button>
-          <button className={styles.deleteButton}>
-            Delete
-          </button> */}
+        <div className={styles.meta}>
+          <small className={styles.timestamp}>
+            Last updated: {new Date(props.StartTime).toLocaleString()}
+          </small>
         </div>
       </div>
     );
@@ -551,55 +707,71 @@ const FieldServiceSchedules = () => {
     // Cancel the default behavior
     args.cancel = true;
 
-    // Check if clicking on an appointment
-    if (args.element && 
-        (args.element.classList.contains('e-appointment') || 
-         args.element.closest('.e-appointment'))) {
-      console.log('Double clicked on appointment');
-      
-      let eventElement = args.element.classList.contains('e-appointment') 
-        ? args.element 
-        : args.element.closest('.e-appointment');
-      
-      const eventData = scheduleRef.current.getEventDetails(eventElement);
-      console.log('Event Data:', eventData);
-      
-      if (eventData && scheduleRef.current) {
-        scheduleRef.current.showQuickInfo(eventData);
-      }
+    // Check if args exists
+    if (!args) {
+      console.warn('Invalid args in double click event');
       return;
     }
 
-    // Handle empty cell double-click with SweetAlert
-    if (args.element.classList.contains('e-work-cells')) {
-      const startTime = args.startTime;
-      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
-      const workerId = args.groupIndex !== undefined ? filteredWorkers[args.groupIndex].id : null;
-      const workerName = filteredWorkers[args.groupIndex]?.text || 'Unknown Worker';
-
-      Swal.fire({
-        title: 'Create a Job?',
-        text: `Are you sure you want to create a job for ${workerName}?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, create job'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          router.push({
-            pathname: '/jobs/create',
-            query: {
-              startDate: startTime.toISOString().split('T')[0],
-              endDate: endTime.toISOString().split('T')[0],
-              startTime: startTime.toTimeString().split(' ')[0],
-              endTime: endTime.toTimeString().split(' ')[0],
-              workerId: workerId,
-              scheduleSession: 'custom'
-            }
-          });
+    try {
+      // Handle appointment click
+      const appointmentElement = args.element?.closest('.e-appointment');
+      if (appointmentElement) {
+        console.log('Double clicked on appointment');
+        
+        if (scheduleRef.current) {
+          const eventData = scheduleRef.current.getEventDetails(appointmentElement);
+          console.log('Event Data:', eventData);
+          
+          if (eventData) {
+            scheduleRef.current.openEditor(eventData, 'Add');
+          }
         }
-      });
+        return;
+      }
+
+      // Handle empty cell click
+      const workCellElement = args.element?.closest('.e-work-cells');
+      if (workCellElement) {
+        const startTime = args.startTime;
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        const workerId = args.groupIndex !== undefined ? filteredWorkers[args.groupIndex]?.id : null;
+        const workerName = filteredWorkers[args.groupIndex]?.text || 'Unknown Worker';
+
+        // Verify we have required data before showing dialog
+        if (!workerId || !startTime || !endTime) {
+          console.warn('Missing required data for job creation', { workerId, startTime, endTime });
+          toast.error('Unable to create job: Missing required information');
+          return;
+        }
+
+        Swal.fire({
+          title: 'Create a Job?',
+          text: `Are you sure you want to create a job for ${workerName}?`,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Yes, create job'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            router.push({
+              pathname: '/jobs/create',
+              query: {
+                startDate: startTime.toISOString().split('T')[0],
+                endDate: endTime.toISOString().split('T')[0],
+                startTime: startTime.toTimeString().split(' ')[0],
+                endTime: endTime.toTimeString().split(' ')[0],
+                workerId: workerId,
+                scheduleSession: 'custom'
+              }
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleCellDoubleClick:', error);
+      toast.error('An error occurred while handling the click event');
     }
   }, [filteredWorkers, router]);
 
@@ -643,16 +815,16 @@ const FieldServiceSchedules = () => {
     });
   }, [currentDate]);
 
-  // Add this debug function to check the data structure
+  // Update the debug function to safely handle dates
   const debugScheduleData = (data) => {
     console.log('Schedule Data Debug:', {
       data,
       firstItem: data[0] ? {
         ...data[0],
-        startTime: data[0].StartTime.toISOString(),
-        endTime: data[0].EndTime.toISOString()
+        startTime: data[0].StartTime instanceof Date ? data[0].StartTime.toLocaleString() : 'Invalid Date',
+        endTime: data[0].EndTime instanceof Date ? data[0].EndTime.toLocaleString() : 'Invalid Date'
       } : null,
-      currentDate: new Date().toISOString()
+      currentDate: new Date().toLocaleString()
     });
   };
 
@@ -845,31 +1017,210 @@ const FieldServiceSchedules = () => {
     toast.info('Filters cleared');
   }, [fieldWorkers]);
 
-  // Add this function before the return statement
+ 
   const onPopupOpen = useCallback((args) => {
-    // Prevent default popup for drag/resize/more events
     if (args.type === 'Editor' || args.type === 'QuickInfo') {
       console.log('Popup opening:', args);
       
-      // If it's a new event being created
+      // For new events
       if (args.type === 'Editor' && !args.data.Id) {
-        args.cancel = true; // Prevent default editor
+        args.cancel = true;
         if (scheduleRef.current) {
           scheduleRef.current.closeEditor();
         }
         return;
       }
-
+  
       if (args.type === 'QuickInfo') {
-        args.cancel = true; // Prevent default editor
+        // For empty cells
+        if (!args.data || !args.data.Subject) {
+          args.cancel = true;
+          return;
+        }
+    
+        // For existing events
+        if (args.data && args.data.Subject) {
+          // Ensure we have valid dates
+          const startTime = args.data.StartTime instanceof Date ? args.data.StartTime : null;
+          const endTime = args.data.EndTime instanceof Date ? args.data.EndTime : null;
+    
+          if (!startTime || !endTime) {
+            args.cancel = true;
+            return;
+          }
+    
+          args.cancel = false;
+        }
+      } else if (args.type === 'Editor') {
+        args.cancel = true;
         if (scheduleRef.current) {
           scheduleRef.current.closeEditor();
         }
-        return;
- 
       }
     }
   }, []);
+
+  const onCellClick = useCallback((args) => {
+    console.log('Cell clicked:', args);
+  }, []);
+  
+  // QuickEditForm component with integrated handleSave
+  const QuickEditForm = ({ data, onSave, onCancel }) => {
+    console.log('QuickEditForm initialized with data:', data);
+
+    const [formData, setFormData] = useState({
+      Subject: data.Subject || '',
+      Description: data.Description || '',
+      StartTime: data.StartTime instanceof Date ? data.StartTime : new Date(),
+      EndTime: data.EndTime instanceof Date ? data.EndTime : new Date(),
+      Priority: data.Priority || 'Medium',
+      JobStatus: data.JobStatus || 'Pending'
+    });
+
+    const handleSave = async (updatedData) => {
+      console.log('handleSave called with:', updatedData);
+      try {
+        // Format dates for Firestore
+        const formattedData = {
+          jobName: updatedData.Subject,
+          jobDescription: updatedData.Description || '',
+          startDate: format(updatedData.StartTime, 'yyyy-MM-dd'),
+          startTime: format(updatedData.StartTime, 'HH:mm'),
+          endDate: format(updatedData.EndTime, 'yyyy-MM-dd'),
+          endTime: format(updatedData.EndTime, 'HH:mm'),
+          priority: updatedData.Priority,
+          jobStatus: updatedData.JobStatus,
+          formattedStartDateTime: updatedData.StartTime,
+          formattedEndDateTime: updatedData.EndTime,
+          lastModifiedAt: new Date()
+        };
+
+        console.log('Formatted data for Firestore:', formattedData);
+        console.log('Updating document with ID:', data.Id);
+
+        // Update Firestore
+        await updateDoc(doc(db, "jobs", data.Id), formattedData);
+        console.log('Firestore update successful');
+
+        // Create the updated schedule event object
+        const updatedEvent = {
+          Id: data.Id,
+          Subject: updatedData.Subject,
+          Description: updatedData.Description,
+          StartTime: updatedData.StartTime,
+          EndTime: updatedData.EndTime,
+          Priority: updatedData.Priority,
+          JobStatus: updatedData.JobStatus,
+          WorkerId: data.WorkerId,
+          Customer: data.Customer,
+          ServiceLocation: data.ServiceLocation,
+          Color: data.Color,
+          TextColor: data.TextColor
+        };
+
+        console.log('Created updatedEvent:', updatedEvent);
+        onSave(updatedEvent);
+        
+        toast.success('Job updated successfully');
+      } catch (error) {
+        console.error('Error updating job:', error);
+        toast.error('Failed to update job');
+      }
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await handleSave(formData);
+      } catch (error) {
+        console.error('Error in form submission:', error);
+        toast.error('Failed to save changes');
+      }
+    };
+
+    return (
+      <Form onSubmit={handleSubmit} className={styles.quickEditForm}>
+        <Form.Group className="mb-2">
+          <Form.Label>Job Name</Form.Label>
+          <Form.Control
+            type="text"
+            value={formData.Subject}
+            onChange={(e) => setFormData(prev => ({ ...prev, Subject: e.target.value }))}
+            required
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-2">
+          <Form.Label>Start Time</Form.Label>
+          <DateTimePickerComponent
+            value={formData.StartTime}
+            onChange={(e) => {
+              if (e.value instanceof Date) {
+                setFormData(prev => ({ ...prev, StartTime: e.value }));
+              }
+            }}
+            format="dd/MM/yy hh:mm a"
+            step={15}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-2">
+          <Form.Label>End Time</Form.Label>
+          <DateTimePickerComponent
+            value={formData.EndTime}
+            onChange={(e) => {
+              if (e.value instanceof Date) {
+                setFormData(prev => ({ ...prev, EndTime: e.value }));
+              }
+            }}
+            format="dd/MM/yy hh:mm a"
+            step={15}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-2">
+          <Form.Label>Priority</Form.Label>
+          <Form.Select
+            value={formData.Priority}
+            onChange={(e) => setFormData(prev => ({ ...prev, Priority: e.target.value }))}
+          >
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </Form.Select>
+        </Form.Group>
+
+        <Form.Group className="mb-2">
+          <Form.Label>Status</Form.Label>
+          <Form.Select
+            value={formData.JobStatus}
+            onChange={(e) => setFormData(prev => ({ ...prev, JobStatus: e.target.value }))}
+          >
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Scheduled">Scheduled</option>
+          </Form.Select>
+        </Form.Group>
+
+        <div className={styles.formActions}>
+          <Button type="submit" variant="primary" size="sm">
+            Save Changes
+          </Button>
+          <Button variant="outline-secondary" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </Form>
+    );
+  };
+
+  // Add this effect to refresh the schedule when data changes
+  useEffect(() => {
+    if (scheduleRef.current) {
+      scheduleRef.current.refreshEvents();
+    }
+  }, [scheduleData]);
 
   return (
     <div>
@@ -1156,6 +1507,7 @@ const FieldServiceSchedules = () => {
                 content: contentTemplate,
                 footer: footerTemplate,
               }}
+              cellClick={onCellClick}
               cellDoubleClick={handleCellDoubleClick}
               timeScale={{ 
                 enable: true, 
