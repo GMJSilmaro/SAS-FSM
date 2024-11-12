@@ -73,11 +73,12 @@ const FollowUpsPage = () => {
     return technician ? technician.workerName : '-';
   };
 
-  // Add this helper function next to getTechnicianName
+  // Update the getCSOName function
   const getCSOName = (workers, createdBy) => {
-    if (!workers || !createdBy?.workerId) return '-';
-    const cso = workers.find(w => w.workerId === createdBy.workerId);
-    return cso ? cso.fullName : '-';
+    if (!workers || !createdBy) return '-';
+
+    const cso = workers.find(w => w.workerId === (typeof createdBy === 'string' ? createdBy : createdBy.workerId));
+    return cso ? (cso.fullName || cso.workerName) : '-';
   };
 
   // Fetch jobs with follow-ups
@@ -112,6 +113,11 @@ const FollowUpsPage = () => {
                   : '-';
 
                 const csoName = getCSOName(workers, followUp.createdBy);
+                console.log('CSO Data:', { 
+                  createdBy: followUp.createdBy, 
+                  workers: workers,
+                  resultingName: csoName 
+                });
 
                 // Only apply other filters if no specific followUpId is provided
                 if (!filters.followUpId) {
@@ -165,7 +171,7 @@ const FollowUpsPage = () => {
     };
 
     fetchJobs();
-  }, [filters]);
+  }, [filters, workers]);
 
   const getStatusBadge = (status) => {
     const statusColors = {
@@ -398,7 +404,7 @@ const FollowUpsPage = () => {
                     <td>{getStatusBadge(followUp.status)}</td>
                     <td>{getPriorityBadge(followUp.priority)}</td>
                     <td>{followUp.technicianName}</td>
-                    <td>{followUp.csoName}</td>
+                    <td>{followUp.csoName || '-'}</td>
                     <td>{format(new Date(followUp.createdAt), 'dd/MM/yyyy HH:mm')}</td>
                     <td>{format(new Date(followUp.updatedAt), 'dd/MM/yyyy HH:mm')}</td>
                   </tr>
