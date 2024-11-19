@@ -67,6 +67,12 @@ const NavbarDefault = [
 		],
 		isAuthenticated: true,
 	},
+	{
+		id: uuid(),
+		menuitem: 'Follow-Ups',
+		link: '/follow-ups',
+		icon: 'ListCheck',
+	},
 ];
 
 //console.log('NavbarDefault:', JSON.stringify(NavbarDefault, null, 2));

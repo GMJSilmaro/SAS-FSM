@@ -49,7 +49,7 @@ const NavDropdownMain = (props) => {
 				padding: '12px 16px',
 				color: 'var(--bs-gray-800)',
 				fontWeight: 500,
-				width: '100%'
+				width: '135px'
 			}}
 			onClick={(e) => onClick && onClick(e)}
 		>

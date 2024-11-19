@@ -140,6 +140,11 @@ const nextConfig = {
         source: "/jobs/create-jobs",
         destination: "/dashboard/jobs/create-jobs?",
       },
+      // Follow-Ups
+      {
+        source: "/follow-ups",
+        destination: "/dashboard/follow-ups",
+      },
 
       // AUTHENTICATION
       {

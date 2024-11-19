@@ -16,6 +16,9 @@ import { db } from '../../../firebase';
 import { format } from 'date-fns';
 import { FaFilter, FaEllipsisV } from 'react-icons/fa';
 import Link from 'next/link';
+import { GeeksSEO } from 'widgets';
+import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { FaPlus } from 'react-icons/fa';
 
 const FollowUpsPage = () => {
   const router = useRouter();
@@ -267,9 +270,131 @@ const FollowUpsPage = () => {
 
   return (
     <Container fluid className="px-6 py-4">
+      <GeeksSEO title="Follow-Ups | SAS&ME - SAP B1 | Portal" />
+         <Row>
+        <Col lg={12} md={12} sm={12}>
+          <div
+            style={{
+              background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
+              padding: "1.5rem 2rem",
+              borderRadius: "0 0 24px 24px",
+              marginTop: "-39px",
+              marginLeft: "10px",
+              marginRight: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-start">
+              <div className="d-flex flex-column">
+                <div className="mb-3">
+                  <h1
+                    className="mb-2"
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: "600",
+                      color: "#FFFFFF",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    Follow-Ups
+                  </h1>
+                  <p
+                    className="mb-2"
+                    style={{
+                      fontSize: "16px",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      fontWeight: "400",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    Manage and track all your follow-ups in one centralized dashboard
+                  </p>
+                  <div
+                    className="d-flex align-items-center gap-2"
+                    style={{
+                      fontSize: "14px",
+                      color: "rgba(255, 255, 255, 0.9)",
+                      background: "rgba(255, 255, 255, 0.1)",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <i className="fe fe-info" style={{ fontSize: "16px" }}></i>
+                    <span>
+                      Track all your follow-ups in one centralized dashboard
+                    </span>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-2 mb-4">
+                  <span
+                    className="badge"
+                    style={{
+                      background: "#FFFFFF",
+                      color: "#4171F5",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Follow-Up Management
+                  </span>
+                  <span
+                    className="badge"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.2)",
+                      color: "#FFFFFF",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <i className="fe fe-list me-1"></i>
+                    Status Management
+                  </span>
+                </div>
+
+                <nav style={{ fontSize: "14px", fontWeight: "500" }}>
+                  <div className="d-flex align-items-center">
+                    <i
+                      className="fe fe-home"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    ></i>
+                    <Link
+                      href="/"
+                      className="text-decoration-none ms-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      Dashboard
+                    </Link>
+                    <span
+                      className="mx-2"
+                      style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                    >
+                      /
+                    </span>
+                    <i
+                      className="fe fe-list"
+                      style={{ color: "#FFFFFF" }}
+                    ></i>
+                    <span className="ms-2" style={{ color: "#FFFFFF" }}>
+                      Follow-Ups
+                    </span>
+                  </div>
+                </nav>
+              </div>
+
+            </div>
+          </div>
+        </Col>
+      </Row>
+
       <Row className="align-items-center justify-content-between g-3 mb-4">
         <Col md={6}>
-          <h1 className="mb-0 h2">Follow-ups</h1>
+         
         </Col>
         <Col md={6} className="d-flex justify-content-end gap-2">
           <div className="d-flex gap-2">
@@ -391,12 +516,12 @@ const FollowUpsPage = () => {
                   <tr key={followUp.id}>
                     <td>{followUp.id}</td>
                     <td>
-                      <Link href={`/dashboard/jobs/${followUp.jobID}`}>
+                      <Link href={`/jobs/view/${followUp.jobID}`}>
                         #{followUp.jobID}
                       </Link>
                     </td>
                     <td>
-                      <Link href={`/customers/${followUp.customerID}`}>
+                      <Link href={`/customers/view/${followUp.customerID}`}>
                         {followUp.customerName}
                       </Link>
                     </td>
