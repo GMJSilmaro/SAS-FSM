@@ -41,16 +41,40 @@ const NavDropdownMain = (props) => {
 		</NavDropdown.Item>
 	);
 
+	const renderNavLink = () => (
+		<Link 
+			href={item.link} 
+			className="nav-link d-flex align-items-center"
+			style={{ 
+				padding: '12px 16px',
+				color: 'var(--bs-gray-800)',
+				fontWeight: 500,
+				width: '100%'
+			}}
+			onClick={(e) => onClick && onClick(e)}
+		>
+			{renderIcon(item.icon)}
+			<span>{item.menuitem}</span>
+			{item.badge && renderBadge(item.badge)}
+		</Link>
+	);
+
 	const NavbarDesktop = () => {
 		return (
 			<NavDropdown
 				title={
-					<span>
+					<span className="d-flex align-items-center" style={{ 
+						padding: '0',
+						color: 'var(--bs-gray-800)',
+						fontWeight: 500
+					}}>
 						{renderIcon(item.icon)}
-						{item.menuitem} {item.badge && renderBadge(item.badge)}
+						{item.menuitem} 
+						{item.badge && renderBadge(item.badge)}
 					</span>
 				}
 				show
+				className="nav-item"
 			>
 				{item.children.map((submenu) => {
 					if (submenu.header) {
@@ -94,11 +118,20 @@ const NavDropdownMain = (props) => {
 
 	const NavbarMobile = () => {
 		return (
-			<NavDropdown title={
-				<span>
-					{renderIcon(item.icon)}
-					{item.menuitem} {item.badge && renderBadge(item.badge)}
-				</span>} >
+			<NavDropdown 
+				title={
+					<span className="d-flex align-items-center" style={{ 
+						color: 'var(--bs-gray-800)',
+						fontWeight: 500,
+						width: '100%'
+					}}>
+						{renderIcon(item.icon)}
+						<span>{item.menuitem}</span>
+						{item.badge && renderBadge(item.badge)}
+					</span>
+				}
+				className="mobile-dropdown w-100"
+			>
 				{item.children.map((submenu, submenuindex) => {
 					if (submenu.divider || submenu.header) {
 						return submenu.divider ? (
@@ -180,7 +213,13 @@ const NavDropdownMain = (props) => {
 	}
 	return (
 		<Fragment>
-			{hasMounted && isDesktop ? <NavbarDesktop /> : <NavbarMobile />}
+			{hasMounted && (
+				item.children && item.children.length > 0 ? (
+					isDesktop ? <NavbarDesktop /> : <NavbarMobile />
+				) : (
+					renderNavLink()
+				)
+			)}
 		</Fragment>
 	);
 };

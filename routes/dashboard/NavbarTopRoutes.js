@@ -5,43 +5,18 @@ const NavbarDefault = [
 	{
 		id: uuid(),
 		menuitem: 'Dashboard',
-		link: '#',
+		link: '/dashboard',
 		icon: 'HouseDoorFill',
-		children: [
-			{ id: uuid(), menuitem: 'Overview', link: '/dashboard'},
-		],
-		isAuthenticated: true,
 	},
 	{
 		id: uuid(),
-		menuitem: 'Manage Customer',
-		link: '#',
+		menuitem: 'Customers',
+		link: '/customers',
 		icon: 'PeopleFill',
-		children: [
-			{
-				id: uuid(),
-				header: true,
-				header_text: 'Customer Menu'
-			},
-			{
-				id: uuid(),
-				menuitem: 'Customers',
-				link: '/customers',
-				icon: 'PersonFill'
-			},
-			// {
-			// 	id: uuid(),
-			// 	menuitem: 'Service Locations',
-				
-			// 	link: '/dashboard/locations/list',
-			// 	icon: 'GeoAltFill'
-			// },
-		],
-		isAuthenticated: true,
 	},
 	{
 		id: uuid(),
-		menuitem: 'Manage Workers',
+		menuitem: 'Workers',
 		link: '#',
 		icon: 'PeopleFill',
 		children: [
@@ -68,7 +43,7 @@ const NavbarDefault = [
 	},
 	{
 		id: uuid(),
-		menuitem: 'Manage Jobs',
+		menuitem: 'Jobs',
 		link: '#',
 		icon: 'BriefcaseFill',
 		children: [

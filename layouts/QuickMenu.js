@@ -352,6 +352,13 @@ const UserAvatar = React.memo(({ userDetails }) => {
 });
 
 const SearchBar = React.memo(({ value, onChange, onSubmit, onClear }) => {
+  // Add handler for key press
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && value.trim()) {
+      onSubmit(e);
+    }
+  };
+
   return (
     <div className="position-relative">
       <div className="d-flex align-items-center">
@@ -362,6 +369,7 @@ const SearchBar = React.memo(({ value, onChange, onSubmit, onClear }) => {
               placeholder="Search jobs, status, etc..."
               value={value}
               onChange={onChange}
+              onKeyPress={handleKeyPress}
               className="form-control border-end-0"
               style={{
                 backgroundColor: '#f8f9fa',
@@ -402,6 +410,9 @@ const SearchBar = React.memo(({ value, onChange, onSubmit, onClear }) => {
               <FaSearch size={14} />
             </Button>
           </InputGroup>
+          <small className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+            Press Enter or click the search icon to search
+          </small>
         </div>
       </div>
     </div>
