@@ -278,7 +278,7 @@ const FollowUpsPage = () => {
               background: "linear-gradient(90deg, #4171F5 0%, #3DAAF5 100%)",
               padding: "1.5rem 2rem",
               borderRadius: "0 0 24px 24px",
-              marginTop: "-39px",
+              marginTop: "-70px",
               marginLeft: "10px",
               marginRight: "10px",
               marginBottom: "20px",
