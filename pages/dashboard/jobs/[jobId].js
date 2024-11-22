@@ -58,23 +58,23 @@ import {
   GeoAltFill,
   BellFill,
   ThreeDotsVertical,
+  ChevronUp,
+  ChevronDown,
+  Trash,
+  Image as ImageIcon,
+  CalendarCheck,
+  Images,
+  CreditCard2Front,
 } from "react-bootstrap-icons";
 import {
   FaPencilAlt, // For edit button
-  FaUsers, // For workers stat card
+  FaTrash, // For delete button
   FaTools, // For equipment stat card
   FaCheckCircle, // For tasks stat card
-  FaWind, // For HVAC equipment icon
-  FaBolt, // For electrical equipment icon
-  FaFaucet, // For plumbing equipment icon
-  FaCog, // For default equipment icon
   FaMapMarkerAlt, // For equipment location icon
   FaIndustry, // For equipment brand icon
   FaBarcode, // For equipment model icon
   FaWhatsapp,
-  FaRegSquare,
-  FaFolder,
-  FaWrench,
   FaHashtag,
   FaCalendarCheck,
   FaCalendarTimes,
@@ -273,7 +273,6 @@ const JobDetails = () => {
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     libraries: googleMapsLibraries,
-    // Add this to ensure the Google Maps script is loaded before using it
   });
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [currentNotesPage, setCurrentNotesPage] = useState(1);
@@ -317,11 +316,25 @@ const JobDetails = () => {
   const [isEditing, setIsEditing] = useState(null);
   // Add this state and useEffect to fetch follow-up types
   const [followUpTypes, setFollowUpTypes] = useState([]);
+  // Add this state at the top of your component
+  const [isTechListExpanded, setIsTechListExpanded] = useState(true);
+  // Add these states at the top of your component
+  const [editingFollowUp, setEditingFollowUp] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [followUpToDelete, setFollowUpToDelete] = useState(null);
+  const [isEquipmentListExpanded, setIsEquipmentListExpanded] = useState(true);
+  const [expandedEquipments, setExpandedEquipments] = useState({});
 
   console.log("Job ID from URL:", jobId);
 
   // Define constants
-  const FOLLOW_UP_STATUSES = ['Logged', 'In Progress', 'Closed', 'Cancelled'];
+  const FOLLOW_UP_STATUSES = [
+    'Logged',
+    'In Progress',
+    'Pending',
+    'Completed',
+    'Cancelled'
+  ];
 
   // Helper functions (outside of useEffect)
   const getTypeWithColor = (typeName) => {
@@ -361,9 +374,6 @@ const JobDetails = () => {
     fetchFollowUpTypes();
   }, []);
 
-  const handleEditClick = () => {
-    router.push(`/jobs/edit-jobs/${jobId}`);
-  };
 
   useEffect(() => {
     // Retrieve email from cookies
@@ -527,29 +537,56 @@ const JobDetails = () => {
     }
   };
 
-  const renderTaskList = () => {
+  const renderJobTasks = () => {
     return (
-      <div className={styles.taskSection}>
-        <div className={styles.taskHeader}>
-          <div className={styles.taskHeaderContent}>
-            <h6>Job Tasks</h6>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => setShowNewTaskForm(!showNewTaskForm)}
-            >
-              {showNewTaskForm ? 'Cancel' : 'Add New Task'}
-            </Button>
+      <section className={styles.tasksSection}>
+        <div className={styles.tasksHeader}>
+          <div className={styles.headerLeft}>
+            <h6 className={styles.sectionTitle}>
+              <ClipboardCheck size={16} className={styles.titleIcon} />
+              Job Tasks
+            </h6>
+            <div className={styles.tasksMeta}>
+              <Badge bg="light" text="dark" className={styles.taskCount}>
+                {job.taskList?.length || 0} tasks
+              </Badge>
+              {job.taskList?.length > 0 && (
+                <Badge bg="success" className={styles.completedCount}>
+                  {job.taskList.filter(task => task.isDone).length} completed
+                </Badge>
+              )}
+            </div>
           </div>
+          <Button
+            variant="outline-primary"
+            size="sm"
+            className={styles.addTaskButton}
+            onClick={() => setShowNewTaskForm(!showNewTaskForm)}
+          >
+            <Plus size={16} />
+            {showNewTaskForm ? 'Cancel' : 'Add Task'}
+          </Button>
         </div>
 
         {showNewTaskForm && (
-          <Form onSubmit={handleAddTask} className={styles.newTaskForm}>
-            {taskInputs.map((task, index) => (
-              <div key={index} className={styles.taskInputGroup}>
-                <Row className="g-2 mb-3">
-                  <Col xs={12}>
-                    <InputGroup>
+          <div className={styles.newTaskFormContainer}>
+            <Form onSubmit={handleAddTask}>
+              {taskInputs.map((task, index) => (
+                <div key={index} className={styles.taskInputGroup}>
+                  <div className={styles.taskInputHeader}>
+                    <h6 className={styles.taskInputTitle}>Task {index + 1}</h6>
+                    {index > 0 && (
+                      <Button 
+                        variant="link"
+                        className={styles.removeTaskButton}
+                        onClick={() => removeTaskInput(index)}
+                      >
+                        <X size={16} />
+                      </Button>
+                    )}
+                  </div>
+                  <Row className="g-3">
+                    <Col xs={12}>
                       <Form.Control
                         type="text"
                         placeholder="Task name"
@@ -560,250 +597,238 @@ const JobDetails = () => {
                           setTaskInputs(newInputs);
                         }}
                       />
-                      {index > 0 && (
-                        <Button 
-                          variant="outline-danger"
-                          onClick={() => {
-                            const newInputs = taskInputs.filter((_, i) => i !== index);
-                            setTaskInputs(newInputs);
-                          }}
-                        >
-                          <X size={16} />
-                        </Button>
-                      )}
-                    </InputGroup>
-                  </Col>
-                  <Col xs={12}>
-                    <Form.Control
-                      as="textarea"
-                      rows={2}
-                      placeholder="Task description (optional)"
-                      value={task.taskDescription}
-                      onChange={(e) => {
-                        const newInputs = [...taskInputs];
-                        newInputs[index].taskDescription = e.target.value;
-                        setTaskInputs(newInputs);
-                      }}
-                    />
-                  </Col>
-                  <Col xs={12}>
-                    <Form.Check
-                      type="checkbox"
-                      label="Priority Task"
-                      checked={task.isPriority}
-                      onChange={(e) => {
-                        const newInputs = [...taskInputs];
-                        newInputs[index].isPriority = e.target.checked;
-                        setTaskInputs(newInputs);
-                      }}
-                    />
-                  </Col>
-                </Row>
-                {index === taskInputs.length - 1 && (
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setTaskInputs([...taskInputs, {
-                      taskName: '',
-                      taskDescription: '',
-                      isPriority: false,
-                      isDone: false
-                    }])}
-                    className="mb-3"
-                  >
-                    <Plus size={16} /> Add Another Task
-                  </Button>
-                )}
-              </div>
-            ))}
-            <div className={styles.formActions}>
-              <Button type="submit" variant="primary">
-                Save Tasks
-              </Button>
-            </div>
-          </Form>
-        )}
-
-        {(!job.taskList || job.taskList.length === 0) ? (
-          <div className={styles.emptyTasks}>
-            <FaCheckCircle size={24} />
-            <p>No tasks added yet</p>
-          </div>
-        ) : (
-          <div className={styles.taskList}>
-            {job.taskList.map((task) => (
-              <div key={task.taskID} className={styles.taskItem}>
-                <div className={styles.taskContent}>
-                  <Form.Check
-                    type="checkbox"
-                    checked={task.isDone}
-                    onChange={() => handleToggleTaskComplete(task.taskID)}
-                    label={
-                      <div className={task.isDone ? styles.completedTask : ''}>
-                        <div className={styles.taskName}>
-                          {task.taskName}
-                          {task.isPriority && (
-                            <Badge bg="danger" className="ms-2">Priority</Badge>
-                          )}
-                        </div>
-                        {task.taskDescription && (
-                          <small className={styles.taskDescription}>
-                            {task.taskDescription}
-                          </small>
-                        )}
-                        {task.completionDate && (
-                          <small className={styles.completionDate}>
-                            Completed: {new Date(task.completionDate).toLocaleDateString()}
-                          </small>
-                        )}
-                      </div>
-                    }
-                  />
+                    </Col>
+                    <Col xs={12}>
+                      <Form.Control
+                        as="textarea"
+                        rows={2}
+                        placeholder="Task description (optional)"
+                        value={task.taskDescription}
+                        onChange={(e) => {
+                          const newInputs = [...taskInputs];
+                          newInputs[index].taskDescription = e.target.value;
+                          setTaskInputs(newInputs);
+                        }}
+                      />
+                    </Col>
+                    <Col xs={12}>
+                      <Form.Check
+                        type="checkbox"
+                        label="Priority Task"
+                        checked={task.isPriority}
+                        onChange={(e) => {
+                          const newInputs = [...taskInputs];
+                          newInputs[index].isPriority = e.target.checked;
+                          setTaskInputs(newInputs);
+                        }}
+                      />
+                    </Col>
+                  </Row>
                 </div>
+              ))}
+              <div className={styles.taskFormActions}>
                 <Button
-                  variant="outline-danger"
+                  variant="outline-secondary"
                   size="sm"
-                  onClick={() => handleDeleteTask(task.taskID, task.taskName)}
-                  className={styles.deleteButton}
+                  onClick={addNewTaskInput}
+                  className={styles.addAnotherButton}
                 >
-                  <X size={16} />
+                  <Plus size={16} /> Add Another Task
+                </Button>
+                <Button type="submit" variant="primary">
+                  Save Tasks
                 </Button>
               </div>
-            ))}
+            </Form>
           </div>
         )}
-      </div>
+
+        <div className={styles.taskListContainer}>
+          {(!job.taskList || job.taskList.length === 0) ? (
+            <div className={styles.emptyTasks}>
+              <ClipboardCheck size={24} />
+              <p>No tasks added yet</p>
+              <Button 
+                variant="outline-primary" 
+                size="sm"
+                onClick={() => setShowNewTaskForm(true)}
+              >
+                Add Your First Task
+              </Button>
+            </div>
+          ) : (
+            <div className={styles.taskList}>
+              {job.taskList.map((task) => (
+                <div 
+                  key={task.taskID} 
+                  className={`${styles.taskItem} ${task.isDone ? styles.taskCompleted : ''}`}
+                >
+                  <div className={styles.taskContent}>
+                    <div className={styles.checkboxWrapper}>
+                      <Form.Check
+                        type="checkbox"
+                        checked={task.isDone}
+                        onChange={() => handleToggleTaskComplete(task.taskID)}
+                        id={`task-${task.taskID}`}
+                        className={styles.taskCheckbox}
+                      />
+                      {task.isDone && (
+                        <div className={styles.completedIndicator}>
+                          <Check size={12} />
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.taskDetails}>
+                      <div className={styles.taskHeader}>
+                        <label 
+                          htmlFor={`task-${task.taskID}`}
+                          className={styles.taskName}
+                        >
+                          {task.taskName}
+                        </label>
+                        {task.isPriority && (
+                          <Badge bg="danger" className={styles.priorityBadge}>
+                            Priority
+                          </Badge>
+                        )}
+                      </div>
+                      {task.taskDescription && (
+                        <p className={styles.taskDescription}>
+                          {task.taskDescription}
+                        </p>
+                      )}
+                      {task.completionDate && (
+                        <div className={styles.completionInfo}>
+                          <Badge bg="success" className={styles.completedBadge}>
+                            <Check size={10} /> Completed
+                          </Badge>
+                          <span className={styles.completionDate}>
+                            <Clock size={12} />
+                            {formatDateTime(task.completionDate)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="link"
+                    className={styles.deleteTaskButton}
+                    onClick={() => handleDeleteTask(task.taskID, task.taskName)}
+                  >
+                    <Trash size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     );
   };
 
-  const renderEquipmentList = () => {
-    if (!job?.equipments || job.equipments.length === 0) {
-      return (
-        <div className={styles.emptyEquipment}>
-          <FaTools size={24} />
-          <p>No equipment data available</p>
-        </div>
-      );
-    }
+  const toggleEquipment = (index) => {
+    setExpandedEquipments(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
 
+  const renderAssignedEquipments = () => {
     return (
-      <div className={styles.equipmentContainer}>
-        <div className={styles.equipmentHeader}>
-          <h5 >
-            <FaTools className="me-2" />
-            Assigned Equipments
-          </h5>
-          <Badge bg="primary" className={styles.equipmentCount}>
-            {job.equipments.length} items
-          </Badge>
+      <section className={styles.section}>
+           <div className={styles.sectionHeader}>
+           <FaTools size={16} className={styles.titleIcon} />
+            <h6 className={styles.sectionTitle}>
+              Assigned Equipments
+              <span className={styles.equipmentCount}>
+                {job.equipments?.length || 0} items
+              </span>
+            </h6>
         </div>
+       
         
-        <div className={styles.equipmentScroll}>
-          {job.equipments.map((equipment, index) => (
-            <div key={index} className="mb-4">
-            
-              
-              <div className={styles.equipmentDetails}>
-                {/* Header */}
-                <div className={styles.equipmentHeader}>
-                  <h5>{equipment.itemName}</h5>
-                  <Badge bg="light" text="dark" className={styles.equipmentType}>
-                    {equipment.equipmentType || 'General'}
+        <div className={styles.equipmentList}>
+          {job.equipments?.map((equipment, index) => (
+            <div key={index} className={styles.equipmentCard}>
+              <div 
+                className={styles.equipmentHeader}
+                onClick={() => toggleEquipment(index)}
+              >
+                <div className={styles.equipmentTitle}>
+                  <h3 className={styles.equipmentName}>{equipment.itemName}</h3>
+                  <Badge className={`${styles.typeBadge} ${styles[equipment.equipmentType.toLowerCase()]}`}>
+                    {equipment.equipmentType}
                   </Badge>
                 </div>
-
-                {/* Main Details */}
-                <div className={styles.specsList}>
-                  {/* Brand & Model */}
-                  <div className={styles.specsGroup}>
-                    {equipment.brand && (
-                      <div className={styles.specItem}>
-                        <FaIndustry className={styles.specIcon} />
-                        <span className={styles.specLabel}>Brand:</span>
-                        <span>{equipment.brand}</span>
-                      </div>
-                    )}
-                    {equipment.modelSeries && (
-                      <div className={styles.specItem}>
-                        <FaBarcode className={styles.specIcon} />
-                        <span className={styles.specLabel}>Model:</span>
-                        <span>{equipment.modelSeries}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Item Details */}
-                  <div className={styles.specsGroup}>
-                    {equipment.itemCode && (
-                      <div className={styles.specItem}>
-                        <FaHashtag className={styles.specIcon} />
-                        <span className={styles.specLabel}>Item Code:</span>
-                        <span>{equipment.itemCode}</span>
-                      </div>
-                    )}
-                    {equipment.itemGroup && (
-                      <div className={styles.specItem}>
-                        <FaLayerGroup className={styles.specIcon} />
-                        <span className={styles.specLabel}>Group:</span>
-                        <span>{equipment.itemGroup}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Serial & Location */}
-                  <div className={styles.specsGroup}>
-                    {equipment.serialNo && (
-                      <div className={styles.specItem}>
-                        <FaQrcode className={styles.specIcon} />
-                        <span className={styles.specLabel}>Serial No:</span>
-                        <span>{equipment.serialNo}</span>
-                      </div>
-                    )}
-                    {equipment.equipmentLocation && (
-                      <div className={styles.specItem}>
-                        <FaMapMarkerAlt className={styles.specIcon} />
-                        <span className={styles.specLabel}>Location:</span>
-                        <span>{equipment.equipmentLocation}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Warranty Dates */}
-                  {(equipment.warrantyStartDate || equipment.warrantyEndDate) && (
-                    <div className={styles.warrantyInfo}>
-                      {equipment.warrantyStartDate && (
-                        <div className={styles.specItem}>
-                          <FaCalendarCheck className={styles.specIcon} />
-                          <span className={styles.specLabel}>Warranty Start:</span>
-                          <span>{new Date(equipment.warrantyStartDate).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                      {equipment.warrantyEndDate && (
-                        <div className={styles.specItem}>
-                          <FaCalendarTimes className={styles.specIcon} />
-                          <span className={styles.specLabel}>Warranty End:</span>
-                          <span>{new Date(equipment.warrantyEndDate).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
+                <button className={styles.collapseButton}>
+                  {expandedEquipments[index] ? (
+                    <ChevronUp size={16} />
+                  ) : (
+                    <ChevronDown size={16} />
                   )}
+                </button>
+              </div>
+              
+              <div className={`${styles.equipmentDetails} ${expandedEquipments[index] ? styles.expanded : styles.collapsed}`}>
+                <div className={styles.detailGrid}>
+                  <div className={styles.detailItem}>
+                    <FaHashtag size={14} className={styles.detailIcon} />
+                    <span className={styles.detailLabel}>Model:</span>
+                    <span className={styles.detailValue}>{equipment.modelSeries}</span>
+                  </div>
+                  
+                  <div className={styles.detailItem}>
+                    <FaBarcode size={14} className={styles.detailIcon} />
+                    <span className={styles.detailLabel}>Item Code:</span>
+                    <span className={styles.detailValue}>{equipment.itemCode}</span>
+                  </div>
+                  
+                  <div className={styles.detailItem}>
+                    <FaLayerGroup size={14} className={styles.detailIcon} />
+                    <span className={styles.detailLabel}>Group:</span>
+                    <span className={styles.detailValue}>{equipment.itemGroup}</span>
+                  </div>
+                  
+                  <div className={styles.detailItem}>
+                    <FaQrcode size={14} className={styles.detailIcon} />
+                    <span className={styles.detailLabel}>Serial No:</span>
+                    <span className={styles.detailValue}>{equipment.serialNo}</span>
+                  </div>
 
-                  {/* Notes */}
-                  {equipment.notes && (
-                    <div className={styles.notesSection}>
-                      <div className={styles.specItem}>
-                        <FaStickyNote className={styles.specIcon} />
-                        <span className={styles.specLabel}>Notes:</span>
+                  <div className={styles.detailItem}>
+                    <FaMapMarkerAlt size={14} className={styles.detailIcon} />
+                    <span className={styles.detailLabel}>Location:</span>
+                    <span className={styles.detailValue}>{equipment.equipmentLocation}</span>
+                  </div>
+                </div>
+
+                {(equipment.warrantyStartDate || equipment.warrantyEndDate || equipment.notes) && (
+                  <div className={styles.equipmentFooter}>
+                    {(equipment.warrantyStartDate || equipment.warrantyEndDate) && (
+                      <div className={styles.warrantyDates}>
+                        <small>
+                          <FaCalendarCheck size={12} />
+                          Warranty Start: {equipment.warrantyStartDate}
+                        </small>
+                        <small>
+                          <FaCalendarTimes size={12} />
+                          Warranty End: {equipment.warrantyEndDate}
+                        </small>
+                      </div>
+                    )}
+                    {equipment.notes && (
+                      <div className={styles.equipmentNotes}>
+                        <FaStickyNote size={12} />
                         <span>{equipment.notes}</span>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
     );
   };
 
@@ -1176,82 +1201,39 @@ const JobDetails = () => {
   };
 
   const renderImages = () => {
-    const noImageAvailable =
-      "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg";
-
-    const handleImageClick = (imageUrl) => {
-      setSelectedImage(imageUrl);
-    };
-
-    const handleCloseModal = () => {
-      setSelectedImage(null);
-    };
-
     return (
-      <div>
-        <h4>Job Images</h4>
-        <div className="d-flex flex-wrap">
-          {images.length > 0 ? (
-            images.map((image, index) => (
-              <div key={index} className="m-2">
-                <img
-                  src={image.url}
-                  alt={`Job image ${index + 1}`}
-                  style={{
-                    width: "200px",
-                    height: "200px",
-                    objectFit: "cover",
-                    cursor: "pointer", // Add pointer cursor
-                  }}
-                  onClick={() => handleImageClick(image.url)}
-                />
-                <p className="text-center mt-1">
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleImageClick(image.url);
-                    }}
-                    style={{ cursor: "pointer" }} // Add pointer cursor to link
-                  >
-                    View
-                  </a>
-                </p>
-              </div>
-            ))
-          ) : (
-            <div className="d-flex flex-column align-items-center m-2">
-              <img
-                src={noImageAvailable}
-                alt="No Image Available"
-                style={{
-                  width: "200px",
-                  height: "200px",
-                  objectFit: "contain",
-                }}
-              />
-              <p className="mt-2">No Images Available</p>
-            </div>
-          )}
+      <div className={styles.imagesSection}>
+        <div className={styles.sectionHeader}>
+          <h6 className={styles.sectionTitle}>
+            <ImageIcon size={16} className={styles.titleIcon} />
+            Job Images
+          </h6>
+          {/* Optional: Add upload button here if needed */}
         </div>
-
-        <Modal
-          show={selectedImage !== null}
-          onHide={handleCloseModal}
-          size="lg"
-          centered
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Image View</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <img
-              src={selectedImage}
-              alt="Enlarged job image"
-              style={{ width: "100%", height: "auto" }}
-            />
-          </Modal.Body>
-        </Modal>
+        
+        {(!job.images || job.images.length === 0) ? (
+          <div className={styles.emptyState}>
+            <ImageIcon size={24} />
+            <p>No images uploaded yet</p>
+            {/* Optional: Add upload button here */}
+          </div>
+        ) : (
+          <div className={styles.imageGrid}>
+            {job.images.map((image, index) => (
+              <div key={index} className={styles.imageCard}>
+                <img 
+                  src={image.url} 
+                  alt={image.caption || `Job image ${index + 1}`}
+                  onClick={() => setSelectedImage(image)}
+                />
+                <div className={styles.imageCaption}>
+                  <span>{image.caption || `Image ${index + 1}`}</span>
+                  <small>{formatDateTime(image.uploadedAt)}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -1310,19 +1292,37 @@ const JobDetails = () => {
     );
   };
 
+  // Update the calculateDuration function
   const calculateDuration = (startTime, endTime) => {
-    if (!startTime || !endTime) return 'N/A';
-    
-    const [startHour, startMinute] = startTime.split(':').map(Number);
-    const [endHour, endMinute] = endTime.split(':').map(Number);
-    
-    let durationMinutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
-    if (durationMinutes < 0) durationMinutes += 24 * 60; // Handle overnight jobs
-    
-    const hours = Math.floor(durationMinutes / 60);
-    const minutes = durationMinutes % 60;
-    
-    return `${hours}h ${minutes}m`;
+    // If job has manual duration set, use those values instead
+    if (job.manualDuration) {
+      const hours = job.estimatedDurationHours || 0;
+      const minutes = job.estimatedDurationMinutes || 0;
+      return `${hours}h ${minutes}m`;
+    }
+
+    // Otherwise calculate from start/end time
+    if (!startTime || !endTime) return "N/A";
+
+    try {
+      const [startHours, startMinutes] = startTime.split(":").map(Number);
+      const [endHours, endMinutes] = endTime.split(":").map(Number);
+
+      let totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+      
+      // Handle cases where end time is on the next day
+      if (totalMinutes < 0) {
+        totalMinutes += 24 * 60;
+      }
+
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      return `${hours}h ${minutes}m`;
+    } catch (error) {
+      console.error("Error calculating duration:", error);
+      return "N/A";
+    }
   };
 
   const renderAssignedWorkers = () => {
@@ -1483,15 +1483,79 @@ const JobDetails = () => {
   // New helper function for payment and signatures
   const renderPaymentAndSignatures = () => {
     return (
-      <div>
-        {/* Add your payment details here */}
-        <div className="mb-4">
-          <h6>Payment Details</h6>
-          {/* Payment content */}
+      <div className={styles.paymentSection}>
+        {/* Payment Details */}
+        <div className={styles.paymentDetails}>
+          <h6 className={styles.subsectionTitle}>Payment Details</h6>
+          <div className={styles.paymentInfo}>
+            <div className={styles.paymentRow}>
+              <span>Payment Status:</span>
+              <Badge bg={job.paymentStatus === 'Paid' ? 'success' : 'warning'}>
+                {job.paymentStatus || 'Pending'}
+              </Badge>
+            </div>
+            {job.paymentAmount && (
+              <div className={styles.paymentRow}>
+                <span>Amount:</span>
+                <strong>${job.paymentAmount}</strong>
+              </div>
+            )}
+            {job.paymentMethod && (
+              <div className={styles.paymentRow}>
+                <span>Method:</span>
+                <span>{job.paymentMethod}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Existing signature content */}
-        {renderSignatures()}
+        {/* Signatures */}
+        <div className={styles.signatures}>
+          <h6 className={styles.subsectionTitle}>Signatures</h6>
+          <div className={styles.signatureGrid}>
+            {/* Technician Signature */}
+            <div className={styles.signatureBox}>
+              <label>Technician Signature:</label>
+              <div className={styles.signatureLine}>
+                {job.technicianSignature ? (
+                  <img 
+                    src={job.technicianSignature} 
+                    alt="Technician Signature" 
+                    className={styles.signatureImage}
+                  />
+                ) : (
+                  <div className={styles.emptySignature}>Not signed</div>
+                )}
+              </div>
+              <small className={styles.timestamp}>
+                {job.technicianSignatureTimestamp 
+                  ? formatDateTime(job.technicianSignatureTimestamp)
+                  : 'Not signed'}
+              </small>
+            </div>
+
+            {/* Customer Signature */}
+            <div className={styles.signatureBox}>
+              <label>Customer Signature:</label>
+              <div className={styles.signatureLine}>
+                {job.customerSignature ? (
+                  <img 
+                    src={job.customerSignature} 
+                    alt="Customer Signature" 
+                    className={styles.signatureImage}
+                  />
+                ) : (
+                  <div className={styles.emptySignature}>Not signed</div>
+                )}
+              </div>
+              <small className={styles.timestamp}>
+                {job.customerSignatureTimestamp 
+                  ? formatDateTime(job.customerSignatureTimestamp)
+                  : 'Not signed'}
+              </small>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -1575,54 +1639,84 @@ const JobDetails = () => {
     }
   };
 
-  const handleDeleteTask = async (taskID, taskName) => {
-    console.log("Starting delete task process...");
-    
-    const result = await Swal.fire({
-      title: 'Delete Task?',
-      html: `Are you sure you want to delete:<br/><strong>${taskName}</strong>`,
+  // Update the showDeleteConfirmation function
+  const showDeleteConfirmation = async (itemType) => {
+    return Swal.fire({
+      title: `Delete ${itemType}?`,
+      text: 'This action cannot be undone',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
+      confirmButtonColor: '#FF4747', // Bright red for delete
+      cancelButtonColor: '#6C757D', // Gray for cancel
       confirmButtonText: 'Yes, delete it!',
       cancelButtonText: 'Cancel',
-      reverseButtons: true
+      reverseButtons: true,
+      background: '#ffffff',
+      customClass: {
+        confirmButton: styles.confirmDeleteButton,
+        cancelButton: styles.confirmCancelButton,
+        title: styles.alertTitle,
+        popup: styles.alertPopup,
+        container: styles.alertContainer,
+        actions: styles.alertActions
+      }
     });
+  };
 
+  // Update handleDeleteFollowUp
+  const handleDeleteFollowUp = async (followUpId) => {
+    const result = await showDeleteConfirmation('Follow-up');
+    
     if (result.isConfirmed) {
-      console.log("Delete confirmed, proceeding...");
       try {
         const jobRef = doc(db, 'jobs', jobId);
-        const updatedTasks = job.taskList.filter(task => task.taskID !== taskID);
+        const updatedFollowUps = { ...job.followUps };
+        delete updatedFollowUps[followUpId];
+        
+        await updateDoc(jobRef, {
+          followUps: updatedFollowUps,
+          followUpCount: (job.followUpCount || 1) - 1
+        });
 
-        // Update local state immediately
+        setJob(prevJob => ({
+          ...prevJob,
+          followUps: updatedFollowUps,
+          followUpCount: (prevJob.followUpCount || 1) - 1
+        }));
+
+        toast.success('Follow-up deleted successfully');
+      } catch (error) {
+        console.error('Error deleting follow-up:', error);
+        toast.error('Failed to delete follow-up');
+      }
+    }
+  };
+
+  // Update handleDeleteTask
+  const handleDeleteTask = async (taskId) => {
+    const result = await showDeleteConfirmation('Task');
+
+    if (result.isConfirmed) {
+      try {
+        const updatedTasks = job.taskList.filter(task => task.taskID !== taskId);
+        const jobRef = doc(db, 'jobs', jobId);
+        
+        await updateDoc(jobRef, {
+          taskList: updatedTasks,
+          updatedAt: serverTimestamp()
+        });
+
         setJob(prevJob => ({
           ...prevJob,
           taskList: updatedTasks,
           updatedAt: new Date()
         }));
 
-        // Update Firebase
-        await updateDoc(jobRef, {
-          taskList: updatedTasks,
-          updatedAt: serverTimestamp()
-        });
-
-        console.log("Task deleted successfully, showing success toast");
-        toast('Task deleted successfully!', {
-          icon: '🗑️',
-        });
-
+        toast.success('Task deleted successfully');
       } catch (error) {
         console.error('Error deleting task:', error);
-        console.log("Showing error toast");
-        toast('Failed to delete task', {
-          icon: '❌',
-        });
+        toast.error('Failed to delete task');
       }
-    } else {
-      console.log("Delete cancelled by user");
     }
   };
 
@@ -1657,13 +1751,24 @@ const JobDetails = () => {
   // Update the renderJobDescription function
   const renderJobDescription = () => {
     return (
-      <section className={styles.sidebarSection}>
+      <section className={styles.descriptionSection}>
         <div className={styles.descriptionHeader}>
           <div className={styles.headerLeft}>
-            <h6 className={styles.sectionTitle}>Job Description</h6>
-            <Badge bg="light" text="dark" className={styles.wordCount}>
-              {job.jobDescription?.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length || 0} words
-            </Badge>
+            <h6 className={styles.sectionTitle}>
+              <FileText size={16} className={styles.titleIcon} />
+              Job Description
+            </h6>
+            <div className={styles.descriptionMeta}>
+              <Badge bg="light" text="dark" className={styles.wordCount}>
+                {job.jobDescription?.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length || 0} words
+              </Badge>
+              {job.updatedAt && (
+                <span className={styles.lastEdited}>
+                  <Clock size={12} />
+                  Last edited {formatDateTime(job.updatedAt)}
+                </span>
+              )}
+            </div>
           </div>
           {!isEditingDescription && (
             <Button
@@ -1676,15 +1781,9 @@ const JobDetails = () => {
               }}
             >
               <FaPencilAlt size={14} />
-              <span className="ms-1">Edit</span>
+              <span>Edit</span>
             </Button>
           )}
-        </div>
-
-        <div className={styles.metaInfo}>
-        
-          <div className={styles.metaDivider}>•</div>
-        
         </div>
 
         {isEditingDescription ? (
@@ -1694,7 +1793,7 @@ const JobDetails = () => {
               rows={6}
               value={editedDescription}
               onChange={(e) => setEditedDescription(e.target.value)}
-              placeholder="Enter job description..."
+              placeholder="Enter detailed job description..."
               className={styles.descriptionInput}
             />
             <div className={styles.editActions}>
@@ -1702,7 +1801,6 @@ const JobDetails = () => {
                 variant="outline-secondary"
                 size="sm"
                 onClick={() => setIsEditingDescription(false)}
-                className={styles.actionButton}
               >
                 Cancel
               </Button>
@@ -1710,7 +1808,6 @@ const JobDetails = () => {
                 variant="primary"
                 size="sm"
                 onClick={handleEditDescription}
-                className={styles.actionButton}
               >
                 Save Changes
               </Button>
@@ -1718,22 +1815,27 @@ const JobDetails = () => {
           </div>
         ) : (
           <div className={styles.descriptionContent}>
-            <div className={styles.descriptionLabel}>Description:</div>
             {job.jobDescription ? (
               <div 
                 className={styles.descriptionText}
                 dangerouslySetInnerHTML={{ __html: job.jobDescription }}
               />
             ) : (
-              <p className={styles.emptyDescription}>No description provided</p>
+              <div className={styles.emptyDescription}>
+                <FileText size={24} />
+                <p>No description provided</p>
+                <Button 
+                  variant="outline-primary" 
+                  size="sm"
+                  onClick={() => {
+                    setIsEditingDescription(true);
+                    setEditedDescription("");
+                  }}
+                >
+                  Add Description
+                </Button>
+              </div>
             )}
-          </div>
-        )}
-
-        {job.updatedAt && (
-          <div className={styles.lastUpdated}>
-            <Clock size={12} />
-            <small>Last updated: {formatDateTime(job.updatedAt)}</small>
           </div>
         )}
       </section>
@@ -1833,25 +1935,6 @@ const JobDetails = () => {
     }
   };
 
-  // Add delete handler
-  const handleDeleteFollowUp = async (followUpId) => {
-      try {
-        const jobRef = doc(db, 'jobs', jobId);
-        const updatedFollowUps = { ...job.followUps };
-        delete updatedFollowUps[followUpId];
-        
-        await updateDoc(jobRef, {
-          followUps: updatedFollowUps,
-          followUpCount: (job.followUpCount || 1) - 1
-        });
-
-        toast.success('Follow-up deleted successfully');
-      } catch (error) {
-        console.error('Error deleting follow-up:', error);
-        toast.error('Failed to delete follow-up');
-      }
-  };
-
   const handleStatusClick = (status) => {
     router.push(`/dashboard/follow-ups?status=${status}`);
   };
@@ -1898,6 +1981,89 @@ const JobDetails = () => {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
     }
+  };
+
+  // Add these handler functions
+  const handleEditClick = (followUp) => {
+    setEditingFollowUp({
+      ...followUp,
+      id: followUp.id || Object.keys(job.followUps).find(key => job.followUps[key] === followUp)
+    });
+    setIsEditing(followUp.id);
+  };
+
+  const handleEditSave = async (followUp) => {
+    try {
+      const jobRef = doc(db, 'jobs', jobId);
+      const userInfo = getCurrentUserInfo();
+      
+      const updatedFollowUp = {
+        ...followUp,
+        updatedAt: new Date().toISOString(),
+        updatedBy: {
+          workerId: userInfo.workerId,
+          email: userInfo.email
+        }
+      };
+
+      await updateDoc(jobRef, {
+        [`followUps.${followUp.id}`]: updatedFollowUp
+      });
+
+      // Update local state
+      setJob(prevJob => ({
+        ...prevJob,
+        followUps: {
+          ...prevJob.followUps,
+          [followUp.id]: updatedFollowUp
+        }
+      }));
+
+      setEditingFollowUp(null);
+      toast.success('Follow-up updated successfully');
+    } catch (error) {
+      console.error('Error updating follow-up:', error);
+      toast.error('Failed to update follow-up');
+    }
+  };
+
+  const handleDeleteClick = (followUp) => {
+    setFollowUpToDelete(followUp);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!followUpToDelete) return;
+    
+    try {
+      await deleteDoc(doc(db, "jobs", jobId, "followUps", followUpToDelete.id));
+      setShowDeleteConfirm(false);
+      setFollowUpToDelete(null);
+    } catch (error) {
+      console.error("Error deleting follow-up:", error);
+    }
+  };
+
+  // Add this helper function for status badge colors
+  const getStatusBadgeColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return 'success';
+      case 'in progress':
+        return 'primary';
+      case 'pending':
+        return 'warning';
+      case 'cancelled':
+        return 'danger';
+      default:
+        return 'secondary';
+    }
+  };
+
+  // Add or update the handleEditJob function
+  const handleEditJob = () => {
+    // Navigate to the edit page for this job
+    router.push(`/jobs/edit-jobs/${jobId}`);
   };
 
   return (
@@ -2034,7 +2200,7 @@ const JobDetails = () => {
                       padding: "0.5rem 1rem",
                       boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                     }}
-                    onClick={handleEditClick}
+                    onClick={handleEditJob}  // Changed from handleEditClick to handleEditJob
                   >
                     <FaPencilAlt size={16} />
                     Edit Job
@@ -2049,402 +2215,459 @@ const JobDetails = () => {
         <Card className={styles.mainCard}>
           <Card.Body>
             <div className={styles.contentGrid}>
-              {/* Left sidebar with customer info and job details */}
-              <div className={styles.sidebar}>
+              {/* Left Column */}
+              <div className={styles.column}>
                 {/* Customer Details */}
-                <section className={styles.sidebarSection}>
-                  <h6>Customer Details</h6>   
-                  <div className={styles.customerCard}>
-                    {/* Company Header */}
-                    <div className={styles.cardHeader}>
-                      <div className={styles.headerContent}>
-                        <div className={styles.companyAvatar}>P</div>
-                        <div>
-                          <h5>{job.customerName}</h5>
-                          <span className={styles.businessType}>Business</span>
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h6 className={styles.sectionTitle}>
+                      <PersonFill className={styles.titleIcon} />
+                      Customer Details
+                    </h6>
+                  </div>
+                  <div className={styles.content}>
+                    <div className={styles.customerDetails}>
+                      {/* Customer Avatar and Name */}
+                      <div className={styles.customerHeader}>
+                        <div className={styles.avatarSection}>
+                          <div className={styles.avatar}>{job.customerName?.[0] || 'P'}</div>
+                          <div className={styles.customerMeta}>
+                            <h3 className={styles.customerName}>{job.customerName}</h3>
+                            <span className={styles.businessBadge}>Business</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Customer Details Grid */}
-                    <div className={styles.customerGrid}>
-                      {/* Left Column */}
-                      <div>
-                        <div className={styles.detailItem}>
-                          <div className={styles.detailLabel}>
-                            <PersonFill className={styles.detailIcon} />
+                      {/* Customer Information List */}
+                      <div className={styles.infoList}>
+                        {/* Contact Person */}
+                        <div className={styles.infoItem}>
+                          <div className={styles.infoLabel}>
+                            <PersonFill size={14} className={styles.infoIcon} />
                             Contact Person
                           </div>
-                          <div className={styles.detailValue}>
-                            {job.contact?.contactFullname}
-                            <div className={styles.contactId}>ID: {job.contact?.contactID}</div>
+                          <div className={styles.infoValue}>
+                            {job.contact?.contactFullname || 'Not specified'}
+                            {job.contact?.contactID && (
+                              <span className={styles.contactId}>ID: {job.contact.contactID}</span>
+                            )}
                           </div>
                         </div>
 
-                        <div className={styles.detailItem}>
-                          <div className={styles.detailLabel}>
-                            <TelephoneFill className={styles.detailIcon} />
+                        {/* Office Phone */}
+                        <div className={styles.infoItem}>
+                          <div className={styles.infoLabel}>
+                            <TelephoneFill size={14} className={styles.infoIcon} />
                             Office Phone
                           </div>
-                          <a href={`tel:${job.contact?.phoneNumber}`} className={styles.phoneLink}>
-                            {job.contact?.phoneNumber}
-                          </a>
+                          <div className={styles.infoValue}>
+                            {job.contact?.phoneNumber ? (
+                              <div className={styles.contactActions}>
+                                <span>{job.contact.phoneNumber}</span>
+                                <div className={styles.actionButtons}>
+                                  <a href={`tel:${job.contact.phoneNumber}`} className={styles.actionIcon}>
+                                    <TelephoneFill size={14} />
+                                  </a>
+                                  <a 
+                                    href={`https://wa.me/${job.contact.phoneNumber.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.actionIcon}
+                                  >
+                                    <FaWhatsapp size={14} />
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              'Not specified'
+                            )}
+                          </div>
                         </div>
 
-                        <div className={styles.detailItem}>
-                          <div className={styles.detailLabel}>
-                            <PhoneFill className={styles.detailIcon} />
+                        {/* Mobile Phone */}
+                        <div className={styles.infoItem}>
+                          <div className={styles.infoLabel}>
+                            <PhoneFill size={14} className={styles.infoIcon} />
                             Mobile Phone
                           </div>
-                          <div className={styles.phoneActions}>
-                            <a href={`tel:${job.contact?.mobilePhone}`} className={styles.phoneLink}>
-                              {job.contact?.mobilePhone}
-                            </a>
-                            <a 
-                              href={`https://wa.me/${job.contact?.mobilePhone}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className={styles.whatsappLink}
-                            >
-                              <FaWhatsapp className={styles.whatsappIcon} />
-                            </a>
+                          <div className={styles.infoValue}>
+                            {job.contact?.mobilePhone ? (
+                              <div className={styles.contactActions}>
+                                <span>{job.contact.mobilePhone}</span>
+                                <div className={styles.actionButtons}>
+                                  <a href={`tel:${job.contact.mobilePhone}`} className={styles.actionIcon}>
+                                    <TelephoneFill size={14} />
+                                  </a>
+                                  <a 
+                                    href={`https://wa.me/${job.contact.mobilePhone.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.actionIcon}
+                                  >
+                                    <FaWhatsapp size={14} />
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              'Not specified'
+                            )}
                           </div>
                         </div>
-                      </div>
 
-                      {/* Right Column */}
-                      <div>
-                        <div className={styles.detailItem}>
-                          <div className={styles.detailLabel}>
-                            <GeoAltFill className={styles.detailIcon} />
+                        {/* Email */}
+                        {job.contact?.email && (
+                          <div className={styles.infoItem}>
+                            <div className={styles.infoLabel}>
+                              <Envelope size={14} className={styles.infoIcon} />
+                              Email
+                            </div>
+                            <div className={styles.infoValue}>
+                              <div className={styles.contactActions}>
+                                <span>{job.contact.email}</span>
+                                <a href={`mailto:${job.contact.email}`} className={styles.actionIcon}>
+                                  <Envelope size={14} />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Location */}
+                        <div className={styles.infoItem}>
+                          <div className={styles.infoLabel}>
+                            <GeoAltFill className={styles.titleIcon} />
                             Location
                           </div>
-                          <address className={styles.address}>
-                            {job.location?.address?.streetAddress}<br />
-                            {job.location?.address?.postalCode}
-                          </address>
+                          <div className={styles.infoValue}>
+                            {job.location?.locationName || job.location?.address || 'No location specified'}
+                          </div>
                         </div>
 
-                        <div className={styles.detailItem}>
-                          <div className={styles.detailLabel}>
-                            <BellFill className={styles.detailIcon} />
-                            Notifications
-                          </div>
-                          <div className={styles.detailValue}>
-                            {job.contact?.notification?.notifyCustomer ? 'Enabled' : 'Disabled'}
-                          </div>
-                        </div>
+                     
                       </div>
                     </div>
                   </div>
                 </section>
+
+                   {/* Job Description Section */}
+                   {renderJobDescription()}
+
+                   
+                {/* Equipment List Section */}
+                
+                  {renderAssignedEquipments()}
+              
+
 
                 {/* Follow-ups Section */}
-                <section className={styles.sidebarSection}>
-                  <div className={styles.followUpsContainer}>
-                    <div className={styles.followUpsHeader}>
-                      <div className={styles.headerLeft}>
-                        <h6 className={styles.followUpsTitle}>
-                          <FaStickyNote />
-                          Follow-ups
-                        </h6>
-                        <Badge className={styles.followUpsCount}>
-                          {Object.keys(job.followUps || {}).length} Items
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="outline-primary"
-                        className={styles.addFollowUpBtn}
-                        onClick={() => setShowFollowUpModal(true)}
-                      >
-                        <Plus />
-                        Add Follow-up
-                      </Button>
-                    </div>
-                    
-                    <div className={styles.followUpsScroll}>
-                      {(!job.followUps || Object.keys(job.followUps).length === 0) ? (
-                        <div className={styles.noFollowUps}>
-                          <FaStickyNote size={24} className="text-muted mb-2" />
-                          <p className="text-muted mb-0">No follow-ups yet</p>
-                        </div>
-                      ) : (
-                        Object.entries(job.followUps)
-                          .sort(([, a], [, b]) => new Date(b.createdAt) - new Date(a.createdAt))
-                          .map(([id, followUp]) => (
-                            <div 
-                              key={id} 
-                              className={styles.followUpCard}
-                              style={{ 
-                                borderLeft: `4px solid ${getPriorityColor(followUp.priority)}` // Add priority color
-                              }}
-                              onClick={(e) => {
-                                if (!e.target.closest('.actionButtons') && !e.target.closest('.statusBadge')) {
-                                  router.push({
-                                    pathname: '/dashboard/follow-ups',
-                                    query: {
-                                      followUpId: id, 
-                                      status: followUp.status,
-                                      type: followUp.type
-                                    }
-                                  });
-                                }
-                              }}
-                            >
-                              <div className={styles.followUpContent}>
-                                <div className={styles.statusTypeRow}>
-                                  {isEditing === followUp.id ? (
-                                    <div className="statusBadge" onClick={(e) => e.stopPropagation()}>
-                                      <Form.Select 
-                                        size="sm"
-                                        value={followUp.status}
-                                        onChange={(e) => handleStatusChange(followUp.id, e.target.value)}
-                                        style={{ width: 'auto', minWidth: '120px' }}
-                                      >
-                                        {FOLLOW_UP_STATUSES.map(status => (
-                                          <option key={status} value={status}>
-                                            {status}
-                                          </option>
-                                        ))}
-                                      </Form.Select>
-                                    </div>
-                                  ) : (
-                                    <div 
-                                      className={`${styles.statusBadge} statusBadge`}
-                                      style={{ 
-                                        backgroundColor: getFollowUpStatusStyle(followUp.status).bg,
-                                        color: getFollowUpStatusStyle(followUp.status).color,
-                                        border: `1px solid ${getFollowUpStatusStyle(followUp.status).border}`,
-                                        padding: '4px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '0.875rem',
-                                        fontWeight: '500',
-                                        display: 'inline-block'
-                                      }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsEditing(followUp.id);
-                                      }}
-                                    >
-                                      {followUp.status}
-                                    </div>
-                                  )}
-                                  <span className={styles.followUpType}>
-                                    {getTypeWithColor(followUp.type)}
-                                  </span>
-                                  
-                            
-                                </div>
-
-                                <div className={styles.followUpNotes}>{followUp.notes}</div>
-
-                                <div className={styles.datesRow}>
-                                  <div className={styles.dateItem}>
-                                    <i className="fe fe-calendar me-1" />
-                                    Due: {new Date(followUp.dueDate).toLocaleDateString()}
-                                    <i className="fe fe-clock me-1" />
-                                    Created: {new Date(followUp.createdAt).toLocaleTimeString([], { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
-                                    })}
-                                     <i className="fe fe-clock me-1" />
-                                    Updated: {new Date(followUp.updatedAt).toLocaleTimeString([], { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
-                                    })}
-                                  </div>
-                                  
-                                </div>
-                                <div className={styles.createdBy}>Created By: {followUp.createdBy?.workerId}</div>
-                              </div>
-
-                              <div className={styles.actionButtonsContainer}>
-                                <div className={styles.actionButtons}>
-                                  <button 
-                                    className={`${styles.actionBtn} ${styles.edit}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setIsEditing(followUp.id);
-                                    }}
-                                  >
-                                    <i className="fe fe-edit-2" />
-                                  </button>
-                                  <button 
-                                    className={`${styles.actionBtn} ${styles.delete}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteFollowUp(followUp.id);
-                                    }}
-                                  >
-                                    <i className="fe fe-trash-2" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                      )}
-                    </div>
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h6 className={styles.sectionTitle}>
+                      <Bell size={16} className={styles.headerIcon} />
+                      Follow-ups
+                    </h6>
+                    <button className={styles.actionButton} onClick={() => setShowFollowUpModal(true)}>
+                      <Plus size={14} />
+                      Add Follow-up
+                    </button>
                   </div>
-                </section>
-                {/* Job Description Section */}
-                {renderJobDescription()}
-
-                {/* Task List Section */}
-                <section className={styles.sidebarSection}>
-                  {renderTaskList()}
-                </section>
-
-              
-              </div>
-
-              {/* Main content area */}
-              <div className={styles.mainContent}>
-                {/* Job Status and Schedule Info */}
-                <section className={styles.contentSection}>
-                  <div className={styles.scheduleInfo}>
-                    <div className={styles.scheduleHeader}>
-                      <h6>
-                        <Calendar4 size={16} className="me-2" />
-                        Appointment Schedule
-                      </h6>
-                      <Badge bg={getStatusColor(job.jobStatus)}>
-                        {getJobStatusName(job.jobStatus)}
-                      </Badge>
-                    </div>
-                    
-                    {/* Date and Time Info */}
-                    <div className={styles.scheduleDetails}>
-                      <div className={styles.dateInfo}>
-                        <div className={styles.calendarBox}>
-                          <div className={styles.month}>
-                            {new Date(job.startDate).toLocaleString('default', { month: 'short' })}
-                          </div>
-                          <div className={styles.day}>
-                            {new Date(job.startDate).getDate()}
-                          </div>
-                        </div>
-                        <div className={styles.timeSlot}>
-                          <Clock size={14} className="me-1" />
-                          <span>{formatTime(job.startTime)} - {formatTime(job.endTime)}</span>
-                        </div>
+                  
+                  <div className={styles.followUpsList}>
+                    {(!job.followUps || Object.keys(job.followUps).length === 0) ? (
+                      <div className={styles.noFollowUps}>
+                        <Bell size={24} className="text-muted mb-2" />
+                        <p className="text-muted mb-0">No follow-ups yet</p>
                       </div>
-                      
-                      <div className={styles.scheduleFooter}>
-                        <div className={styles.duration}>
-                          <Clock size={14} className="me-1" />
-                          Duration: {calculateDuration(job.startTime, job.endTime)}
-                        </div>
-                        <div className={styles.arrangedBy}>
-                          <PersonFill size={14} className="me-1" />
-                          Arranged by: {job.createdBy?.fullName}
-                        </div>
-                      </div>
-
-                      {/* Assigned Technicians */}
-                      <div className={styles.scheduleFooter}>
-                        <div className={styles.techHeader}>
-                          <h6 className="mb-0">
-                            <FaUsers size={14} className="me-2" />
-                            Assigned Technicians
-                          </h6>
-                          <Badge bg="info" className="ms-2">
-                            {job.assignedWorkers?.length || 0} assigned
-                          </Badge>
-                        </div>
-
-                        <div className={styles.techList}>
-                          {job.assignedWorkers?.length > 0 ? (
-                            job.assignedWorkers.map((worker, index) => {
-                              const workerDetails = workers.find(w => w.workerId === worker.workerId);
-                              return (
-                                <div key={index} className={styles.techItem}>
-                                  <div className={styles.techAvatar}>
-                                    {workerDetails?.profilePicture ? (
-                                      <Image
-                                        src={workerDetails.profilePicture}
-                                        alt={workerDetails.fullName}
-                                        width={32}
-                                        height={32}
-                                        className={styles.avatarImage}
-                                      />
-                                    ) : (
-                                      <div className={styles.avatarPlaceholder}>
-                                        {workerDetails?.firstName?.[0] || 'T'}
-                                      </div>
-                                    )}
-                                   
+                    ) : (
+                      Object.entries(job.followUps)
+                        .sort(([, a], [, b]) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .map(([id, followUp]) => (
+                          <div 
+                            key={id} 
+                            className={styles.followUpCard}
+                            style={{ 
+                              borderLeft: `4px solid ${getPriorityColor(followUp.priority)}` 
+                            }}
+                          >
+                            {editingFollowUp?.id === id ? (
+                              <div className={styles.editForm}>
+                                <Form onSubmit={(e) => {
+                                  e.preventDefault();
+                                  handleEditSave({ ...editingFollowUp });
+                                }}>
+                                  <Form.Group className="mb-3">
+                                    <Form.Control
+                                      as="textarea"
+                                      value={editingFollowUp.notes}
+                                      onChange={(e) => setEditingFollowUp({
+                                        ...editingFollowUp,
+                                        notes: e.target.value
+                                      })}
+                                    />
+                                  </Form.Group>
+                                {/* Add status dropdown */}
+                                <Form.Group className="mb-3">
+                                  <Form.Select
+                                    value={editingFollowUp.status}
+                                    onChange={(e) => setEditingFollowUp({
+                                      ...editingFollowUp,
+                                      status: e.target.value
+                                    })}
+                                  >
+                                    {FOLLOW_UP_STATUSES.map(status => (
+                                      <option key={status} value={status}>{status}</option>
+                                    ))}
+                                  </Form.Select>
+                                </Form.Group>
+                                <div className={styles.editActions}>
+                                  <Button 
+                                    variant="secondary" 
+                                    onClick={() => setEditingFollowUp(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button 
+                                    variant="primary" 
+                                    type="submit"
+                                  >
+                                    Save
+                                  </Button>
+                                </div>
+                              </Form>
+                            </div>
+                          ) : (
+                            <>
+                              <div className={styles.followUpHeader}>
+                                <div className={styles.followUpStatus}>
+                                  <Badge bg={getStatusBadgeColor(followUp.status)}>
+                                    {followUp.status}
+                                  </Badge>
+                                </div>
+                                <div className={styles.followUpActions}>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    onClick={() => handleEditClick(followUp)}
+                                  >
+                                    <FaPencilAlt size={14} />
+                                  </Button>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    onClick={() => handleDeleteFollowUp(id)}
+                                  >
+                                    <FaTrash size={14} />
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className={styles.followUpContent}>
+                                <p className={styles.followUpNotes}>{followUp.notes}</p>
+                                <div className={styles.followUpMeta}>
+                                  <div className={styles.metaItem}>
+                                    <Calendar4 size={12} />
+                                    <span>Due: {new Date(followUp.dueDate).toLocaleDateString()}</span>
                                   </div>
-                                  
-                                  <div className={styles.techInfo}>
-                                    <div className={styles.techName}>
-                                      {workerDetails?.fullName || 'Unknown Technician'}
-                                      <span className={styles.techId}>ID: {workerDetails?.workerId}</span>
-                                    </div>
-                                    
-                                    <div className={styles.techActions}>
-                                      {workerDetails?.primaryPhone && (
-                                        <>
-                                          <a href={`tel:${workerDetails.primaryPhone}`} className={styles.actionIcon}>
-                                            <TelephoneFill size={12} />
-                                          </a>
-                                          <a 
-                                            href={`https://wa.me/${workerDetails.primaryPhone.replace(/\D/g, '')}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={styles.actionIcon}
-                                          >
-                                            <FaWhatsapp size={12} />
-                                          </a>
-                                        </>
-                                      )}
-                                      {workerDetails?.email && (
-                                        <a href={`mailto:${workerDetails.email}`} className={styles.actionIcon}>
-                                          <Envelope size={12} />
-                                        </a>
-                                      )}
-                                    </div>
+                                  <div className={styles.metaItem}>
+                                    <Clock size={12} />
+                                    <span>Created: {new Date(followUp.createdAt).toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}</span>
+                                  </div>
+                                  <div className={styles.metaItem}>
+                                    <PersonFill size={12} />
+                                    <span>By: {followUp.createdBy?.email || 'Unknown'}</span>
                                   </div>
                                 </div>
-                              );
-                            })
-                          ) : (
-                            <div className={styles.noTech}>
-                              <FaUsers size={20} />
-                              <p>No technicians assigned</p>
-                            </div>
+                              </div>
+                            </>
                           )}
                         </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+             
+                {/* GPS Tracking Section */}
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h6 className={styles.sectionTitle}>Location & Time Tracking</h6>
+                  </div>
+                  <div className={styles.customerCard}>
+                    <div className={styles.mapContainer}>{renderMap()}</div>
+                    <div className={styles.timeTracking}>
+                      <div>Start: {job.jobStartTime || "Not started"}</div>
+                      <div>End: {job.jobEndTime || "Not completed"}</div>
+                      <div>Duration: {calculateJobDuration()}</div>
+                    </div>
+                  </div>
+                </section>
+
+
+             
+              </div>
+
+              {/* Right Column */}
+              <div className={styles.column}>
+                {/* Job Status and Schedule Info */}
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h6 className={styles.sectionTitle}>
+                      <CalendarCheck className={styles.titleIcon} />
+                      Appointment Schedule
+                    </h6>
+                  </div>
+                  <div className={styles.scheduleContent}>
+                    {/* Date and Time Info */}
+                    <div className={styles.scheduleBox}>
+                      <div className={styles.dateBox}>
+                        <div className={styles.month}>NOV</div>
+                        <div className={styles.day}>23</div>
+                      </div>
+                      
+                      <div className={styles.scheduleInfo}>
+                        <div className={styles.timeSlot}>
+                          <Clock size={14} />
+                          <span>{formatTime(job.startTime)} - {formatTime(job.endTime)}</span>
+                        </div>
+                        <div className={styles.duration}>
+                          <Clock size={14} />
+                          <span>Duration: {job.manualDuration || `${job.estimatedDurationHours}h${job.estimatedDurationMinutes ? ` and ${job.estimatedDurationMinutes}m` : ''}`}</span>
+                        </div>
+                        <div className={styles.arrangedBy}>
+                          <PersonFill size={14} />
+                          <span>Arranged by: {job.createdBy?.fullName || 'Unknown'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Assigned Technicians */}
+                    <div className={styles.techSection}>
+                      <div 
+                        className={styles.techHeader} 
+                        onClick={() => setIsTechListExpanded(!isTechListExpanded)}
+                      >
+                        <div className={styles.techHeaderLeft}>
+                          <PersonFill size={14} />
+                          <span>Assigned Technicians</span>
+                          <span className={styles.techCount}>
+                            ({job.assignedWorkers?.length || 0})
+                          </span>
+                        </div>
+                        <button className={styles.collapseButton}>
+                          {isTechListExpanded ? (
+                            <ChevronUp size={16} />
+                          ) : (
+                            <ChevronDown size={16} />
+                          )}
+                        </button>
+                      </div>
+                      
+                      <div className={`${styles.techList} ${isTechListExpanded ? styles.expanded : styles.collapsed}`}>
+                        {job.assignedWorkers?.length > 0 ? (
+                          job.assignedWorkers.map((worker, index) => {
+                            const workerDetails = workers.find(w => w.workerId === worker.workerId);
+                            return (
+                              <div key={index} className={styles.techItem}>
+                                <div className={styles.techProfile}>
+                                  {workerDetails?.profilePicture ? (
+                                    <Image 
+                                      src={workerDetails.profilePicture} 
+                                      alt={workerDetails.fullName}
+                                      width={40}
+                                      height={40}
+                                      className={styles.techImage}
+                                    />
+                                  ) : (
+                                    <div className={styles.techInitial}>
+                                      {workerDetails?.firstName?.[0] || 'T'}
+                                    </div>
+                                  )}
+                                  <div className={styles.techInfo}>
+                                    <span className={styles.techName}>{workerDetails?.fullName}</span>
+                                    <span className={styles.techId}>ID: {workerDetails?.workerId}</span>
+                                  </div>
+                                </div>
+                                <div className={styles.techActions}>
+                                  {workerDetails?.primaryPhone && (
+                                    <>
+                                      <a href={`tel:${workerDetails.primaryPhone}`} className={styles.actionIcon}>
+                                        <TelephoneFill size={14} />
+                                      </a>
+                                      <a href={`https://wa.me/${workerDetails.primaryPhone.replace(/\D/g, '')}`} 
+                                         target="_blank" 
+                                         rel="noopener noreferrer" 
+                                         className={styles.actionIcon}>
+                                        <FaWhatsapp size={14} />
+                                      </a>
+                                    </>
+                                  )}
+                                  {workerDetails?.email && (
+                                    <a href={`mailto:${workerDetails.email}`} className={styles.actionIcon}>
+                                      <Envelope size={14} />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className={styles.noTech}>No technicians assigned</div>
+                        )}
                       </div>
                     </div>
                   </div>
                 </section>
 
-                 {/* Equipment List Section */}
-                 <section className={styles.contentSection}>
-                  {renderEquipmentList()}
-                </section>
-
-                {/* GPS Tracking Section */}
-                <section className={styles.contentSection}>
-                  <h6>Location & Time Tracking</h6>
-                  <div className={styles.mapContainer}>{renderMap()}</div>
-                  <div className={styles.timeTracking}>
-                    <div>Start: {job.jobStartTime || "Not started"}</div>
-                    <div>End: {job.jobEndTime || "Not completed"}</div>
-                    <div>Duration: {calculateJobDuration()}</div>
-                  </div>
-                </section>
+                   {/* Task List Section */}
+               
+                  {renderJobTasks()}
+            
 
                 {/* Images Section */}
-                <section className={styles.contentSection}>
-                  <h6>Job Images</h6>
-                  {renderImages()}
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h6 className={styles.sectionTitle}>
+                      <Images className={styles.titleIcon} />
+                      Job Images
+                    </h6>
+                  </div>
+                  {!job.images || job.images.length === 0 ? (
+                    <div className={styles.emptyState}>
+                      <Images size={24} />
+                      <p>No images uploaded yet</p>
+                    </div>
+                  ) : (
+                    <div className={styles.imageGrid}>
+                      {job.images.map((image, index) => (
+                        <div key={index} className={styles.imageCard}>
+                          <img 
+                            src={image.url} 
+                            alt={image.caption || `Job image ${index + 1}`}
+                            onClick={() => setSelectedImage(image)}
+                          />
+                          <div className={styles.imageCaption}>
+                            <span>{image.caption || `Image ${index + 1}`}</span>
+                            <small>{formatDateTime(image.uploadedAt)}</small>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </section>
 
                 {/* Payment & Signature Section */}
-                <section className={styles.contentSection}>
-                  <h6>Payment & Signatures</h6>
-                  {renderPaymentAndSignatures()}
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h6 className={styles.sectionTitle}>
+                      <CreditCard2Front className={styles.titleIcon} />
+                      Payment & Signatures
+                    </h6>
+                  </div>
+                  <div className={styles.paymentDetails}>
+                    {renderPaymentAndSignatures()}
+                  </div>
                 </section>
               </div>
             </div>
@@ -2459,6 +2682,27 @@ const JobDetails = () => {
         handleCreateFollowUp={handleCreateFollowUp} // Pass the function as prop
         onSuccess={handleFollowUpSuccess}
       />
+      {/* Delete Confirmation Modal */}
+      <Modal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Delete</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Are you sure you want to delete this follow-up?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleDeleteConfirm}>
+            Delete
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };

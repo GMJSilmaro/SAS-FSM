@@ -83,18 +83,6 @@ const CreateWorker = () => {
   };
 
   const handleContactFormSubmit = async (contactFormData) => {
-    // Validation: Check for required fields
-    if (
-      !contactFormData.primaryPhone ||
-      !contactFormData.address.streetAddress ||
-      !contactFormData.address.stateProvince ||
-      !contactFormData.address.postalCode ||
-      !contactFormData.emergencyContactName ||
-      !contactFormData.emergencyContactPhone
-    ) {
-      toast.error("Please fill in all required contact fields.");
-      return; // Stop execution if validation fails
-    }
 
     try {
       setContactData({ ...contactFormData });

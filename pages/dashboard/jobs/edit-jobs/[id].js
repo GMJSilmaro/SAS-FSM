@@ -125,7 +125,7 @@ const EditJobPage = () => {
           <p>{error}</p>
           <button 
             className="btn btn-primary" 
-            onClick={() => router.push('/dashboard/jobs/list-jobs')}
+            onClick={() => router.push('/jobs')}
           >
             Back to Jobs List
           </button>

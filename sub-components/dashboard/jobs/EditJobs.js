@@ -74,6 +74,7 @@ const EditJobs = ({ initialJobData, jobId: jobIdProp, validateJobForm }) => {
     priority: initialJobData?.priority || '',
     jobStatus: initialJobData?.jobStatus || 'Created',
     scheduleSession: initialJobData?.scheduleSession || '',
+    manualDuration: false,
     estimatedDurationHours: initialJobData?.estimatedDurationHours || '',
     estimatedDurationMinutes: initialJobData?.estimatedDurationMinutes || '',
     contact: {
@@ -451,7 +452,7 @@ useEffect(() => {
   // Add this useEffect near your other useEffect hooks
   useEffect(() => {
     const fetchCustomers = async () => {
-      ////console.log("🚀 Starting customer fetch...");
+      ////console.log(" Starting customer fetch...");
 
       try {
         // //console.log("📡 Making API request to /api/getCustomers");
@@ -1053,11 +1054,23 @@ useEffect(() => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
-    setHasChanges(true);
+
+    if (name === "estimatedDurationHours" || name === "estimatedDurationMinutes") {
+      // Ensure the values are saved as numbers
+      const numValue = value === '' ? 0 : parseInt(value, 10);
+      setFormData(prev => ({
+        ...prev,
+        [name]: numValue,
+        // Remove manualDuration flag as we're directly using the duration values
+        startTime: prev.startTime,
+        endTime: prev.endTime
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   // Function to check for overlapping jobs with improved date handling and worker schedule checking
@@ -1159,47 +1172,18 @@ useEffect(() => {
 
       const jobRef = doc(db, "jobs", jobIdProp);
       
-      // Prepare the update data
-      const updateData = {
+      // Ensure duration values are numbers
+      const updatedData = {
         ...formData,
-        lastModifiedAt: Timestamp.now(),
-        equipments: selectedEquipments, // Use the selected equipments
-        location: {
-          locationName: formData.location?.locationName || '',
-          address: {
-            streetNo: formData.location?.address?.streetNo || '',
-            streetAddress: formData.location?.address?.streetAddress || '',
-            block: formData.location?.address?.block || '',
-            buildingNo: formData.location?.address?.buildingNo || '',
-            city: formData.location?.address?.city || '',
-            stateProvince: formData.location?.address?.stateProvince || '',
-            postalCode: formData.location?.address?.postalCode || '',
-            country: formData.location?.address?.country || '',
-          },
-          coordinates: {
-            latitude: formData.location?.coordinates?.latitude || '',
-            longitude: formData.location?.coordinates?.longitude || '',
-          }
-        },
-        contact: {
-          contactID: formData.contact?.contactID || '',
-          contactFullname: formData.contact?.contactFullname || '',
-          firstName: formData.contact?.firstName || '',
-          middleName: formData.contact?.middleName || '',
-          lastName: formData.contact?.lastName || '',
-          email: formData.contact?.email || '',
-          mobilePhone: formData.contact?.mobilePhone || '',
-          phoneNumber: formData.contact?.phoneNumber || '',
-          notification: {
-            notifyCustomer: formData.contact?.notification?.notifyCustomer || false,
-          }
-        }
+        estimatedDurationHours: parseInt(formData.estimatedDurationHours || 0, 10),
+        estimatedDurationMinutes: parseInt(formData.estimatedDurationMinutes || 0, 10),
+        // Other fields...
       };
 
       setProgress(50);
 
       // Update the document in Firebase
-      await updateDoc(jobRef, updateData);
+      await updateDoc(jobRef, updatedData);
 
       setProgress(100);
       toast.success('Job updated successfully!');
@@ -1209,7 +1193,7 @@ useEffect(() => {
       setOriginalEquipments(selectedEquipments);
       
       // Optionally refresh the data
-      router.push('/jobs');
+      router.push(`/jobs/view/${jobIdProp}`);
 
     } catch (error) {
       console.error('Error updating job:', error);
@@ -2118,13 +2102,8 @@ useEffect(() => {
                     type="number"
                     name="estimatedDurationHours"
                     value={formData.estimatedDurationHours}
-                    onChange={calculateDuration}
+                    onChange={handleInputChange}
                     placeholder="Hours"
-                    readOnly={
-                      formData.scheduleSession !== "custom" ||
-                      (formData.startTime && formData.endTime)
-                    }
-                    required
                   />
                   <InputGroup.Text>h</InputGroup.Text>
                   <Form.Control
@@ -2133,15 +2112,10 @@ useEffect(() => {
                     value={formData.estimatedDurationMinutes}
                     onChange={handleInputChange}
                     placeholder="Minutes"
-                    readOnly={
-                      formData.scheduleSession !== "custom" ||
-                      (formData.startTime && formData.endTime)
-                    }
-                    required
                   />
                   <InputGroup.Text>m</InputGroup.Text>
                 </InputGroup>
-                {formData.startTime && formData.endTime && (
+                {formData.startTime && formData.endTime && !formData.manualDuration && (
                   <small className="text-muted">
                     Duration auto-calculated from time range
                   </small>

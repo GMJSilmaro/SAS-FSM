@@ -1396,6 +1396,7 @@ const AddNewJobs = ({ validateJobForm }) => {
         endTime: selectedWindow.timeEnd,
         estimatedDurationHours,
         estimatedDurationMinutes,
+        manualDuration: false // Reset manual duration flag when selecting a session
       });
     } else {
       setFormData({
@@ -1405,6 +1406,7 @@ const AddNewJobs = ({ validateJobForm }) => {
         endTime: "",
         estimatedDurationHours: "",
         estimatedDurationMinutes: "",
+        manualDuration: false
       });
     }
   };
@@ -1438,8 +1440,8 @@ const AddNewJobs = ({ validateJobForm }) => {
         [name]: value,
       };
 
-      // Calculate duration if both times are set
-      if (newFormData.startTime && newFormData.endTime) {
+      // Only calculate duration if user hasn't manually entered values
+      if (!formData.manualDuration) {
         const duration = calculateDuration(
           newFormData.startTime,
           newFormData.endTime
@@ -1449,6 +1451,13 @@ const AddNewJobs = ({ validateJobForm }) => {
       }
 
       setFormData(newFormData);
+    } else if (name === "estimatedDurationHours" || name === "estimatedDurationMinutes") {
+      // Set flag to indicate manual duration entry
+      setFormData({
+        ...formData,
+        [name]: value,
+        manualDuration: true
+      });
     } else {
       setFormData({
         ...formData,
