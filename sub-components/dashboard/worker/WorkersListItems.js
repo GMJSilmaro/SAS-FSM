@@ -518,8 +518,11 @@ const WorkersListItems = () => {
       }
   
       if (filters.status) {
-        const isActive = filters.status === 'active';
-        filtered = filtered.filter((worker) => worker.isActive === isActive);
+        filtered = filtered.filter((worker) => {
+          if (filters.status === 'active') return worker.activeUser === true;
+          if (filters.status === 'inactive') return worker.activeUser === false;
+          return true;
+        });
       }
   
       if (filters.role) {
@@ -889,13 +892,13 @@ const WorkersListItems = () => {
       }
     }),
 
-    columnHelper.accessor('isActive', {
+    columnHelper.accessor('activeUser', {
       header: 'STATUS',
       size: 120,
       cell: info => (
         <div className="d-flex flex-column align-items-start">
           <Badge 
-            bg={info.getValue() ? 'success' : 'danger'}
+            bg={info.getValue() === true ? 'success' : 'danger'}
             style={{
               padding: '6px 12px',
               borderRadius: '6px',
@@ -903,7 +906,7 @@ const WorkersListItems = () => {
               fontWeight: '500'
             }}
           >
-            {info.getValue() ? 'Active' : 'Inactive'}
+            {info.getValue() === true ? 'Active' : 'Inactive'}
           </Badge>
           <small className="text-muted mt-1" style={{ fontSize: '11px' }}>
             Last login: {formatDate(info.row.original.lastLogin)}

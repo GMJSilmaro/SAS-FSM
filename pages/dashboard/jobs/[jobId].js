@@ -689,10 +689,10 @@ const JobDetails = () => {
     return (
       <div className={styles.equipmentContainer}>
         <div className={styles.equipmentHeader}>
-          <h6 className={styles.equipmentTitle}>
+          <h5 >
             <FaTools className="me-2" />
             Assigned Equipments
-          </h6>
+          </h5>
           <Badge bg="primary" className={styles.equipmentCount}>
             {job.equipments.length} items
           </Badge>
@@ -2286,12 +2286,6 @@ const JobDetails = () => {
                     </div>
                   </div>
                 </section>
-
-                  {/* Equipment List Section */}
-                  <section className={styles.sidebarSection}>
-                  {renderEquipmentList()}
-                </section>
-
                 {/* Job Description Section */}
                 {renderJobDescription()}
 
@@ -2307,207 +2301,127 @@ const JobDetails = () => {
               <div className={styles.mainContent}>
                 {/* Job Status and Schedule Info */}
                 <section className={styles.contentSection}>
-                  <div className={styles.statusHeader}>
-                    {/* Appointment Schedule */}
-                    <div className={styles.scheduleInfo}>
-                      <div className={styles.scheduleHeader}>
-                        <h6>
-                          <Calendar4 size={16} className="me-2" />
-                          Appointment Schedule
-                        </h6>
-                        <Badge bg={getStatusColor(job.jobStatus)}>
-                          {getJobStatusName(job.jobStatus)}
-                        </Badge>
+                  <div className={styles.scheduleInfo}>
+                    <div className={styles.scheduleHeader}>
+                      <h6>
+                        <Calendar4 size={16} className="me-2" />
+                        Appointment Schedule
+                      </h6>
+                      <Badge bg={getStatusColor(job.jobStatus)}>
+                        {getJobStatusName(job.jobStatus)}
+                      </Badge>
+                    </div>
+                    
+                    {/* Date and Time Info */}
+                    <div className={styles.scheduleDetails}>
+                      <div className={styles.dateInfo}>
+                        <div className={styles.calendarBox}>
+                          <div className={styles.month}>
+                            {new Date(job.startDate).toLocaleString('default', { month: 'short' })}
+                          </div>
+                          <div className={styles.day}>
+                            {new Date(job.startDate).getDate()}
+                          </div>
+                        </div>
+                        <div className={styles.timeSlot}>
+                          <Clock size={14} className="me-1" />
+                          <span>{formatTime(job.startTime)} - {formatTime(job.endTime)}</span>
+                        </div>
                       </div>
                       
-                      <div className={styles.scheduleDetails}>
-                        <div className={styles.dateInfo}>
-                          <div className={styles.calendarBox}>
-                            <div className={styles.month}>
-                              {new Date(job.startDate).toLocaleString('default', { month: 'short' })}
-                            </div>
-                            <div className={styles.day}>
-                              {new Date(job.startDate).getDate()}
-                            </div>
-                          </div>
-                          <div className={styles.timeSlot}>
-                            <Clock size={14} className="me-1" />
-                            <span>{formatTime(job.startTime)} - {formatTime(job.endTime)}</span>
-                          </div>
+                      <div className={styles.scheduleFooter}>
+                        <div className={styles.duration}>
+                          <Clock size={14} className="me-1" />
+                          Duration: {calculateDuration(job.startTime, job.endTime)}
                         </div>
-                        
-                        <div className={styles.scheduleFooter}>
-                          <div className={styles.duration}>
-                            <Clock size={14} className="me-1" />
-                            Duration: {calculateDuration(job.startTime, job.endTime)}
-                          </div>
-                          <div className={styles.arrangedBy}>
-                            <PersonFill size={14} className="me-1" />
-                            Arranged by: {job.createdBy?.fullName}
-                          </div>
+                        <div className={styles.arrangedBy}>
+                          <PersonFill size={14} className="me-1" />
+                          Arranged by: {job.createdBy?.fullName}
                         </div>
                       </div>
-                    </div>
 
-                    {/* Assigned Technicians */}
-                    <div className={styles.assignedWorkers}>
-                      <div className={styles.techHeader}>
-                        <h6>
-                          <FaUsers size={16} className="me-2" />
-                          Assigned Technicians
-                        </h6>
-                        <Badge bg="info">
-                          {job.assignedWorkers?.length || 0} assigned
-                        </Badge>
-                      </div>
+                      {/* Assigned Technicians */}
+                      <div className={styles.scheduleFooter}>
+                        <div className={styles.techHeader}>
+                          <h6 className="mb-0">
+                            <FaUsers size={14} className="me-2" />
+                            Assigned Technicians
+                          </h6>
+                          <Badge bg="info" className="ms-2">
+                            {job.assignedWorkers?.length || 0} assigned
+                          </Badge>
+                        </div>
 
-                      {job.assignedWorkers?.length > 0 ? (
-                        <div className={styles.techGrid}>
-                          {job.assignedWorkers.map((worker, index) => {
-                            const workerDetails = workers.find(w => w.workerId === worker.workerId);
-                            
-                            return (
-                              <div key={index} className={styles.techCard}>
-                                <div className={styles.techAvatar}>
-                                  {workerDetails?.profilePicture ? (
-                                    <Image
-                                      src={workerDetails.profilePicture}
-                                      alt={workerDetails.fullName}
-                                      width={40}
-                                      height={40}
-                                      className={styles.avatarImage}
-                                    />
-                                  ) : (
-                                    <div className={styles.avatarPlaceholder}>
-                                      {workerDetails?.firstName?.[0] || 'T'}
-                                    </div>
-                                  )}
-                                  <div 
-                                    className={styles.statusIndicator} 
-                                    data-status={workerDetails?.isOnline ? 'online' : 'offline'} 
-                                  />
-                                </div>
-                                
-                                <div className={styles.techInfo}>
-                                  <div className={styles.techName}>
-                                    {workerDetails?.fullName || 'Unknown Technician'}
-                                  </div>
-                                  <div className={styles.techRole}>
-                                    {workerDetails?.role || 'Technician'} · ID: {workerDetails?.workerId}
+                        <div className={styles.techList}>
+                          {job.assignedWorkers?.length > 0 ? (
+                            job.assignedWorkers.map((worker, index) => {
+                              const workerDetails = workers.find(w => w.workerId === worker.workerId);
+                              return (
+                                <div key={index} className={styles.techItem}>
+                                  <div className={styles.techAvatar}>
+                                    {workerDetails?.profilePicture ? (
+                                      <Image
+                                        src={workerDetails.profilePicture}
+                                        alt={workerDetails.fullName}
+                                        width={32}
+                                        height={32}
+                                        className={styles.avatarImage}
+                                      />
+                                    ) : (
+                                      <div className={styles.avatarPlaceholder}>
+                                        {workerDetails?.firstName?.[0] || 'T'}
+                                      </div>
+                                    )}
+                                   
                                   </div>
                                   
-                                  {/* Skills Section */}
-                                  {workerDetails?.skills && workerDetails.skills.length > 0 && (
-                                    <div className={styles.skillsContainer}>
-                                      {workerDetails.skills.map((skill, idx) => (
-                                        <Badge 
-                                          key={idx} 
-                                          bg="light" 
-                                          text="dark" 
-                                          className={styles.skillBadge}
-                                        >
-                                          {skill}
-                                        </Badge>
-                                      ))}
+                                  <div className={styles.techInfo}>
+                                    <div className={styles.techName}>
+                                      {workerDetails?.fullName || 'Unknown Technician'}
+                                      <span className={styles.techId}>ID: {workerDetails?.workerId}</span>
                                     </div>
-                                  )}
-
-                                  {/* Contact Actions */}
-                                  <div className={styles.techActions}>
-                                    {workerDetails?.primaryPhone && (
-                                      <>
-                                        <OverlayTrigger
-                                          placement="top"
-                                          overlay={<Tooltip>Call Primary: {workerDetails.primaryPhone}</Tooltip>}
-                                        >
-                                          <a href={`tel:${workerDetails.primaryPhone}`} 
-                                             className={styles.techAction}>
+                                    
+                                    <div className={styles.techActions}>
+                                      {workerDetails?.primaryPhone && (
+                                        <>
+                                          <a href={`tel:${workerDetails.primaryPhone}`} className={styles.actionIcon}>
                                             <TelephoneFill size={12} />
                                           </a>
-                                        </OverlayTrigger>
-                                        <OverlayTrigger
-                                          placement="top"
-                                          overlay={<Tooltip>WhatsApp: {workerDetails.primaryPhone}</Tooltip>}
-                                        >
                                           <a 
                                             href={`https://wa.me/${workerDetails.primaryPhone.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className={styles.techAction}
+                                            className={styles.actionIcon}
                                           >
                                             <FaWhatsapp size={12} />
                                           </a>
-                                        </OverlayTrigger>
-                                      </>
-                                    )}
-                                    {workerDetails?.secondaryPhone && (
-                                      <>
-                                        <OverlayTrigger
-                                          placement="top"
-                                          overlay={<Tooltip>Call Secondary: {workerDetails.secondaryPhone}</Tooltip>}
-                                        >
-                                          <a href={`tel:${workerDetails.secondaryPhone}`} 
-                                             className={styles.techAction}>
-                                            <PhoneFill size={12} />
-                                          </a>
-                                        </OverlayTrigger>
-                                        <OverlayTrigger
-                                          placement="top"
-                                          overlay={<Tooltip>WhatsApp: {workerDetails.secondaryPhone}</Tooltip>}
-                                        >
-                                          <a 
-                                            href={`https://wa.me/${workerDetails.secondaryPhone.replace(/\D/g, '')}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={styles.techAction}
-                                          >
-                                            <FaWhatsapp size={12} />
-                                          </a>
-                                        </OverlayTrigger>
-                                      </>
-                                    )}
-                                    {workerDetails?.email && (
-                                      <OverlayTrigger
-                                        placement="top"
-                                        overlay={<Tooltip>Email: {workerDetails.email}</Tooltip>}
-                                      >
-                                        <a href={`mailto:${workerDetails.email}`} 
-                                           className={styles.techAction}>
+                                        </>
+                                      )}
+                                      {workerDetails?.email && (
+                                        <a href={`mailto:${workerDetails.email}`} className={styles.actionIcon}>
                                           <Envelope size={12} />
                                         </a>
-                                      </OverlayTrigger>
-                                    )}
-                                  </div>
-
-                                  {/* Additional Details */}
-                                  <div className={styles.techDetails}>
-                                    <small className={styles.detailItem}>
-                                      <GeoAltFill size={12} className="me-1" />
-                                      {workerDetails?.address?.stateProvince || 'Location N/A'}
-                                    </small>
-                                    {workerDetails?.shortBio && (
-                                      <small className={styles.detailItem}>
-                                        <FileText size={12} className="me-1" />
-                                        {workerDetails.shortBio}
-                                      </small>
-                                    )}
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })
+                          ) : (
+                            <div className={styles.noTech}>
+                              <FaUsers size={20} />
+                              <p>No technicians assigned</p>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className={styles.noTech}>
-                          <div className={styles.noTechIcon}>
-                            <FaUsers size={24} />
-                          </div>
-                          <p>No technicians assigned</p>
-                          <small>Assign technicians to manage this job</small>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
+                </section>
+
+                 {/* Equipment List Section */}
+                 <section className={styles.contentSection}>
+                  {renderEquipmentList()}
                 </section>
 
                 {/* GPS Tracking Section */}

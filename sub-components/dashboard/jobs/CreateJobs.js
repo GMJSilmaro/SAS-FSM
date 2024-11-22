@@ -75,6 +75,26 @@ const sanitizeDataForFirestore = (data) => {
   return sanitized;
 };
 
+// Add this helper function near the top of your file
+const formatContactData = (contactData) => {
+  if (!contactData) return {};
+  
+  const fullName = `${contactData.firstName || ""} ${
+    contactData.middleName || ""
+  } ${contactData.lastName || ""}`.trim();
+
+  return {
+    contactID: contactData.value || contactData.contactID || "",
+    contactFullname: fullName,
+    firstName: contactData.firstName || "",
+    middleName: contactData.middleName || "",
+    lastName: contactData.lastName || "",
+    phoneNumber: contactData.tel1 || contactData.phoneNumber || "",
+    mobilePhone: contactData.tel2 || contactData.mobilePhone || "",
+    email: contactData.email || "",
+  };
+};
+
 const AddNewJobs = ({ validateJobForm }) => {
   const router = useRouter();
   const { startDate, endDate, startTime, endTime, workerId, scheduleSession } =
@@ -171,7 +191,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       },
     },
     assignedWorkers: {}, // Empty object, will be filled when workers are assigned
-    jobStatus: "Created", // Should be populated later, e.g., Work in Progress, Completed, etc.
+    jobStatus: "", // Should be populated later, e.g., Work in Progress, Completed, etc.
     priority: "", // Low, Medium, High, or any other predefined statuses
     startDate: "", // Initialize as empty string instead of null
     endDate: "", // Initialize as empty string instead of null
@@ -1054,26 +1074,12 @@ const AddNewJobs = ({ validateJobForm }) => {
   const handleContactChange = (selectedOption) => {
     if (!selectedOption) return;
 
-    const fullName = `${selectedOption.firstName || ""} ${
-      selectedOption.middleName || ""
-    } ${selectedOption.lastName || ""}`.trim();
-
-    setSelectedContact(selectedOption);
-
     setFormData((prevFormData) => ({
       ...prevFormData,
-      contact: {
-        ...prevFormData.contact, // Ensure you don't overwrite other fields like notification
-        contactID: selectedOption.value || "",
-        contactFullname: fullName,
-        firstName: selectedOption.firstName || "",
-        middleName: selectedOption.middleName || "",
-        lastName: selectedOption.lastName || "",
-        phoneNumber: selectedOption.tel1 || "",
-        mobilePhone: selectedOption.tel2 || "",
-        email: selectedOption.email || "",
-      },
+      contact: formatContactData(selectedOption)
     }));
+
+    setSelectedContact(selectedOption);
   };
 
   const handleLocationChange = async (selectedOption) => {
@@ -1816,12 +1822,7 @@ const AddNewJobs = ({ validateJobForm }) => {
         })),
 
         // Contact
-        contact: {
-          contactID: selectedContact?.contactID || "",
-          contactFullname: selectedContact?.contactFullname || "",
-          contactEmail: selectedContact?.contactEmail || "",
-          contactPhone: selectedContact?.contactPhone || "",
-        },
+        contact: formatContactData(selectedContact),
 
         // Workers
         assignedWorkers: selectedWorkers.map((worker) => ({
@@ -1934,7 +1935,6 @@ const AddNewJobs = ({ validateJobForm }) => {
       return;
     }
 
-    // ... rest of your submit logic
   };
 
   // Function to toggle the visibility of the Service Location section
@@ -2714,11 +2714,7 @@ const AddNewJobs = ({ validateJobForm }) => {
                     value={formData.estimatedDurationHours}
                     onChange={handleInputChange}
                     placeholder="Hours"
-                    readOnly={
-                      formData.scheduleSession !== "custom" ||
-                      (formData.startTime && formData.endTime)
-                    }
-                    required
+                   
                   />
                   <InputGroup.Text>h</InputGroup.Text>
                   <Form.Control
@@ -2727,11 +2723,7 @@ const AddNewJobs = ({ validateJobForm }) => {
                     value={formData.estimatedDurationMinutes}
                     onChange={handleInputChange}
                     placeholder="Minutes"
-                    readOnly={
-                      formData.scheduleSession !== "custom" ||
-                      (formData.startTime && formData.endTime)
-                    }
-                    required
+                   
                   />
                   <InputGroup.Text>m</InputGroup.Text>
                 </InputGroup>

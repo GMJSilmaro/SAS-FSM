@@ -292,6 +292,7 @@
 
 .equipmentContainer {
   width: 100%;
+  height: 100%;
 }
 
 .equipmentSummary {
@@ -339,16 +340,6 @@
 .plumbing { background-color: #FF9800; }
 .default { background-color: #757575; }
 
-.equipmentTitle {
-  flex: 1;
-}
-
-.equipmentTitle h6 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.2;
-  margin: 0;
-}
 
 .equipmentDetails {
   display: flex;
@@ -814,14 +805,7 @@
   border-bottom: 1px solid #e5e9f2;
 }
 
-.equipmentTitle {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #2c3e50;
-}
+
 
 .equipmentCount {
   font-size: 0.75rem;
@@ -829,7 +813,7 @@
 }
 
 .equipmentScroll {
-  max-height: 300px;
+  max-height: 500px;
   overflow-y: auto;
   padding: 1rem;
   /* Custom scrollbar styles */
@@ -1673,4 +1657,111 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.divider {
+  margin: 1.5rem 0;
+  border-top: 1px solid #e9ecef;
+}
+
+.techSection {
+  margin-top: 1rem;
+}
+
+.techList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.techItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+}
+
+.techAvatar {
+  position: relative;
+}
+
+.avatarImage, .avatarPlaceholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.avatarPlaceholder {
+  background-color: #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+
+.statusIndicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.statusIndicator[data-status="online"] {
+  background-color: #28a745;
+}
+
+.statusIndicator[data-status="offline"] {
+  background-color: #dc3545;
+}
+
+.techInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.techName {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.techId {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: normal;
+}
+
+.techActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.techAction {
+  color: #6c757d;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s;
+}
+
+.techAction:hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+.noTech {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: #6c757d;
+  text-align: center;
 }
