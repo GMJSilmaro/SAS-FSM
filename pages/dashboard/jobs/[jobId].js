@@ -324,6 +324,16 @@ const JobDetails = () => {
   const [followUpToDelete, setFollowUpToDelete] = useState(null);
   const [isEquipmentListExpanded, setIsEquipmentListExpanded] = useState(true);
   const [expandedEquipments, setExpandedEquipments] = useState({});
+  // Add these state variables at the top with other useState declarations
+  const [jobImages, setJobImages] = useState([]);
+  const [signatures, setSignatures] = useState({
+    technician: null,
+    customer: null
+  });
+  const [showImageModal, setShowImageModal] = useState(false);
+  // Update the useEffect to include a loading state
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [isLoadingSignatures, setIsLoadingSignatures] = useState(true);
 
   console.log("Job ID from URL:", jobId);
 
@@ -454,6 +464,60 @@ const JobDetails = () => {
       // Cleanup subscription on unmount
       return () => unsubscribe();
     }
+  }, [jobId]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!jobId) return;
+  
+      // Fetch images
+      const imagesRef = collection(db, 'jobs', jobId, 'images');
+      const imagesSnap = await getDocs(imagesRef);
+      const imagesData = imagesSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      console.log('Fetched images TEST:', imagesData);
+      setJobImages(imagesData);
+  
+ 
+    };
+  
+    fetchData();
+  }, [jobId]);
+  
+
+  // Add this useEffect to fetch signatures
+  useEffect(() => {
+    const fetchSignatures = async () => {
+      if (!jobId) return;
+
+      try {
+        setIsLoadingSignatures(true);
+        console.log('Fetching signatures for job:', jobId);
+        
+        const signaturesRef = collection(db, 'jobs', jobId, 'signatures');
+        const signaturesSnapshot = await getDocs(signaturesRef);
+        
+        const signaturesData = {};
+        signaturesSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          signaturesData[data.type] = {
+            id: doc.id,
+            ...data
+          };
+        });
+        
+        console.log('Fetched signatures:', signaturesData);
+        setSignatures(signaturesData);
+      } catch (error) {
+        console.error('Error fetching signatures:', error);
+      } finally {
+        setIsLoadingSignatures(false);
+      }
+    };
+
+    fetchSignatures();
   }, [jobId]);
 
   const formatDate = (dateString) => {
@@ -1171,73 +1235,127 @@ const JobDetails = () => {
       </>
     );
   };
-
   const renderSignatures = () => {
+    const techSignature = signatures.find(sig => sig.type === 'technician');
+    const customerSignature = signatures.find(sig => sig.type === 'customer');
+  
     return (
-      <div>
-        <h4>Signatures</h4>
-        <div className="d-flex justify-content-between">
-          <div>
-            <p>Technician Signature: ___________________</p>
-            <p>
-              Timestamp:{" "}
-              {job.technicianSignatureTimestamp
-                ? new Date(job.technicianSignatureTimestamp).toLocaleString()
-                : "Not signed"}
-            </p>
+      <div className={styles.signaturesSection}>
+        <h6>Signatures</h6>
+        <div className={styles.signatureGrid}>
+          <div className={styles.signatureBox}>
+            <p>Technician Signature:</p>
+            {techSignature ? (
+              <img src={techSignature.signatureURL} alt="Technician Signature" />
+            ) : (
+              <div className={styles.notSigned}>Not signed</div>
+            )}
           </div>
-          <div>
-            <p>Worker Signature: ___________________</p>
-            <p>
-              Timestamp:{" "}
-              {job.workerSignatureTimestamp
-                ? new Date(job.workerSignatureTimestamp).toLocaleString()
-                : "Not signed"}
-            </p>
+          <div className={styles.signatureBox}>
+            <p>Customer Signature:</p>
+            {customerSignature ? (
+              <img src={customerSignature.signatureURL} alt="Customer Signature" />
+            ) : (
+              <div className={styles.notSigned}>Not signed</div>
+            )}
           </div>
         </div>
       </div>
     );
   };
-
-  const renderImages = () => {
-    return (
-      <div className={styles.imagesSection}>
-        <div className={styles.sectionHeader}>
-          <h6 className={styles.sectionTitle}>
-            <ImageIcon size={16} className={styles.titleIcon} />
-            Job Images
-          </h6>
-          {/* Optional: Add upload button here if needed */}
-        </div>
-        
-        {(!job.images || job.images.length === 0) ? (
-          <div className={styles.emptyState}>
-            <ImageIcon size={24} />
-            <p>No images uploaded yet</p>
-            {/* Optional: Add upload button here */}
-          </div>
-        ) : (
+  const renderImages = () => (
+    <div className={styles.imagesSection}>
+      {jobImages.length === 0 ? (
+        <div className={styles.emptyState}>No images uploaded yet</div>
+      ) : (
+        <>
           <div className={styles.imageGrid}>
-            {job.images.map((image, index) => (
-              <div key={index} className={styles.imageCard}>
-                <img 
-                  src={image.url} 
-                  alt={image.caption || `Job image ${index + 1}`}
-                  onClick={() => setSelectedImage(image)}
-                />
+            {jobImages.map((image) => (
+              <div 
+                key={image.id} 
+                className={styles.imageCard}
+                onClick={() => {
+                  setSelectedImage(image);
+                  setShowImageModal(true);
+                }}
+              >
+                <img src={image.url} alt={image.description} />
                 <div className={styles.imageCaption}>
-                  <span>{image.caption || `Image ${index + 1}`}</span>
-                  <small>{formatDateTime(image.uploadedAt)}</small>
+                  <p>{image.description}</p>
+                  <small>{image.timestamp}</small>
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
-    );
-  };
-
+  
+          {/* Image Modal */}
+          <Modal 
+            show={showImageModal} 
+            onHide={() => setShowImageModal(false)}
+            size="lg"
+            centered
+            className={styles.imageModal}
+          >
+            <Modal.Header closeButton>
+              <Modal.Title>Image Details</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {selectedImage && (
+                <div className={styles.modalImageContainer}>
+                  <img 
+                    src={selectedImage.url} 
+                    alt={selectedImage.description}
+                    className={styles.modalImage}
+                  />
+                  <div className={styles.imageDetails}>
+                    <div className={styles.detailRow}>
+                      <strong>Description:</strong>
+                      <p>{selectedImage.description || 'No description available'}</p>
+                    </div>
+                    <div className={styles.detailRow}>
+                      <strong>Uploaded:</strong>
+                      <p>{selectedImage.timestamp ? new Date(selectedImage.timestamp).toLocaleString() : 'Date not available'}</p>
+                    </div>
+                    {selectedImage.uploadedBy && (
+                      <div className={styles.detailRow}>
+                        <strong>Uploaded By:</strong>
+                        <p>{selectedImage.uploadedBy}</p>
+                      </div>
+                    )}
+                    {selectedImage.category && (
+                      <div className={styles.detailRow}>
+                        <strong>Category:</strong>
+                        <p>{selectedImage.category}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              {selectedImage?.url && (
+                <Button 
+                  variant="primary" 
+                  href={selectedImage.url} 
+                  download
+                  className={styles.downloadButton}
+                >
+                  <Images className="me-2" />
+                  Download Image
+                </Button>
+              )}
+              <Button 
+                variant="secondary" 
+                onClick={() => setShowImageModal(false)}
+              >
+                Close
+              </Button>
+            </Modal.Footer>
+          </Modal>
+        </>
+      )}
+    </div>
+  );
   const renderMap = () => {
     if (!isLoaded) {
       return (
@@ -1480,7 +1598,7 @@ const JobDetails = () => {
     return "Duration calculation";
   };
 
-  // New helper function for payment and signatures
+  // Update the renderPaymentAndSignatures function
   const renderPaymentAndSignatures = () => {
     return (
       <div className={styles.paymentSection}>
@@ -1517,42 +1635,44 @@ const JobDetails = () => {
             <div className={styles.signatureBox}>
               <label>Technician Signature:</label>
               <div className={styles.signatureLine}>
-                {job.technicianSignature ? (
-                  <img 
-                    src={job.technicianSignature} 
-                    alt="Technician Signature" 
-                    className={styles.signatureImage}
-                  />
+                {signatures.technician ? (
+                  <>
+                    <img 
+                      src={signatures.technician.signatureURL} 
+                      alt="Technician Signature" 
+                      className={styles.signatureImage}
+                    />
+                    <div className={styles.signatureMeta}>
+                      <small>Signed by: {signatures.technician.signedBy}</small>
+                      <small>{formatDateTime(signatures.technician.timestamp)}</small>
+                    </div>
+                  </>
                 ) : (
                   <div className={styles.emptySignature}>Not signed</div>
                 )}
               </div>
-              <small className={styles.timestamp}>
-                {job.technicianSignatureTimestamp 
-                  ? formatDateTime(job.technicianSignatureTimestamp)
-                  : 'Not signed'}
-              </small>
             </div>
 
             {/* Customer Signature */}
             <div className={styles.signatureBox}>
               <label>Customer Signature:</label>
               <div className={styles.signatureLine}>
-                {job.customerSignature ? (
-                  <img 
-                    src={job.customerSignature} 
-                    alt="Customer Signature" 
-                    className={styles.signatureImage}
-                  />
+                {signatures.customer ? (
+                  <>
+                    <img 
+                      src={signatures.customer.signatureURL} 
+                      alt="Customer Signature" 
+                      className={styles.signatureImage}
+                    />
+                    <div className={styles.signatureMeta}>
+                      <small>Signed by: {signatures.customer.signedBy}</small>
+                      <small>{formatDateTime(signatures.customer.timestamp)}</small>
+                    </div>
+                  </>
                 ) : (
                   <div className={styles.emptySignature}>Not signed</div>
                 )}
               </div>
-              <small className={styles.timestamp}>
-                {job.customerSignatureTimestamp 
-                  ? formatDateTime(job.customerSignatureTimestamp)
-                  : 'Not signed'}
-              </small>
             </div>
           </div>
         </div>
@@ -2627,34 +2747,13 @@ const JobDetails = () => {
 
                 {/* Images Section */}
                 <section className={styles.section}>
-                  <div className={styles.sectionHeader}>
+                <div className={styles.sectionHeader}>
                     <h6 className={styles.sectionTitle}>
-                      <Images className={styles.titleIcon} />
+                      <CreditCard2Front className={styles.titleIcon} />
                       Job Images
                     </h6>
                   </div>
-                  {!job.images || job.images.length === 0 ? (
-                    <div className={styles.emptyState}>
-                      <Images size={24} />
-                      <p>No images uploaded yet</p>
-                    </div>
-                  ) : (
-                    <div className={styles.imageGrid}>
-                      {job.images.map((image, index) => (
-                        <div key={index} className={styles.imageCard}>
-                          <img 
-                            src={image.url} 
-                            alt={image.caption || `Job image ${index + 1}`}
-                            onClick={() => setSelectedImage(image)}
-                          />
-                          <div className={styles.imageCaption}>
-                            <span>{image.caption || `Image ${index + 1}`}</span>
-                            <small>{formatDateTime(image.uploadedAt)}</small>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {renderImages()}
                 </section>
 
                 {/* Payment & Signature Section */}
