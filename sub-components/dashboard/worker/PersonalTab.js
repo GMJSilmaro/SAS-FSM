@@ -323,7 +323,6 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
               type="date"
               value={expirationDate}
               onChange={(e) => setExpirationDate(e.target.value)}
-              required
             />
           </Form.Group>
         </Row>

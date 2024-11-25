@@ -95,12 +95,12 @@ const CreateWorker = () => {
   };
 
   const handleSkillsFormSubmit = async (skillsFormData) => {
-    // Validation: Check for required fields
-    if (!skillsFormData.length) {
-      // Check if at least one skill is provided
-      toast.error("Please fill in all required skills fields.");
-      return; // Stop execution if validation fails
-    }
+    // // Validation: Check for required fields
+    // if (!skillsFormData.length) {
+    //   // Check if at least one skill is provided
+    //   toast.error("Please fill in all required skills fields.");
+    //   return; // Stop execution if validation fails
+    // }
 
     try {
       const userData = {

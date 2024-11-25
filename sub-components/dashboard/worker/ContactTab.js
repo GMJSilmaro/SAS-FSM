@@ -172,7 +172,7 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
             placeholder="Enter Emergency Contact Name"
             value={emergencyContactName}
             onChange={(e) => setEmergencyContactName(e.target.value)}
-            required
+  
           />
         </Form.Group>
 
@@ -183,7 +183,7 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
             placeholder="Enter Emergency Contact Phone"
             value={emergencyContactPhone}
             onChange={(e) => setEmergencyContactPhone(e.target.value)}
-            required
+  
           />
         </Form.Group>
 
@@ -193,7 +193,7 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
             aria-label="Select Emergency Contact Relationship"
             value={emergencyRelationship}
             onChange={(e) => setEmergencyRelationship(e.target.value)}
-            required
+  
           >
             <option>Select Relationship</option>
             <option value="Parent">Parent</option>

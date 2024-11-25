@@ -43,11 +43,11 @@ export const SkillsTab = ({ onSubmit, initialValues }) => {
     // Filter out any empty skill entries
     const filteredSkills = skills.filter((skill) => skill.trim() !== "");
 
-    // Validation: Ensure at least one skill is provided
-    if (filteredSkills.length === 0) {
-      toast.error("Please add at least 1 skill for this worker.");
-      return;
-    }
+    // // Validation: Ensure at least one skill is provided
+    // if (filteredSkills.length === 0) {
+    //   toast.error("Please add at least 1 skill for this worker.");
+    //   return;
+    // }
 
     onSubmit(filteredSkills); // Pass the valid skills to the parent
   };
