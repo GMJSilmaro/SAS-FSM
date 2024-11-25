@@ -73,18 +73,18 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
     // Log the data for debugging
     console.log("Contact Form Data:", formData);
 
-    // Check if required fields are filled
-    if (
-      !trimmedPrimaryPhone ||
-      !trimmedStreetAddress ||
-      !trimmedStateProvince ||
-      !trimmedZipCode ||
-      !trimmedEmergencyContactName ||
-      !trimmedEmergencyContactPhone
-    ) {
-      toast.error("Please fill in all required contact fields.");
-      return;
-    }
+    // // Check if required fields are filled
+    // if (
+    //   !trimmedPrimaryPhone ||
+    //   !trimmedStreetAddress ||
+    //   !trimmedStateProvince ||
+    //   !trimmedZipCode ||
+    //   !trimmedEmergencyContactName ||
+    //   !trimmedEmergencyContactPhone
+    // ) {
+    //   toast.error("Please fill in all required contact fields.");
+    //   return;
+    // }
 
     // If all fields are valid, submit the form
     onSubmit(formData);
@@ -140,7 +140,6 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
             placeholder="Enter Street Address"
             value={streetAddress}
             onChange={(e) => setStreetAddress(e.target.value)}
-            required
           />
         </Form.Group>
 
@@ -151,7 +150,6 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
             placeholder="Enter State / Province"
             value={stateProvince}
             onChange={(e) => setStateProvince(e.target.value)}
-            required
           />
         </Form.Group>
 
@@ -162,7 +160,6 @@ export const ContactTab = ({ onSubmit, initialValues }) => {
             placeholder="Enter Zip Code / Postal Code"
             value={zipCode}
             onChange={(e) => setZipCode(e.target.value)}
-            required
           />
         </Form.Group>
       </Row>

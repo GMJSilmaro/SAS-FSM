@@ -275,7 +275,6 @@ export const PersonalTab = ({ onSubmit, initialValues }) => {
               type="date"
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
-              required
             />
           </Form.Group>
 
