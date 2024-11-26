@@ -2118,6 +2118,21 @@ const AddNewJobs = ({ validateJobForm }) => {
   );
 
   const handleRepeatSettingChange = (field, value) => {
+    if (field === 'endType' && value === 'never') {
+      toast.info(
+        `Note: Recurring jobs will be limited to ${MAX_OCCURRENCES} occurrences for system performance`,
+        {
+          duration: 5000,
+          style: {
+            background: "#fff",
+            color: "#0dcaf0",
+            padding: "16px",
+            borderLeft: "6px solid #0dcaf0",
+          },
+        }
+      );
+    }
+    
     setRepeatSettings(prev => ({
       ...prev,
       [field]: value
@@ -2142,31 +2157,40 @@ const AddNewJobs = ({ validateJobForm }) => {
       return dates;
     }
 
+    // Set a maximum number of occurrences even for "never" ending repeats
+    const MAX_OCCURRENCES = 52; // For example, limit to 52 occurrences (1 year for weekly)
+    
     const endDate = repeatSettings.endType === 'date' 
       ? new Date(repeatSettings.endDate)
       : null;
     
     const maxOccurrences = repeatSettings.endType === 'occurrences'
       ? parseInt(repeatSettings.occurrences)
+      : repeatSettings.endType === 'never'
+      ? MAX_OCCURRENCES
       : null;
 
     let currentDate = new Date(startDate);
     
-    while (true) {
-      // Break if we've reached the end date or max occurrences
+    while (dates.length < maxOccurrences) {
+      // Break if we've reached the end date
       if (endDate && currentDate > endDate) break;
-      if (maxOccurrences && dates.length >= maxOccurrences) break;
+      
+      // Break if we've reached the maximum occurrences
+      if (dates.length >= MAX_OCCURRENCES) {
+        console.log(`Reached maximum limit of ${MAX_OCCURRENCES} occurrences`);
+        break;
+      }
 
       switch (repeatSettings.frequency) {
         case 'daily':
           currentDate = new Date(currentDate.setDate(
-            currentDate.getDate() + repeatSettings.interval
+            currentDate.getDate() + parseInt(repeatSettings.interval)
           ));
           break;
 
         case 'weekly':
           if (repeatSettings.weekDays.length > 0) {
-            // Handle specific weekdays
             currentDate = new Date(currentDate.setDate(
               currentDate.getDate() + 1
             ));
@@ -2176,19 +2200,18 @@ const AddNewJobs = ({ validateJobForm }) => {
               ));
             }
           } else {
-            // Simple weekly repeat
             currentDate = new Date(currentDate.setDate(
-              currentDate.getDate() + (7 * repeatSettings.interval)
+              currentDate.getDate() + (7 * parseInt(repeatSettings.interval))
             ));
           }
           break;
 
         case 'monthly':
           currentDate = new Date(currentDate.setMonth(
-            currentDate.getMonth() + repeatSettings.interval
+            currentDate.getMonth() + parseInt(repeatSettings.interval)
           ));
           // Adjust to specified day of month
-          currentDate.setDate(repeatSettings.monthDay);
+          currentDate.setDate(parseInt(repeatSettings.monthDay));
           break;
       }
 
