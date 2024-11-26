@@ -960,18 +960,26 @@ const WorkersListItems = () => {
     })
   ];
 
+  // Add pagination state
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
+  // Update the table configuration
   const table = useReactTable({
     data: filteredWorkers,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    // Add these lines
+    onPaginationChange: setPagination,
     state: {
-      pagination: {
-        pageIndex: 0,
-        pageSize: 10,
-      },
+      pagination,
     },
+    // Optional: control page count
+    pageCount: Math.ceil(filteredWorkers.length / pagination.pageSize),
   });
 
   // Add debug logs
@@ -1096,6 +1104,17 @@ const WorkersListItems = () => {
   useEffect(() => {
     handleSearch();
   }, [handleSearch, filters]);
+
+  useEffect(() => {
+    console.log('Pagination Debug:', {
+      currentPage: pagination.pageIndex,
+      pageSize: pagination.pageSize,
+      totalItems: filteredWorkers.length,
+      totalPages: Math.ceil(filteredWorkers.length / pagination.pageSize),
+      canNextPage: table.getCanNextPage(),
+      canPrevPage: table.getCanPreviousPage()
+    });
+  }, [pagination, filteredWorkers, table]);
 
   return (
     <Fragment>
@@ -1379,23 +1398,27 @@ const WorkersListItems = () => {
               <div className="d-flex justify-content-between align-items-center mt-4">
                 <div>
                   <span className="text-muted">
-                    Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+                    Showing {pagination.pageIndex * pagination.pageSize + 1} to{' '}
                     {Math.min(
-                      (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                      (pagination.pageIndex + 1) * pagination.pageSize,
                       filteredWorkers.length
                     )}{' '}
                     of {filteredWorkers.length} entries
                   </span>
                 </div>
-                <div>
+                <div className="d-flex gap-2">
                   <Button
                     variant="outline-primary"
-                    className="me-2 btn-icon-text"
+                    className="btn-icon-text"
                     onClick={() => table.previousPage()}
                     disabled={!table.getCanPreviousPage()}
                   >
                     Previous
                   </Button>
+                  <span className="d-flex align-items-center px-3">
+                    Page {pagination.pageIndex + 1} of{' '}
+                    {Math.ceil(filteredWorkers.length / pagination.pageSize)}
+                  </span>
                   <Button
                     variant="outline-primary"
                     className="btn-icon-text"

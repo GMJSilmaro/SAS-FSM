@@ -95,6 +95,51 @@ const formatContactData = (contactData) => {
   };
 };
 
+// Add these helper functions at the top of your file
+const generateBaseJobNo = async () => {
+  try {
+    // Get the current year's last two digits
+    const year = new Date().getFullYear().toString().slice(-2);
+    
+    // Query Firestore to get the latest job number for this year
+    const jobsRef = collection(db, "jobs");
+    const q = query(
+      jobsRef,
+      where("jobNo", ">=", `JOB${year}0000`),
+      where("jobNo", "<=", `JOB${year}9999`),
+      orderBy("jobNo", "desc"),
+      limit(1)
+    );
+    
+    const snapshot = await getDocs(q);
+    let nextNumber = 1;
+    
+    if (!snapshot.empty) {
+      // Extract the number from the latest job number
+      const latestJobNo = snapshot.docs[0].data().jobNo;
+      const currentNumber = parseInt(latestJobNo.slice(-4));
+      nextNumber = currentNumber + 1;
+    }
+    
+    // Format the job number with leading zeros
+    const formattedNumber = nextNumber.toString().padStart(4, '0');
+    const newJobNo = `Job${year}${formattedNumber}`;
+    console.log("Generated job number:", newJobNo);
+    return newJobNo;
+  } catch (error) {
+    console.error("Error generating job number:", error);
+    throw new Error("Failed to generate job number");
+  }
+};
+
+const generateRepeatJobNo = (baseJobNo, sequence) => {
+  return `${baseJobNo}-${sequence.toString().padStart(3, '0')}`;
+};
+
+const generateRepeatGroupId = () => {
+  return `R${Date.now()}`;
+};
+
 const AddNewJobs = ({ validateJobForm }) => {
   const router = useRouter();
   const { startDate, endDate, startTime, endTime, workerId, scheduleSession } =
@@ -349,7 +394,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
   const [showServiceLocation, setShowServiceLocation] = useState(true);
   const [showEquipments, setShowEquipments] = useState(true);
-  const [jobNo, setJobNo] = useState("0000");
+  const [jobNo, setJobNo] = useState("Loading...");
   const [validated, setValidated] = useState(false);
   const [activeKey, setActiveKey] = useState("summary");
   const [isLoading, setIsLoading] = useState(true);
@@ -364,6 +409,36 @@ const AddNewJobs = ({ validateJobForm }) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // Add new state for repeat settings
+  const [repeatSettings, setRepeatSettings] = useState({
+    isRepeat: false,
+    frequency: 'none', // none, daily, weekly, monthly
+    interval: 1,
+    weekDays: [], // For weekly frequency
+    monthDay: 1, // For monthly frequency
+    endDate: '', // Optional end date for repetition
+    occurrences: '', // Optional number of occurrences
+    endType: 'never' // never, date, occurrences
+  });
+
+  // Add repeat options
+  const repeatFrequencyOptions = [
+    { value: 'none', label: 'Do not repeat' },
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' }
+  ];
+
+  const weekDayOptions = [
+    { value: 0, label: 'Sunday' },
+    { value: 1, label: 'Monday' },
+    { value: 2, label: 'Tuesday' },
+    { value: 3, label: 'Wednesday' },
+    { value: 4, label: 'Thursday' },
+    { value: 5, label: 'Friday' },
+    { value: 6, label: 'Saturday' }
+  ];
 
   useEffect(() => {
     const getCurrentUserInfo = async () => {
@@ -1707,8 +1782,13 @@ const AddNewJobs = ({ validateJobForm }) => {
       setProgress(0);
       setIsSubmitting(true);
 
-      console.log("Starting submission process...");
-      setProgress(20);
+      // Generate base job number
+      const baseJobNo = await generateBaseJobNo();
+      const repeatGroupId = repeatSettings.isRepeat ? generateRepeatGroupId() : null;
+
+      // Generate recurring dates if repeat is enabled
+      const jobDates = repeatSettings.isRepeat ? generateRecurringDates() : [new Date(formData.startDate)];
+      console.log("Generated job dates:", jobDates);
 
       // Check for overlaps
       console.log("Checking for schedule conflicts...");
@@ -1751,148 +1831,175 @@ const AddNewJobs = ({ validateJobForm }) => {
         }
       }
 
-      // Format dates and create updated form data
+      // Format dates and prepare base form data
       console.log("Formatting dates and preparing form data...");
       setProgress(60);
-      const formattedStartDateTime = formatDateTime(
-        formData.startDate,
-        formData.startTime
-      );
-      const formattedEndDateTime = formatDateTime(
-        formData.endDate,
-        formData.endTime
-      );
 
-      // Prepare the form data
-      const updatedFormData = {
-        // Basic Job Info
-        jobID: jobNo || "",
-        jobNo: jobNo || "",
-        jobName: formData.jobName || "",
-        jobDescription: formData.jobDescription || "",
-        jobStatus: "Created",
-        priority: formData.priority || "",
+      // Create jobs for each date
+      for (let i = 0; i < jobDates.length; i++) {
+        const currentDate = jobDates[i];
+        const currentJobNo = repeatSettings.isRepeat && i > 0 
+          ? generateRepeatJobNo(baseJobNo, i + 1)
+          : baseJobNo;
 
-        // Customer Info
-        customerID: selectedCustomer?.cardCode || "",
-        customerName: selectedCustomer?.cardName || "",
+        const formattedStartDateTime = formatDateTime(
+          currentDate.toISOString().split('T')[0],
+          formData.startTime
+        );
 
-        // Dates and Times
-        startDate: formattedStartDateTime || null,
-        endDate: formattedEndDateTime || null,
-        startTime: formData.startTime || "",
-        endTime: formData.endTime || "",
+        const endDate = new Date(currentDate);
+        endDate.setHours(new Date(formData.endDate).getHours());
+        endDate.setMinutes(new Date(formData.endDate).getMinutes());
+        const formattedEndDateTime = formatDateTime(
+          endDate.toISOString().split('T')[0],
+          formData.endTime
+        );
 
-        // Location
-        location: {
-          locationName: selectedLocation?.address || "",
-          siteId: selectedLocation?.value || "",
-          addressType: selectedLocation?.addressType || "",
-          address: {
-            streetNo: selectedLocation?.streetNo || "",
-            streetAddress: selectedLocation?.address || "",
-            block: selectedLocation?.block || "",
-            buildingNo: selectedLocation?.building || "",
-            city: selectedLocation?.city || "",
-            stateProvince: selectedLocation?.stateProvince || "",
-            postalCode: selectedLocation?.zipCode || "",
-            country: selectedLocation?.countryName || "",
+        // Prepare the form data
+        const updatedFormData = {
+          // Basic Job Info
+          jobID: currentJobNo,
+          jobNo: currentJobNo,
+          jobName: repeatSettings.isRepeat 
+            ? `${formData.jobName} (${i + 1}/${jobDates.length})`
+            : formData.jobName,
+          jobDescription: formData.jobDescription || "",
+          jobStatus: "Created",
+          priority: formData.priority || "",
+
+          // Repeat Job Information
+          repeatJob: repeatSettings.isRepeat ? {
+            isRepeat: true,
+            repeatGroupId: repeatGroupId,
+            baseJobNo: baseJobNo,
+            sequence: i + 1,
+            totalOccurrences: jobDates.length,
+            settings: repeatSettings
+          } : null,
+
+          // Customer Info
+          customerID: selectedCustomer?.cardCode || "",
+          customerName: selectedCustomer?.cardName || "",
+
+          // Dates and Times
+          startDate: formattedStartDateTime || null,
+          endDate: formattedEndDateTime || null,
+          startTime: formData.startTime || "",
+          endTime: formData.endTime || "",
+
+          // Location
+          location: {
+            locationName: selectedLocation?.address || "",
+            siteId: selectedLocation?.value || "",
+            addressType: selectedLocation?.addressType || "",
+            address: {
+              streetNo: selectedLocation?.streetNo || "",
+              streetAddress: selectedLocation?.address || "",
+              block: selectedLocation?.block || "",
+              buildingNo: selectedLocation?.building || "",
+              city: selectedLocation?.city || "",
+              stateProvince: selectedLocation?.stateProvince || "",
+              postalCode: selectedLocation?.zipCode || "",
+              country: selectedLocation?.countryName || "",
+            },
+            coordinates: formData.location?.coordinates || {
+              latitude: "",
+              longitude: "",
+            },
+            displayAddress: `${
+              selectedLocation?.building ? `${selectedLocation.building} - ` : ""
+            }${selectedLocation?.address}`,
+            fullAddress: [
+              selectedLocation?.building && `${selectedLocation.building}`,
+              selectedLocation?.address,
+              selectedLocation?.city,
+              selectedLocation?.stateProvince,
+              selectedLocation?.zipCode,
+              selectedLocation?.countryName,
+            ]
+              .filter(Boolean)
+              .join(", "),
           },
-          coordinates: formData.location?.coordinates || {
-            latitude: "",
-            longitude: "",
+          equipments: formData.equipments.map((equipment) => ({
+            itemCode: equipment.itemCode || "",
+            itemName: equipment.itemName || "",
+            itemGroup: equipment.itemGroup || "",
+            brand: equipment.brand || "",
+            equipmentLocation: equipment.equipmentLocation || "",
+            equipmentType: equipment.equipmentType || "",
+            modelSeries: equipment.modelSeries || "",
+            serialNo: equipment.serialNo || "",
+            notes: equipment.notes || "",
+            warrantyStartDate: equipment.warrantyStartDate || null,
+            warrantyEndDate: equipment.warrantyEndDate || null,
+          })),
+
+          // Contact
+          contact: formatContactData(selectedContact),
+
+          // Workers
+          assignedWorkers: selectedWorkers.map((worker) => ({
+            workerId: worker.value || "",
+            workerName: worker.label || "",
+          })),
+
+          // Tasks
+          taskList: tasks.map((task) => ({
+            taskID: task.taskID || "",
+            taskName: task.taskName || "",
+            taskDescription: task.taskDescription || "",
+            assignedTo: task.assignedTo || "",
+            isPriority: Boolean(task.isPriority),
+            isDone: Boolean(task.isDone),
+            completionDate: task.completionDate
+              ? Timestamp.fromDate(new Date(task.completionDate))
+              : null,
+          })),
+
+          // Metadata
+          createdBy: {
+            workerId: currentUser.workerId || "unknown",
+            fullName: currentUser.fullName || "anonymous",
+            timestamp: Timestamp.now(),
           },
-          displayAddress: `${
-            selectedLocation?.building ? `${selectedLocation.building} - ` : ""
-          }${selectedLocation?.address}`,
-          fullAddress: [
-            selectedLocation?.building && `${selectedLocation.building}`,
-            selectedLocation?.address,
-            selectedLocation?.city,
-            selectedLocation?.stateProvince,
-            selectedLocation?.zipCode,
-            selectedLocation?.countryName,
-          ]
-            .filter(Boolean)
-            .join(", "),
-        },
-        equipments: formData.equipments.map((equipment) => ({
-          itemCode: equipment.itemCode || "",
-          itemName: equipment.itemName || "",
-          itemGroup: equipment.itemGroup || "",
-          brand: equipment.brand || "",
-          equipmentLocation: equipment.equipmentLocation || "",
-          equipmentType: equipment.equipmentType || "",
-          modelSeries: equipment.modelSeries || "",
-          serialNo: equipment.serialNo || "",
-          notes: equipment.notes || "",
-          warrantyStartDate: equipment.warrantyStartDate || null,
-          warrantyEndDate: equipment.warrantyEndDate || null,
-        })),
 
-        // Contact
-        contact: formatContactData(selectedContact),
+          // Timestamps
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
 
-        // Workers
-        assignedWorkers: selectedWorkers.map((worker) => ({
-          workerId: worker.value || "",
-          workerName: worker.label || "",
-        })),
+        // Sanitize the data before saving
+        const sanitizedData = sanitizeDataForFirestore(updatedFormData);
+        console.log(`Sanitized data for job ${i + 1}:`, sanitizedData);
 
-        // Tasks
-        taskList: tasks.map((task) => ({
-          taskID: task.taskID || "",
-          taskName: task.taskName || "",
-          taskDescription: task.taskDescription || "",
-          assignedTo: task.assignedTo || "",
-          isPriority: Boolean(task.isPriority),
-          isDone: Boolean(task.isDone),
-          completionDate: task.completionDate
-            ? Timestamp.fromDate(new Date(task.completionDate))
-            : null,
-        })),
-
-        // Metadata
-        createdBy: {
-          workerId: currentUser.workerId || "unknown",
-          fullName: currentUser.fullName || "anonymous",
-          timestamp: Timestamp.now(),
-        },
-
-        // Timestamps
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-
-      // Sanitize the data before saving
-      const sanitizedData = sanitizeDataForFirestore(updatedFormData);
-
-      console.log("Sanitized data to be saved:", sanitizedData);
-
-      // Save to Firestore with error handling
-      try {
-        const jobRef = doc(db, "jobs", jobNo);
-        await setDoc(jobRef, sanitizedData);
-        console.log("Successfully saved to Firestore");
-        setProgress(100);
-
-        // Show success message
-        toast.success("Job created successfully!", {
-          duration: 5000,
-          style: {
-            background: "#fff",
-            color: "#28a745",
-            padding: "16px",
-            borderLeft: "6px solid #28a745",
-          },
-        });
-
-        // Handle success (redirect, reset form, etc.)
-        handleSubmitSuccess({ jobId: jobNo });
-      } catch (firestoreError) {
-        console.error("Firestore save error:", firestoreError);
-        throw new Error(`Failed to save job: ${firestoreError.message}`);
+        // Save to Firestore
+        try {
+          const jobRef = doc(db, "jobs", currentJobNo);
+          await setDoc(jobRef, sanitizedData);
+          console.log(`Successfully saved job ${i + 1} to Firestore`);
+          setProgress(60 + (35 * (i + 1) / jobDates.length));
+        } catch (firestoreError) {
+          console.error(`Firestore save error for job ${i + 1}:`, firestoreError);
+          throw new Error(`Failed to save job ${i + 1}: ${firestoreError.message}`);
+        }
       }
+
+      setProgress(100);
+
+      // Show success message
+      toast.success(`Successfully created ${jobDates.length} job(s)!`, {
+        duration: 5000,
+        style: {
+          background: "#fff",
+          color: "#28a745",
+          padding: "16px",
+          borderLeft: "6px solid #28a745",
+        },
+      });
+
+      // Handle success (redirect, reset form, etc.)
+      handleSubmitSuccess({ jobId: baseJobNo });
+
     } catch (error) {
       console.error("Submit error:", error);
       setIsSubmitting(false);
@@ -2009,6 +2116,104 @@ const AddNewJobs = ({ validateJobForm }) => {
       </OverlayTrigger>
     </Form.Label>
   );
+
+  const handleRepeatSettingChange = (field, value) => {
+    setRepeatSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleWeekDayToggle = (day) => {
+    setRepeatSettings(prev => ({
+      ...prev,
+      weekDays: prev.weekDays.includes(day)
+        ? prev.weekDays.filter(d => d !== day)
+        : [...prev.weekDays, day]
+    }));
+  };
+
+  // Function to generate recurring dates
+  const generateRecurringDates = () => {
+    const startDate = new Date(formData.startDate);
+    const dates = [startDate];
+    
+    if (!repeatSettings.isRepeat || repeatSettings.frequency === 'none') {
+      return dates;
+    }
+
+    const endDate = repeatSettings.endType === 'date' 
+      ? new Date(repeatSettings.endDate)
+      : null;
+    
+    const maxOccurrences = repeatSettings.endType === 'occurrences'
+      ? parseInt(repeatSettings.occurrences)
+      : null;
+
+    let currentDate = new Date(startDate);
+    
+    while (true) {
+      // Break if we've reached the end date or max occurrences
+      if (endDate && currentDate > endDate) break;
+      if (maxOccurrences && dates.length >= maxOccurrences) break;
+
+      switch (repeatSettings.frequency) {
+        case 'daily':
+          currentDate = new Date(currentDate.setDate(
+            currentDate.getDate() + repeatSettings.interval
+          ));
+          break;
+
+        case 'weekly':
+          if (repeatSettings.weekDays.length > 0) {
+            // Handle specific weekdays
+            currentDate = new Date(currentDate.setDate(
+              currentDate.getDate() + 1
+            ));
+            while (!repeatSettings.weekDays.includes(currentDate.getDay())) {
+              currentDate = new Date(currentDate.setDate(
+                currentDate.getDate() + 1
+              ));
+            }
+          } else {
+            // Simple weekly repeat
+            currentDate = new Date(currentDate.setDate(
+              currentDate.getDate() + (7 * repeatSettings.interval)
+            ));
+          }
+          break;
+
+        case 'monthly':
+          currentDate = new Date(currentDate.setMonth(
+            currentDate.getMonth() + repeatSettings.interval
+          ));
+          // Adjust to specified day of month
+          currentDate.setDate(repeatSettings.monthDay);
+          break;
+      }
+
+      if (currentDate > startDate) {
+        dates.push(new Date(currentDate));
+      }
+    }
+
+    return dates;
+  };
+
+  const initializeJobNo = async () => {
+    try {
+      const newJobNo = await generateBaseJobNo();
+      setJobNo(newJobNo);
+    } catch (error) {
+      console.error("Error initializing job number:", error);
+      setJobNo("Error");
+    }
+  };
+
+  // Add this useEffect
+  useEffect(() => {
+    initializeJobNo();
+  }, []); // Empty dependency array means this runs once when component mounts
 
   return (
     <>
@@ -2518,7 +2723,7 @@ const AddNewJobs = ({ validateJobForm }) => {
                     type="text"
                     value={jobNo}
                     readOnly
-                    style={{ width: "95px" }}
+                    style={{ width: "150px" }}
                   />
                 </Form.Group>
               </Col>
@@ -2763,27 +2968,130 @@ const AddNewJobs = ({ validateJobForm }) => {
                 />
               </Form.Group>
             </Row>
-            {/* <p className="text-muted">Notification:</p>
-            <Row className="mt-3">
-              <Form.Group controlId="adminWorkerNotify">
-                <Form.Check
-                  type="checkbox"
-                  name="adminWorkerNotify"
-                  checked={formData.adminWorkerNotify}
-                  onChange={handleInputChange}
-                  label="Admin/Worker: Notify when Job Status changed and new Job message Submitted"
-                />
-              </Form.Group>
-              <Form.Group controlId="customerNotify">
-                <Form.Check
-                  type="checkbox"
-                  name="customerNotify"
-                  checked={formData.customerNotify}
-                  onChange={handleInputChange}
-                  label="Customer: Notify when Job Status changed and new Job message Submitted"
-                />
-              </Form.Group>
-            </Row> */}
+            <hr className="my-4" />
+<h5 className="mb-3">Repeat Settings</h5>
+
+<Row className="mb-3">
+  <Form.Group as={Col} md="3">
+    <Form.Check
+      type="switch"
+      id="repeat-switch"
+      label="Repeat Job"
+      checked={repeatSettings.isRepeat}
+      onChange={(e) => handleRepeatSettingChange('isRepeat', e.target.checked)}
+    />
+  </Form.Group>
+</Row>
+
+{repeatSettings.isRepeat && (
+  <>
+    <Row className="mb-3">
+      <Form.Group as={Col} md="4">
+        <Form.Label>Repeat Frequency</Form.Label>
+        <Form.Select
+          value={repeatSettings.frequency}
+          onChange={(e) => handleRepeatSettingChange('frequency', e.target.value)}
+        >
+          {repeatFrequencyOptions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Form.Select>
+      </Form.Group>
+
+      <Form.Group as={Col} md="4">
+        <Form.Label>Repeat Every</Form.Label>
+        <InputGroup>
+          <Form.Control
+            type="number"
+            min="1"
+            value={repeatSettings.interval}
+            onChange={(e) => handleRepeatSettingChange('interval', e.target.value)}
+          />
+          <InputGroup.Text>
+            {repeatSettings.frequency === 'daily' ? 'Days' :
+             repeatSettings.frequency === 'weekly' ? 'Weeks' :
+             repeatSettings.frequency === 'monthly' ? 'Months' : ''}
+          </InputGroup.Text>
+        </InputGroup>
+      </Form.Group>
+    </Row>
+
+    {repeatSettings.frequency === 'weekly' && (
+      <Row className="mb-3">
+        <Form.Group as={Col}>
+          <Form.Label>Repeat On</Form.Label>
+          <div className="d-flex gap-2">
+            {weekDayOptions.map(day => (
+              <Form.Check
+                key={day.value}
+                type="checkbox"
+                id={`weekday-${day.value}`}
+                label={day.label.substring(0, 3)}
+                checked={repeatSettings.weekDays.includes(day.value)}
+                onChange={() => handleWeekDayToggle(day.value)}
+              />
+            ))}
+          </div>
+        </Form.Group>
+      </Row>
+    )}
+
+    {repeatSettings.frequency === 'monthly' && (
+      <Row className="mb-3">
+        <Form.Group as={Col} md="4">
+          <Form.Label>Day of Month</Form.Label>
+          <Form.Control
+            type="number"
+            min="1"
+            max="31"
+            value={repeatSettings.monthDay}
+            onChange={(e) => handleRepeatSettingChange('monthDay', e.target.value)}
+          />
+        </Form.Group>
+      </Row>
+    )}
+
+    <Row className="mb-3">
+      <Form.Group as={Col} md="4">
+        <Form.Label>End Repeat</Form.Label>
+        <Form.Select
+          value={repeatSettings.endType}
+          onChange={(e) => handleRepeatSettingChange('endType', e.target.value)}
+        >
+          <option value="never">Never</option>
+          <option value="date">On Date</option>
+          <option value="occurrences">After Occurrences</option>
+        </Form.Select>
+      </Form.Group>
+
+      {repeatSettings.endType === 'date' && (
+        <Form.Group as={Col} md="4">
+          <Form.Label>End Date</Form.Label>
+          <Form.Control
+            type="date"
+            value={repeatSettings.endDate}
+            onChange={(e) => handleRepeatSettingChange('endDate', e.target.value)}
+            min={formData.startDate}
+          />
+        </Form.Group>
+      )}
+
+      {repeatSettings.endType === 'occurrences' && (
+        <Form.Group as={Col} md="4">
+          <Form.Label>Number of Occurrences</Form.Label>
+          <Form.Control
+            type="number"
+            min="1"
+            value={repeatSettings.occurrences}
+            onChange={(e) => handleRepeatSettingChange('occurrences', e.target.value)}
+          />
+        </Form.Group>
+      )}
+    </Row>
+  </>
+)}
             {/* SUBMIT BUTTON! */}
             <Row className="align-items-center">
               <Col md={{ span: 4, offset: 8 }} xs={12} className="mt-4">

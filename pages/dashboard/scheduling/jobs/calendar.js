@@ -3,9 +3,10 @@ import {
   getDocs,
   collection,
   updateDoc,
-  doc as firestoreDoc,
+  doc,
   setDoc,
-  getDoc
+  getDoc,
+  writeBatch,
 } from "firebase/firestore"; // Firebase Firestore imports
 import { db } from "../../../../firebase";
 import {
@@ -134,13 +135,13 @@ const Calendar = () => {
         }
 
         const jobsSnapshot = await getDocs(collection(db, "jobs"));
-        const jobsData = await Promise.all(jobsSnapshot.docs.map(async (doc) => {
-          const job = doc.data();
+        const jobsData = await Promise.all(jobsSnapshot.docs.map(async (firestoreDoc) => {
+          const job = firestoreDoc.data();
           
           // Fetch worker details for each assigned worker
           const workersData = await Promise.all(
             job.assignedWorkers.map(async (worker) => {
-              const userDoc = await getDoc(firestoreDoc(db, "users", worker.workerId));
+              const userDoc = await getDoc(doc(db, "users", worker.workerId));
               const userData = userDoc.data();
               return {
                 workerId: worker.workerId,
@@ -151,7 +152,7 @@ const Calendar = () => {
           );
 
           return {
-            Id: doc.id,
+            Id: firestoreDoc.id,
             Subject: job.jobName,
             JobNo: job.jobNo,
             Customer: job.customerName,
@@ -197,8 +198,8 @@ const Calendar = () => {
 
     // Generate new notification ID in format 'N-001'
     let latestIdNum = 0;
-    querySnapshot.forEach((doc) => {
-      const docId = doc.id;
+    querySnapshot.forEach((firestoreDoc) => {
+      const docId = firestoreDoc.id;
       const match = docId.match(/N-(\d+)/);
       if (match) {
         const idNum = parseInt(match[1]);
@@ -224,7 +225,7 @@ const Calendar = () => {
     };
 
     // Save the notification to Firestore
-    const notificationRef = firestoreDoc(db, "notifications", newNotificationId);
+    const notificationRef = doc(db, "notifications", newNotificationId);
     await setDoc(notificationRef, notificationEntry);
     console.log(`Job update notification added with ID: ${newNotificationId}`);
   };
@@ -234,7 +235,7 @@ const Calendar = () => {
     const currentView = scheduleObj.current.currentView;
 
     try {
-      const jobRef = firestoreDoc(db, "jobs", Id);
+      const jobRef = doc(db, "jobs", Id);
       let updatedStartTime, updatedEndTime;
 
       if (currentView === "Month") {
@@ -311,7 +312,7 @@ const Calendar = () => {
     const currentView = scheduleObj.current.currentView;
 
     try {
-      const jobRef = firestoreDoc(db, "jobs", Id);
+      const jobRef = doc(db, "jobs", Id);
       let updatedStartTime, updatedEndTime;
 
       if (currentView === "Month") {
@@ -888,7 +889,7 @@ const Calendar = () => {
   // Add this function to save legend changes to Firebase
   const saveLegendToFirebase = async (newLegendItems) => {
     try {
-      const legendRef = firestoreDoc(db, 'settings', 'jobStatuses');
+      const legendRef = doc(db, 'settings', 'jobStatuses');
       await setDoc(legendRef, { items: newLegendItems }, { merge: true });
     } catch (error) {
       console.error('Error saving legend items:', error);
@@ -943,7 +944,7 @@ const Calendar = () => {
   useEffect(() => {
     const fetchLegendItems = async () => {
       try {
-        const legendRef = firestoreDoc(db, 'settings', 'jobStatuses');
+        const legendRef = doc(db, 'settings', 'jobStatuses');
         const legendDoc = await getDoc(legendRef);
         
         if (legendDoc.exists()) {
@@ -971,18 +972,66 @@ const Calendar = () => {
     fetchLegendItems();
   }, []);
 
+  // Add this helper function to calculate repeating dates correctly
+  const calculateRepeatingDates = (startDate, endDate, frequency, services, selectedMonths) => {
+    const dates = [];
+    const duration = endDate.getTime() - startDate.getTime();
+    let currentDate = new Date(startDate);
+
+    const getNextDate = (current, freq) => {
+      const next = new Date(current);
+      switch (freq) {
+        case 'weekly':
+          next.setDate(next.getDate() + 7);
+          break;
+        case 'biweekly':
+          next.setDate(next.getDate() + 14);
+          break;
+        case 'monthly':
+          next.setMonth(next.getMonth() + 1);
+          break;
+        case 'quarterly':
+          next.setMonth(next.getMonth() + 3);
+          break;
+        case 'yearly':
+          next.setFullYear(next.getFullYear() + 1);
+          break;
+      }
+      return next;
+    };
+
+    let count = 0;
+    while (count < services) {
+      // Skip if months are selected and current month is not in selection
+      if (selectedMonths.length > 0) {
+        const currentMonth = currentDate.getMonth();
+        if (!selectedMonths.includes(currentMonth)) {
+          currentDate = getNextDate(currentDate, frequency);
+          continue;
+        }
+      }
+
+      const endDateTime = new Date(currentDate.getTime() + duration);
+      dates.push([new Date(currentDate), endDateTime]);
+      currentDate = getNextDate(currentDate, frequency);
+      count++;
+    }
+
+    return dates;
+  };
+
+  // Update the handleRepeatJob function
   const handleRepeatJob = async (jobData) => {
     try {
       const { Id, Subject } = jobData;
       
-      // First, get the latest job number from the jobs collection
+      // Get the latest job number
       const jobsSnapshot = await getDocs(collection(db, "jobs"));
       let maxJobNo = 0;
 
-      jobsSnapshot.forEach((doc) => {
-        const jobNo = doc.data().jobNo;
+      jobsSnapshot.forEach((firestoreDoc) => {
+        const jobNo = firestoreDoc.data().jobNo;
         if (jobNo) {
-          // Assuming job numbers are in format "JOB-001"
           const numPart = parseInt(jobNo.split('-')[1]);
           if (!isNaN(numPart) && numPart > maxJobNo) {
             maxJobNo = numPart;
@@ -1019,18 +1068,10 @@ const Calendar = () => {
             <div class="form-group">
               <label class="form-label fw-bold">Select Months (Optional)</label>
               <select id="months" class="form-select" multiple size="6">
-                <option value="0">January</option>
-                <option value="1">February</option>
-                <option value="2">March</option>
-                <option value="3">April</option>
-                <option value="4">May</option>
-                <option value="5">June</option>
-                <option value="6">July</option>
-                <option value="7">August</option>
-                <option value="8">September</option>
-                <option value="9">October</option>
-                <option value="10">November</option>
-                <option value="11">December</option>
+                ${Array.from({ length: 12 }, (_, i) => {
+                  const date = new Date(2024, i, 1);
+                  return `<option value="${i}">${date.toLocaleString('default', { month: 'long' })}</option>`;
+                }).join('')}
               </select>
               <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
             </div>
@@ -1039,7 +1080,6 @@ const Calendar = () => {
         customClass: {
           container: 'swal2-custom',
           popup: 'swal2-custom-popup',
-          // Add gap between buttons using actions container
           actions: 'swal2-actions-custom',
           confirmButton: 'btn btn-primary px-4',
           cancelButton: 'btn btn-outline-secondary'
@@ -1091,12 +1131,18 @@ const Calendar = () => {
             selectedMonths
           );
 
-          // Create new jobs with sequential job numbers
-          const creationPromises = newDates.map(async ([startDate, endDate], index) => {
-            const newJobNo = `JOB-${String(maxJobNo + index + 1).padStart(3, '0')}`;
-            const newJobId = `${Id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const batch = writeBatch(db);
+          const newJobsData = [];
+          const timestamp = Date.now();
+          const repeatGroupId = `R${timestamp}`; // Unique identifier for this group of repeat jobs
+
+          for (let i = 0; i < newDates.length; i++) {
+            const [startDate, endDate] = newDates[i];
+            const newJobNo = `JOB-${String(maxJobNo + i + 1).padStart(3, '0')}`;
             
-            // Create new job data with modifications
+            // Create a more structured document ID
+            const newJobId = `${repeatGroupId}-${(i + 1).toString().padStart(3, '0')}`;
+            
             const newJobData = {
               ...jobDetails,
               jobNo: newJobNo,
@@ -1104,19 +1150,20 @@ const Calendar = () => {
               endDate: endDate.toISOString(),
               parentJobId: Id,
               isRepeating: true,
+              repeatJob: {
+                groupId: repeatGroupId,
+                sequence: i + 1,
+                totalInSequence: services,
+                frequency: frequency,
+                originalJobId: Id,
+                originalJobNo: jobDetails.jobNo
+              },
               jobStatus: defaultStatus || 'created',
               createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              repeatDetails: {
-                originalJobId: Id,
-                originalJobNo: jobDetails.jobNo,
-                frequency: frequency,
-                occurrence: index + 1,
-                totalOccurrences: services
-              }
+              updatedAt: new Date().toISOString()
             };
 
-            // Remove any existing status-specific fields that shouldn't be copied
+            // Remove status-specific fields
             delete newJobData.completedAt;
             delete newJobData.completedBy;
             delete newJobData.startedAt;
@@ -1127,18 +1174,18 @@ const Calendar = () => {
             delete newJobData.validatedBy;
 
             const newJobRef = doc(db, "jobs", newJobId);
-            await setDoc(newJobRef, newJobData);
+            batch.set(newJobRef, newJobData);
 
-            return {
+            newJobsData.push({
               Id: newJobId,
-              Subject: jobDetails.jobName,
+              Subject: `${jobDetails.jobName} (${i + 1}/${services})`, // Add sequence to subject
               JobNo: newJobNo,
               Customer: jobDetails.customerName,
               ServiceLocation: jobDetails.location?.locationName || "",
               AssignedWorkers: jobDetails.assignedWorkers?.map((worker) => ({
                 workerId: worker.workerId,
                 fullName: worker.fullName || worker.workerId,
-                profilePicture: worker.contact?.profilePicture || "/images/avatar/NoProfile.png",
+                profilePicture: worker.profilePicture || "/images/avatar/NoProfile.png",
               })) || [],
               StartTime: startDate,
               EndTime: endDate,
@@ -1148,10 +1195,20 @@ const Calendar = () => {
               Category: jobDetails.category || "N/A",
               ServiceCall: jobDetails.serviceCallID || "N/A",
               Equipment: jobDetails.equipments?.[0]?.itemName || "N/A",
-            };
+              IsRepeatJob: true,
+              RepeatSequence: `${i + 1}/${services}`,
+              RepeatGroupId: repeatGroupId
+            });
+          }
+
+          // Update the original job to indicate it has repeat jobs
+          batch.update(jobRef, {
+            hasRepeatJobs: true,
+            repeatGroupId: repeatGroupId
           });
 
-          const newJobsData = await Promise.all(creationPromises);
+          // Commit the batch
+          await batch.commit();
 
           // Update the events state
           const updatedEvents = [...events, ...newJobsData];
@@ -1169,14 +1226,12 @@ const Calendar = () => {
 
           Swal.close();
           showToast(`Successfully created ${newDates.length} repeated jobs`, 'success');
-
+          
           if (scheduleObj.current) {
             scheduleObj.current.refreshEvents();
           }
 
-          // Invalidate cache after creating new jobs
           invalidateCache();
-
         } catch (error) {
           console.error('Error in job creation:', error);
           Swal.close();
@@ -1188,49 +1243,6 @@ const Calendar = () => {
       Swal.close();
       showToast('Failed to open repeat job dialog', 'error');
     }
-  };
-
-  const calculateRepeatingDates = (startDate, endDate, frequency, services, selectedMonths) => {
-    const dates = [];
-    const duration = endDate - startDate;
-    let currentDate = new Date(startDate);
-
-    const getNextDate = (current) => {
-      const next = new Date(current);
-      switch (frequency) {
-        case 'weekly':
-          next.setDate(next.getDate() + 7);
-          break;
-        case 'biweekly':
-          next.setDate(next.getDate() + 14);
-          break;
-        case 'monthly':
-          next.setMonth(next.getMonth() + 1);
-          break;
-        case 'quarterly':
-          next.setMonth(next.getMonth() + 3);
-          break;
-        case 'yearly':
-          next.setFullYear(next.getFullYear() + 1);
-          break;
-      }
-      return next;
-    };
-
-    for (let i = 0; i < services; i++) {
-      if (selectedMonths.length > 0) {
-        // If specific months are selected, find the next valid month
-        while (!selectedMonths.includes(currentDate.getMonth())) {
-          currentDate = getNextDate(currentDate);
-        }
-      }
-
-      const newEndDate = new Date(currentDate.getTime() + duration);
-      dates.push([new Date(currentDate), newEndDate]);
-      currentDate = getNextDate(currentDate);
-    }
-
-    return dates;
   };
 
   useEffect(() => {
