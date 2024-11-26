@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Row, Col, Table, Button, Modal, Form, Alert, InputGroup } from 'react-bootstrap';
-import { Eye, PinMap, Search, CaretUpFill, CaretDownFill } from 'react-bootstrap-icons';
+import { Row, Col, Table, Button, Modal, Form, Alert, InputGroup, Badge } from 'react-bootstrap';
+import { Eye, PinMap, Search, CaretUpFill, CaretDownFill, CurrencyExchange, GeoAltFill, HouseFill, TelephoneFill } from 'react-bootstrap-icons';
+import { CustomCountryFlag } from 'components/flags/CountryFlags';
 import { toast } from 'react-toastify';
 
 const headerStyle = {
@@ -9,6 +10,15 @@ const headerStyle = {
   backgroundColor: '#f8f9fa',
   position: 'relative',
   padding: '12px 8px',
+};
+
+// Add this helper function to extract unit number
+const getUnitNumber = (buildingFloorRoom) => {
+  if (!buildingFloorRoom) return '';
+  
+  // Match the #XX-XX pattern
+  const match = buildingFloorRoom.match(/#\d{2}-\d{2}/);
+  return match ? match[0] : buildingFloorRoom;
 };
 
 export const ServiceLocationTab = ({ customerData }) => {
@@ -26,22 +36,25 @@ export const ServiceLocationTab = ({ customerData }) => {
     return <div className="p-4">No service locations found.</div>;
   }
 
-  const formatAddress = (address) => {
-    const parts = [
-      address.Street,
-      address.Block,
-      address.ZipCode,
-      address.City,
-      address.Country
-    ].filter(Boolean);
-    return parts.join(', ');
-  };
+// Update the formatAddress function
+const formatAddress = (address) => {
+  return [
+    address.Street,
+    address.BuildingFloorRoom,
+    address.Country === 'SG' ? 'Singapore' : address.Country,
+    address.ZipCode,
+  ].filter(Boolean).join(', ');
+};
 
   const findContactForAddress = (addressName) => {
     if (!customerData.ContactEmployees) return null;
-    return customerData.ContactEmployees.find(
-      contact => contact.Address === addressName
+    
+    // If there are multiple contacts, return the first active one
+    const contacts = customerData.ContactEmployees.filter(
+      contact => contact.Active === 'tYES'
     );
+    
+    return contacts.length > 0 ? contacts[0] : null;
   };
 
   const handleViewDetails = (location) => {
@@ -152,23 +165,58 @@ export const ServiceLocationTab = ({ customerData }) => {
               return (
                 <tr key={index}>
                   <td>
-                    {location.AddressType === 'bo_ShipTo' ? 'Shipping Address' :
-                     location.AddressType === 'bo_BillTo' ? 'Billing Address' :
-                     'Other'}
+                    <div className="d-flex align-items-center">
+                      {location.AddressType === 'bo_BillTo' ? (
+                        <CurrencyExchange className="me-2 text-primary" size={14} />
+                      ) : (
+                        <GeoAltFill className="me-2 text-primary" size={14} />
+                      )}
+                      <span className="fw-bold text-primary">
+                        {location.AddressType === 'bo_ShipTo' ? 'Shipping Address' :
+                         location.AddressType === 'bo_BillTo' ? 'Billing Address' : 'Other'}
+                      </span>
+                    </div>
                   </td>
                   <td>
-                    <div><strong>{location.AddressName}</strong></div>
-                    <div>{formatAddress(location)}</div>
+                    <div>
+                      <div className="d-flex align-items-center">
+                        <HouseFill className="me-2 text-primary" size={14} />
+                        <span className="fw-bold text-primary">
+                        <div>{location.BuildingFloorRoom || '-'}</div>
+                        </span>
+                        {(location.AddressName === customerData.ShipToDefault || 
+                          location.AddressName === customerData.BilltoDefault) && (
+                          <Badge bg="primary" className="ms-2">Default</Badge>
+                        )}
+                        {location.Country && (
+                          <div className="ms-2">
+                            <CustomCountryFlag country={location.Country} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="ms-4 text-muted">
+                    
+                        {formatAddress(location)}
+                      </div>
+                    </div>
                   </td>
                   <td>
-                    {contact ? contact.Name : 
-                     (location.AddressType === 'bo_ShipTo' ? customerData.ShipToDefault :
-                      location.AddressType === 'bo_BillTo' ? customerData.BilltoDefault :
-                      'N/A')}
+                    {contact ? (
+                      <div>
+                        <div className="fw-bold">{contact.Name}</div>
+                        <div className="text-muted small">
+                          {[contact.FirstName, contact.LastName].filter(Boolean).join(' ')}
+                        </div>
+                      </div>
+                    ) : 'N/A'}
                   </td>
                   <td>
-                    {contact ? contact.Phone1 : 
-                     (customerData.Phone1 || 'N/A')}
+                    {contact && contact.Phone1 ? (
+                      <a href={`tel:${contact.Phone1}`} className="text-decoration-none">
+                        <TelephoneFill className="me-2" />
+                        {contact.Phone1}
+                      </a>
+                    ) : 'N/A'}
                   </td>
                   <td>
                     <span className={`badge ${location.U_Status === 'Active' ? 'bg-primary' : 'bg-success'}`}>
@@ -179,7 +227,6 @@ export const ServiceLocationTab = ({ customerData }) => {
                     <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(location)} className="me-2">
                       <Eye size={16} className="me-1" /> View Details
                     </Button>
-                   
                   </td>
                 </tr>
               );

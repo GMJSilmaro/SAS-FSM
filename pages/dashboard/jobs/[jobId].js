@@ -149,6 +149,8 @@ const getJobStatusName = (status) => {
       return "InProgress";
     case "Job Complete":
       return "Job Complete";
+    case "Completed":
+      return "Job Complete";
     case "InProgress":
       return "InProgress";
     case "In Progress":
@@ -176,6 +178,8 @@ const getStatusColor = (status) => {
     case "In Progress":
       return "warning"; // orange
     case "Job Complete":
+      return "success"; // green
+    case "Completed":
       return "success"; // green
     case "Validate":
       return "info"; // light blue

@@ -336,7 +336,7 @@ const ViewJobs = () => {
     inactiveWorkers: 0,
     fieldWorkers: 0,
   });
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [perPage, setPerPage] = useState(10);
   const [totalRows, setTotalRows] = useState(0);
   const [error, setError] = useState(null);
@@ -1118,19 +1118,18 @@ const ViewJobs = () => {
     getSortedRowModel: getSortedRowModel(),
     state: {
       pagination: {
-        pageIndex: currentPage - 1,
+        pageIndex: currentPage,
         pageSize: perPage,
       },
     },
-    manualPagination: true,
-    pageCount: Math.ceil(totalRows / perPage),
+    pageCount: Math.ceil(filteredJobs.length / perPage),
     onPaginationChange: (updater) => {
       if (typeof updater === "function") {
-        const newPageIndex = updater({
-          pageIndex: currentPage - 1,
+        const newState = updater({
+          pageIndex: currentPage,
           pageSize: perPage,
-        }).pageIndex;
-        handlePageChange(newPageIndex + 1);
+        });
+        setCurrentPage(newState.pageIndex);
       }
     },
   });
@@ -1139,23 +1138,24 @@ const ViewJobs = () => {
     <div className="d-flex justify-content-between align-items-center mt-4">
       <div>
         <span className="text-muted">
-          Showing {(currentPage - 1) * perPage + 1} to{" "}
-          {Math.min(currentPage * perPage, totalRows)} of {totalRows} entries
+          Showing {currentPage * perPage + 1} to{" "}
+          {Math.min((currentPage + 1) * perPage, filteredJobs.length)} of{" "}
+          {filteredJobs.length} entries
         </span>
       </div>
       <div>
         <Button
           variant="outline-primary"
           className="me-2"
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
         >
           Previous
         </Button>
         <Button
           variant="outline-primary"
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage >= Math.ceil(totalRows / perPage)}
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
         >
           Next
         </Button>
