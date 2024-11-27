@@ -143,6 +143,8 @@ const getJobStatusName = (status) => {
       return "Created";
     case "Confirmed":
       return "Confirmed";
+    case "Repeated":
+      return "Repeated";
     case "Cancelled":
       return "Cancelled";
     case "Job Started":
@@ -171,6 +173,8 @@ const getStatusColor = (status) => {
       return "secondary"; // grey
     case "Confirmed":
       return "primary"; // blue
+    case "Repeated":
+      return "info"; // light blue
     case "Cancelled":
       return "danger"; // red
     case "Job Started":

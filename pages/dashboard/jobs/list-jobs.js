@@ -380,8 +380,13 @@ const ViewJobs = () => {
       case "InProgress":
       case "In Progress":
         return <span style={getStyle("#F59E0B")}>In Progress</span>;
+      case "Repeated":
+        return <span style={getStyle("#3B82F6")}>Repeated</span>;
       case "Job Complete":
         return <span style={getStyle("#10B981")}>Job Complete</span>;
+      case "Completed":
+        return <span style={getStyle("#10B981")}>Job Completed</span>;
+          
       case "Validate":
         return <span style={getStyle("#06B6D4", "#000")}>Validate</span>;
       case "Scheduled":
