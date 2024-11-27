@@ -95,18 +95,17 @@ const formatContactData = (contactData) => {
   };
 };
 
-// Add these helper functions at the top of your file
 const generateBaseJobNo = async () => {
   try {
-    // Get the current year's last two digits
-    const year = new Date().getFullYear().toString().slice(-2);
+    // Get the current year
+    const year = new Date().getFullYear();
     
     // Query Firestore to get the latest job number for this year
     const jobsRef = collection(db, "jobs");
     const q = query(
       jobsRef,
-      where("jobNo", ">=", `JOB${year}0000`),
-      where("jobNo", "<=", `JOB${year}9999`),
+      where("jobNo", ">=", `${year}-000001`),
+      where("jobNo", "<=", `${year}-999999`),
       orderBy("jobNo", "desc"),
       limit(1)
     );
@@ -117,20 +116,26 @@ const generateBaseJobNo = async () => {
     if (!snapshot.empty) {
       // Extract the number from the latest job number
       const latestJobNo = snapshot.docs[0].data().jobNo;
-      const currentNumber = parseInt(latestJobNo.slice(-4));
-      nextNumber = currentNumber + 1;
+      const [yearPrefix, number] = latestJobNo.split('-');
+      
+      // If it's a new year, start from 1, otherwise increment
+      if (yearPrefix === year.toString()) {
+        nextNumber = parseInt(number) + 1;
+      }
     }
     
-    // Format the job number with leading zeros
-    const formattedNumber = nextNumber.toString().padStart(4, '0');
-    const newJobNo = `Job${year}${formattedNumber}`;
-    console.log("Generated job number:", newJobNo);
+    // Format the job number with leading zeros (6 digits)
+    const formattedNumber = nextNumber.toString().padStart(6, '0');
+    
+    const newJobNo = `${year}-${formattedNumber}`;
+    //// console.log("Generated job number:", newJobNo);
     return newJobNo;
   } catch (error) {
     console.error("Error generating job number:", error);
     throw new Error("Failed to generate job number");
   }
 };
+
 
 const generateRepeatJobNo = (baseJobNo, sequence) => {
   return `${baseJobNo}-${sequence.toString().padStart(3, '0')}`;
@@ -452,7 +457,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
         const { user } = await response.json();
 
-        console.log("Fetched user data:", user);
+       // // console.log("Fetched user data:", user);
 
         if (!user.workerId) {
           throw new Error("Worker ID not found in user data");
@@ -808,7 +813,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
   // Handle ReactQuill change event for the job description
   const handleDescriptionChange = (htmlContent) => {
-    console.log("Updated description (HTML):", htmlContent); // Debugging
+    //// console.log("Updated description (HTML):", htmlContent); // Debugging
     setFormData((prevState) => ({
       ...prevState,
       jobDescription: htmlContent, // Store the HTML content
@@ -840,7 +845,7 @@ const AddNewJobs = ({ validateJobForm }) => {
   };
 
   const handleCustomerChange = async (selectedOption) => {
-    console.log("handleCustomerChange called with:", selectedOption);
+    //// console.log("handleCustomerChange called with:", selectedOption);
 
     setSelectedContact(null);
     setSelectedLocation(null);
@@ -852,7 +857,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       (option) => option.value === selectedOption.value
     );
 
-    console.log("Selected customer:", selectedCustomer);
+    //// console.log("Selected customer:", selectedCustomer);
 
     setFormData((prevFormData) => ({
       ...prevFormData,
@@ -862,7 +867,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
     // Fetch related data for the selected customer
     try {
-      console.log("Fetching related data for customer:", selectedOption.value);
+     // // console.log("Fetching related data for customer:", selectedOption.value);
 
       // Fetch contacts for the customer
       const contactsResponse = await fetch("/api/getContacts", {
@@ -878,7 +883,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       }
 
       const contactsData = await contactsResponse.json();
-      console.log("Fetched contacts:", contactsData);
+    //  // console.log("Fetched contacts:", contactsData);
 
       const formattedContacts = contactsData.map((item) => ({
         value: item.contactId,
@@ -931,7 +936,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       }
 
       const locationsData = await locationsResponse.json();
-      console.log("Fetched locations:", locationsData);
+      //// console.log("Fetched locations:", locationsData);
 
       // Format locations with more detailed information
       const formattedLocations = locationsData
@@ -1018,7 +1023,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       }
 
       const equipmentsData = await equipmentsResponse.json();
-      console.log("Fetched equipments:", equipmentsData);
+      // // console.log("Fetched equipments:", equipmentsData);
 
       const formattedEquipments = equipmentsData.map((item) => ({
         value: item.ItemCode,
@@ -1071,7 +1076,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       }
 
       const serviceCallsData = await serviceCallResponse.json();
-      console.log("Fetched service calls:", serviceCallsData);
+      // // console.log("Fetched service calls:", serviceCallsData);
 
       const formattedServiceCalls = serviceCallsData.map((item) => ({
         value: item.serviceCallID,
@@ -1158,7 +1163,7 @@ const AddNewJobs = ({ validateJobForm }) => {
   };
 
   const handleLocationChange = async (selectedOption) => {
-    console.log("Selected Location:", selectedOption); // For debugging
+    // console.log("Selected Location:", selectedOption); // For debugging
 
     // Find the selected location from the flattened options
     const selectedLocation = selectedOption;
@@ -1214,7 +1219,7 @@ const AddNewJobs = ({ validateJobForm }) => {
         .filter(Boolean)
         .join(", ");
 
-      console.log("Geocoding address:", fullAddress); // For debugging
+      // console.log("Geocoding address:", fullAddress); // For debugging
 
       const coordinates = await fetchCoordinates(fullAddress);
 
@@ -1253,7 +1258,7 @@ const AddNewJobs = ({ validateJobForm }) => {
   };
 
   const handleSelectedServiceCallChange = async (selectedServiceCall) => {
-    // console.log(
+    // // console.log(
     //   "handleSelectedServiceCallChange called with:",
     //   selectedServiceCall
     // );
@@ -1279,10 +1284,10 @@ const AddNewJobs = ({ validateJobForm }) => {
         // Show loading toast
         toast.loading("Fetching sales orders...", { id: "salesOrdersFetch" });
 
-        console.log("Fetching sales orders with:", {
-          cardCode: selectedCustomer.value,
-          serviceCallID: selectedServiceCall.value,
-        });
+        // console.log("Fetching sales orders with:", {
+        //  cardCode: selectedCustomer.value,
+       //   serviceCallID: selectedServiceCall.value,
+      //  });
 
         const salesOrderResponse = await fetch("/api/getSalesOrder", {
           method: "POST",
@@ -1318,7 +1323,7 @@ const AddNewJobs = ({ validateJobForm }) => {
         }
 
         const response = await salesOrderResponse.json();
-        console.log("Fetched sales orders:", response);
+        // console.log("Fetched sales orders:", response);
 
         if (!response.value) {
           console.error("Unexpected response format:", response);
@@ -1546,7 +1551,7 @@ const AddNewJobs = ({ validateJobForm }) => {
     try {
       const existingJobsRef = collection(db, "jobs");
       const promises = selectedWorkers.map(async (worker) => {
-        console.log(`Checking for overlaps for worker: ${worker.label}`);
+        // console.log(`Checking for overlaps for worker: ${worker.label}`);
 
         // Update query to properly check assignedWorkers array
         const existingJobsQuery = query(
@@ -1565,9 +1570,9 @@ const AddNewJobs = ({ validateJobForm }) => {
         );
         const newJobEnd = new Date(`${formData.endDate}T${formData.endTime}`);
 
-        console.log(
-          `New Job Schedule - Start: ${newJobStart}, End: ${newJobEnd}`
-        );
+        // console.log(
+        //   `New Job Schedule - Start: ${newJobStart}, End: ${newJobEnd}`
+        // );
 
         const conflicts = [];
 
@@ -1578,9 +1583,9 @@ const AddNewJobs = ({ validateJobForm }) => {
           const existingJobStart = new Date(jobData.startDate);
           const existingJobEnd = new Date(jobData.endDate);
 
-          console.log(
-            `Existing Job (${doc.id}) - Start: ${existingJobStart}, End: ${existingJobEnd}`
-          );
+          // console.log(
+        //    `Existing Job (${doc.id}) - Start: ${existingJobStart}, End: ${existingJobEnd}`
+          // );
 
           // Check for overlap with improved date comparison
           const hasOverlap =
@@ -1608,7 +1613,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       const results = await Promise.all(promises);
       const allConflicts = results.filter(Boolean).flat();
 
-      console.log("Schedule conflict check results:", allConflicts);
+      // console.log("Schedule conflict check results:", allConflicts);
       return allConflicts;
     } catch (error) {
       console.error("Error checking for schedule conflicts:", error);
@@ -1632,12 +1637,12 @@ const AddNewJobs = ({ validateJobForm }) => {
       }).then((result) => {
         if (result.isConfirmed) {
           // Redirect to job details page
-          router.push(`/dashboard/jobs/${jobId}`);
+          router.push(`/jobs/view/${jobId}`);
         } else {
           // Reset form for creating another job
           setFormData({
             ...initialFormState, // Make sure to define initialFormState at the top of your component
-            jobNo: generateNewJobNo(), // You'll need to implement this function
+            jobNo: generateNewJobNo(), 
           });
           setSelectedCustomer(null);
           setSelectedContact(null);
@@ -1707,38 +1712,68 @@ const AddNewJobs = ({ validateJobForm }) => {
   };
 
   // Add this function to generate new job numbers
-  const generateNewJobNo = () => {
-    const date = new Date();
-    const year = date.getFullYear().toString().substr(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
-    return `JOB${year}${month}${day}${random}`;
+  const generateNewJobNo = async () => {
+    try {
+      // Get the current year
+      const year = new Date().getFullYear();
+      
+      // Query Firestore to get the latest job number for this year
+      const jobsRef = collection(db, "jobs");
+      const q = query(
+        jobsRef,
+        where("jobNo", ">=", `${year}-000001`),
+        where("jobNo", "<=", `${year}-999999`),
+        orderBy("jobNo", "desc"),
+        limit(1)
+      );
+      
+      const snapshot = await getDocs(q);
+      let nextNumber = 1;
+      
+      if (!snapshot.empty) {
+        // Extract the number from the latest job number
+        const latestJobNo = snapshot.docs[0].data().jobNo;
+        const [yearPrefix, number] = latestJobNo.split('-');
+        
+        // If it's a new year, start from 1, otherwise increment
+        if (yearPrefix === year.toString()) {
+          nextNumber = parseInt(number) + 1;
+        }
+      }
+      
+      // Format the job number with leading zeros (6 digits)
+      const formattedNumber = nextNumber.toString().padStart(6, '0');
+      
+      const newJobNo = `${year}-${formattedNumber}`;
+      // console.log("Generated job number:", newJobNo);
+      return newJobNo;
+    } catch (error) {
+      console.error("Error generating job number:", error);
+      throw new Error("Failed to generate job number");
+    }
   };
 
   // Updated handleSubmitClick function
   const handleSubmitClick = async () => {
     try {
       // Log all form data before submission
-      console.log("=== FORM SUBMISSION DATA ===");
-      console.log("Form Data:", {
-        ...formData,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
-      });
-      console.log("Selected Customer:", selectedCustomer);
-      console.log("Selected Contact:", selectedContact);
-      console.log("Selected Location:", selectedLocation);
-      console.log("Selected Service Call:", selectedServiceCall);
-      console.log("Selected Sales Order:", selectedSalesOrder);
-      console.log("Selected Workers:", selectedWorkers);
-      console.log("Tasks:", tasks);
-      console.log("Job Contact Type:", selectedJobContactType);
-      console.log("=== END FORM DATA ===");
+      // console.log("=== FORM SUBMISSION DATA ===");
+      // console.log("Form Data:", {
+      // ...formData,
+      //   startDate: formData.startDate,
+      //   endDate: formData.endDate,
+      //   startTime: formData.startTime,
+      //   endTime: formData.endTime,
+      // });
+      //console.log("Selected Customer:", selectedCustomer);
+      //console.log("Selected Contact:", selectedContact);
+      //console.log("Selected Location:", selectedLocation);
+      //console.log("Selected Service Call:", selectedServiceCall);
+      //console.log("Selected Sales Order:", selectedSalesOrder);
+      //console.log("Selected Workers:", selectedWorkers);
+      //console.log("Tasks:", tasks);
+      //console.log("Job Contact Type:", selectedJobContactType);
+      //console.log("=== END FORM DATA ===");
 
       // Validation check
       const missingFields = [];
@@ -1755,7 +1790,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       if (!selectedJobContactType) missingFields.push("Job Contact Type");
 
       if (missingFields.length > 0) {
-        console.log("Missing Required Fields:", missingFields);
+       // console.log("Missing Required Fields:", missingFields);
         toast.error(
           <div>
             <strong>Please fill in all required fields:</strong>
@@ -1788,10 +1823,10 @@ const AddNewJobs = ({ validateJobForm }) => {
 
       // Generate recurring dates if repeat is enabled
       const jobDates = repeatSettings.isRepeat ? generateRecurringDates() : [new Date(formData.startDate)];
-      console.log("Generated job dates:", jobDates);
+      // console.log("Generated job dates:", jobDates);
 
       // Check for overlaps
-      console.log("Checking for schedule conflicts...");
+      // console.log("Checking for schedule conflicts...");
       setProgress(40);
       const conflicts = await checkForOverlappingJobs();
 
@@ -1832,7 +1867,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       }
 
       // Format dates and prepare base form data
-      console.log("Formatting dates and preparing form data...");
+      // console.log("Formatting dates and preparing form data...");
       setProgress(60);
 
       // Create jobs for each date
@@ -1886,6 +1921,8 @@ const AddNewJobs = ({ validateJobForm }) => {
           endDate: formattedEndDateTime || null,
           startTime: formData.startTime || "",
           endTime: formData.endTime || "",
+          estimatedDurationHours: formData.estimatedDurationHours || "",
+          estimatedDurationMinutes: formData.estimatedDurationMinutes || "",
 
           // Location
           location: {
@@ -1970,13 +2007,13 @@ const AddNewJobs = ({ validateJobForm }) => {
 
         // Sanitize the data before saving
         const sanitizedData = sanitizeDataForFirestore(updatedFormData);
-        console.log(`Sanitized data for job ${i + 1}:`, sanitizedData);
+        //// console.log(`Sanitized data for job ${i + 1}:`, sanitizedData);
 
         // Save to Firestore
         try {
           const jobRef = doc(db, "jobs", currentJobNo);
           await setDoc(jobRef, sanitizedData);
-          console.log(`Successfully saved job ${i + 1} to Firestore`);
+         // // console.log(`Successfully saved job ${i + 1} to Firestore`);
           setProgress(60 + (35 * (i + 1) / jobDates.length));
         } catch (firestoreError) {
           console.error(`Firestore save error for job ${i + 1}:`, firestoreError);
@@ -1996,7 +2033,7 @@ const AddNewJobs = ({ validateJobForm }) => {
           borderLeft: "6px solid #28a745",
         },
       });
-
+      initializeJobNo();
       // Handle success (redirect, reset form, etc.)
       handleSubmitSuccess({ jobId: baseJobNo });
 
@@ -2178,7 +2215,7 @@ const AddNewJobs = ({ validateJobForm }) => {
       
       // Break if we've reached the maximum occurrences
       if (dates.length >= MAX_OCCURRENCES) {
-        console.log(`Reached maximum limit of ${MAX_OCCURRENCES} occurrences`);
+        //// console.log(`Reached maximum limit of ${MAX_OCCURRENCES} occurrences`);
         break;
       }
 
@@ -2222,6 +2259,7 @@ const AddNewJobs = ({ validateJobForm }) => {
 
     return dates;
   };
+
 
   const initializeJobNo = async () => {
     try {

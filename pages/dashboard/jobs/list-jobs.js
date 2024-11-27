@@ -58,7 +58,7 @@ import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { Users, Activity, Clock, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import { FaUser, FaPlus } from "react-icons/fa";
+import { FaUser, FaPlus, FaClipboard  } from "react-icons/fa";
 
 const stripHtmlTags = (html) => {
   if (!html) return "";
@@ -372,21 +372,24 @@ const ViewJobs = () => {
 
     switch (status) {
       case "Created":
-        return <span style={getStyle("#D3D3D3", "#000")}>Created</span>; // Light Gray
+        return <span style={getStyle("#E2E2E2", "#000")}>Created</span>;
       case "Confirmed":
-        return <span style={getStyle("#4169E1")}>Confirmed</span>; // Royal Blue
+        return <span style={getStyle("#3B82F6")}>Confirmed</span>;
       case "Cancelled":
-        return <span style={getStyle("#FF0000")}>Cancelled</span>; // Red
+        return <span style={getStyle("#EF4444")}>Cancelled</span>;
       case "InProgress":
-        return <span style={getStyle("#FFA500")}>InProgress</span>; // Orange
+      case "In Progress":
+        return <span style={getStyle("#F59E0B")}>In Progress</span>;
       case "Job Complete":
-        return <span style={getStyle("#008000")}>Job Complete</span>; // Green
+        return <span style={getStyle("#10B981")}>Job Complete</span>;
       case "Validate":
-        return <span style={getStyle("#00FFFF", "#000")}>Validate</span>; // Cyan
+        return <span style={getStyle("#06B6D4", "#000")}>Validate</span>;
       case "Scheduled":
-        return <span style={getStyle("#808080")}>Scheduled</span>; // Gray
+        return <span style={getStyle("#6B7280")}>Scheduled</span>;
+      case "Rescheduled":
+        return <span style={getStyle("#7C3AED")}>Rescheduled</span>;
       default:
-        return <span style={getStyle("#D3D3D3", "#000")}>{status}</span>; // Default to light gray
+        return <span style={getStyle("#E2E2E2", "#000")}>{status}</span>;
     }
   };
 
@@ -486,16 +489,31 @@ const ViewJobs = () => {
   const columns = [
     columnHelper.accessor("jobNo", {
       header: "Job No.",
-      size: 150,
+      size: 250,
       cell: (info) => (
         <div className="d-flex align-items-center">
-          <span className="fw-semibold">{info.getValue()}</span>
+          <Badge
+            className="d-flex align-items-center gap-2"
+            style={{
+              background: "linear-gradient(45deg, #4171F5, #3DAAF5)",
+              color: "#fff",
+              padding: "8px 12px",
+              borderRadius: "6px",
+              fontSize: "0.875rem",
+              fontWeight: "600",
+              boxShadow: "0 2px 4px rgba(65, 113, 245, 0.15)",
+              border: "1px solid rgba(255, 255, 255, 0.1)"
+            }}
+          >
+            <FaClipboard size={12} style={{ opacity: 0.9 }} />
+            {info.getValue()}
+          </Badge>
         </div>
       ),
     }),
     columnHelper.accessor("jobName", {
       header: "Subject Name",
-      size: 150,
+      size: 130,
       cell: (info) => (
         <OverlayTrigger
           placement="top"
@@ -511,7 +529,7 @@ const ViewJobs = () => {
           <Link href={`/jobs/view/${info.row.original.id}`} passHref>
             <div
               className="fw-semibold text-primary text-truncate cursor-pointer"
-              style={{ maxWidth: "130px" }}
+              style={{ maxWidth: "130px", position: "center" }}
               onClick={(e) => e.stopPropagation()}
             >
               {info.getValue()}
@@ -1437,21 +1455,24 @@ const ViewJobs = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case "Created":
-        return "#D3D3D3"; // Light Gray
+        return "#E2E2E2";
       case "Confirmed":
-        return "#4169E1"; // Royal Blue
+        return "#3B82F6";
       case "Cancelled":
-        return "#FF0000"; // Red
+        return "#EF4444";
       case "InProgress":
-        return "#FFA500"; // Orange
+      case "In Progress":
+        return "#F59E0B";
       case "Job Complete":
-        return "#008000"; // Green
+        return "#10B981";
       case "Validate":
-        return "#00FFFF"; // Cyan
+        return "#06B6D4";
       case "Scheduled":
-        return "#808080"; // Gray
+        return "#6B7280";
+      case "Rescheduled":
+        return "#7C3AED";
       default:
-        return "#D3D3D3"; // Default to light gray
+        return "#E2E2E2";
     }
   };
 

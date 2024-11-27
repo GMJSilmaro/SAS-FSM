@@ -2059,6 +2059,41 @@ const JobDetails = () => {
     }
   };
 
+  const formatFirestoreTimestamp = (timestamp) => {
+    if (!timestamp) return "N/A";
+    
+    // Check if it's a Firestore Timestamp
+    if (timestamp?.seconds) {
+      // Convert to JavaScript Date
+      const date = new Date(timestamp.seconds * 1000);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    // Handle regular dates
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    // Handle string dates
+    if (typeof timestamp === 'string') {
+      return timestamp;
+    }
+    
+    return "N/A";
+  };
+
   const handleStatusClick = (status) => {
     router.push(`/dashboard/follow-ups?status=${status}`);
   };
@@ -2232,7 +2267,7 @@ const JobDetails = () => {
                       <span>Created by: {job.createdBy?.fullName || "System User"}</span>
                       <span className="mx-2">•</span>
                       <Calendar4 size={12} /> {/* Also reduced icon size from 14 to 12 */}
-                      <span>Created: {formatDateTime(job.createdAt)}</span>
+                      <span>Created: {formatFirestoreTimestamp(job.createdAt)}</span>
                     </div>
                     <p
                       className="mb-2"

@@ -2,7 +2,6 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { app } from '../../firebase';
-import { serverLogActivity } from '../../utils/serverLogActivity';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { serialize } from 'cookie';
 
@@ -127,17 +126,7 @@ export default async function handler(req, res) {
       expiryTime: sessionExpiryTime.toISOString()
     });
 
-    // Log successful login
-    await serverLogActivity(userData.workerId, 'LOGIN_SUCCESS', {
-      email,
-      timestamp: new Date().toISOString(),
-      userDetails: {
-        workerId: userData.workerId,
-        isAdmin: userData.isAdmin === 'true',
-        role: userData.role
-      }
-    });
-
+    
     // Return success response with cookie information
     return res.status(200).json({
       success: true,
@@ -161,21 +150,7 @@ export default async function handler(req, res) {
       stack: error.stack
     });
 
-    // Log SAP B1 login failure
-    await serverLogActivity(workerId || 'SYSTEM', 'SAP_B1_LOGIN_FAILED', {
-      timestamp: new Date().toISOString(),
-      error: error.message
-    });
-
-    // Log login failure with detailed error
-    await serverLogActivity(workerId || 'SYSTEM', 'LOGIN_FAILED', {
-      email,
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      errorCode: error.code,
-      stack: error.stack
-    });
-
+    
     // Clear all cookies on error
     const clearCookies = [
       'B1SESSION',
