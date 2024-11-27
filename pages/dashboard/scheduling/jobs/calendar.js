@@ -59,6 +59,7 @@ import { Plus } from 'react-feather'; // Add this import
 import Link from 'next/link';
 import { Button } from 'react-bootstrap';
 import { FaPlus } from 'react-icons/fa';
+import { Timestamp } from "firebase/firestore";
 
 const DEFAULT_LEGEND_ITEMS = [
   { id: 'created', status: "Created", color: "#9e9e9e" },
@@ -68,6 +69,23 @@ const DEFAULT_LEGEND_ITEMS = [
   { id: 'complete', status: "Job Complete", color: "#32CD32" },
   { id: 'validate', status: "Validate", color: "#00bcd4" },
   { id: 'scheduled', status: "Scheduled", color: "#607d8b" }
+];
+
+const repeatFrequencyOptions = [
+  { value: 'none', label: 'Do not repeat' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' }
+];
+
+const weekDayOptions = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' }
 ];
 
 const Calendar = () => {
@@ -973,108 +991,59 @@ const Calendar = () => {
   }, []);
 
   // Add this helper function to calculate repeating dates correctly
-  const calculateRepeatingDates = (startDate, endDate, frequency, services, selectedMonths) => {
-    const dates = [];
-    const duration = endDate.getTime() - startDate.getTime();
-    let currentDate = new Date(startDate);
+  const calculateRepeatingDates = (startDate, endDate, repeatSettings) => {
+    const dateRanges = [];
+    
+    // Get the number of occurrences and interval
+    const occurrences = parseInt(repeatSettings.occurrences);
+    const interval = parseInt(repeatSettings.interval);
 
-    const getNextDate = (current, freq) => {
-      const next = new Date(current);
-      switch (freq) {
-        case 'weekly':
-          next.setDate(next.getDate() + 7);
-          break;
-        case 'biweekly':
-          next.setDate(next.getDate() + 14);
-          break;
-        case 'monthly':
-          next.setMonth(next.getMonth() + 1);
-          break;
-        case 'quarterly':
-          next.setMonth(next.getMonth() + 3);
-          break;
-        case 'yearly':
-          next.setFullYear(next.getFullYear() + 1);
-          break;
-      }
-      return next;
-    };
-
-    let count = 0;
-    while (count < services) {
-      // Skip if months are selected and current month is not in selection
-      if (selectedMonths.length > 0) {
-        const currentMonth = currentDate.getMonth();
-        if (!selectedMonths.includes(currentMonth)) {
-          currentDate = getNextDate(currentDate, frequency);
-          continue;
-        }
-      }
-
-      const endDateTime = new Date(currentDate.getTime() + duration);
-      dates.push([new Date(currentDate), endDateTime]);
-      currentDate = getNextDate(currentDate, frequency);
-      count++;
+    // Convert to Date objects
+    let start = new Date(startDate);
+    let end = new Date(endDate);
+    
+    // Generate dates for each occurrence
+    for (let i = 1; i < occurrences; i++) {
+      // Add interval days to both start and end dates
+      let newStart = new Date(start);
+      let newEnd = new Date(end);
+      
+      newStart.setDate(start.getDate() + (i * interval));
+      newEnd.setDate(end.getDate() + (i * interval));
+      
+      dateRanges.push([newStart, newEnd]);
     }
-
-    return dates;
+    
+    return dateRanges;
   };
 
-  // Update the handleRepeatJob function
+  // In handleRepeatJob:
   const handleRepeatJob = async (jobData) => {
     try {
-      const { Id, Subject } = jobData;
-      
-      // Get the latest job number
-      const jobsSnapshot = await getDocs(collection(db, "jobs"));
-      let maxJobNo = 0;
-
-      jobsSnapshot.forEach((firestoreDoc) => {
-        const jobNo = firestoreDoc.data().jobNo;
-        if (jobNo) {
-          const numPart = parseInt(jobNo.split('-')[1]);
-          if (!isNaN(numPart) && numPart > maxJobNo) {
-            maxJobNo = numPart;
-          }
-        }
-      });
-
       const result = await Swal.fire({
-        title: 'Repeat Job',
+        title: 'Repeat Job Settings',
         html: `
-          <div class="swal2-custom-container">
-            <div class="form-group mb-3">
-              <label class="form-label fw-bold">Frequency</label>
-              <select id="frequency" class="form-select">
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Bi-weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-            </div>
-            <div class="form-group mb-3">
-              <label class="form-label fw-bold">Number of Occurrences</label>
-              <input 
-                type="number" 
-                id="services" 
-                class="form-control" 
-                min="1" 
-                max="52" 
-                value="1"
-              >
-              <small class="text-muted">Maximum 52 occurrences</small>
-            </div>
-            <div class="form-group">
-              <label class="form-label fw-bold">Select Months (Optional)</label>
-              <select id="months" class="form-select" multiple size="6">
-                ${Array.from({ length: 12 }, (_, i) => {
-                  const date = new Date(2024, i, 1);
-                  return `<option value="${i}">${date.toLocaleString('default', { month: 'long' })}</option>`;
-                }).join('')}
-              </select>
-              <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
-            </div>
+          <div class="mb-3">
+            <label class="form-label">Number of Occurrences</label>
+            <input 
+              id="occurrences" 
+              class="form-control" 
+              type="number"
+              min="2"
+              value="2"
+              placeholder="How many times to repeat?"
+            >
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Interval (days)</label>
+            <input 
+              id="interval" 
+              class="form-control" 
+              type="number"
+              min="1"
+              value="1"
+              placeholder="Repeat every X days"
+            >
           </div>
         `,
         customClass: {
@@ -1089,161 +1058,51 @@ const Calendar = () => {
         cancelButtonText: 'Cancel',
         buttonsStyling: false,
         preConfirm: () => {
-          const frequency = document.getElementById('frequency').value;
-          const services = parseInt(document.getElementById('services').value);
-          const monthsSelect = document.getElementById('months');
-          const selectedMonths = Array.from(monthsSelect.selectedOptions).map(option => parseInt(option.value));
+          const occurrences = document.getElementById('occurrences').value;
+          const interval = document.getElementById('interval').value;
           
-          if (services < 1 || services > 52) {
-            Swal.showValidationMessage('Number of occurrences must be between 1 and 52');
+          if (!occurrences || !interval) {
+            Swal.showValidationMessage('Please fill in all fields');
             return false;
           }
           
-          return { frequency, services, selectedMonths };
+          return { occurrences, interval };
         }
       });
 
       if (result.isConfirmed) {
-        try {
-          Swal.fire({
-            title: 'Creating Jobs',
-            html: 'Please wait while we create the repeated jobs...',
-            allowOutsideClick: false,
-            didOpen: () => {
-              Swal.showLoading();
-            }
-          });
+        const repeatSettings = result.value; // Get values from dialog result
+        // ... rest of your existing code ...
 
-          const { frequency, services, selectedMonths } = result.value;
-          const jobRef = doc(db, "jobs", Id);
-          const originalJob = await getDoc(jobRef);
-          
-          if (!originalJob.exists()) {
-            throw new Error('Original job not found');
-          }
-
-          const jobDetails = originalJob.data();
-          const newDates = calculateRepeatingDates(
-            new Date(jobDetails.startDate),
-            new Date(jobDetails.endDate),
-            frequency,
-            services,
-            selectedMonths
-          );
-
-          const batch = writeBatch(db);
-          const newJobsData = [];
-          const timestamp = Date.now();
-          const repeatGroupId = `R${timestamp}`; // Unique identifier for this group of repeat jobs
-
-          for (let i = 0; i < newDates.length; i++) {
-            const [startDate, endDate] = newDates[i];
-            const newJobNo = `JOB-${String(maxJobNo + i + 1).padStart(3, '0')}`;
-            
-            // Create a more structured document ID
-            const newJobId = `${repeatGroupId}-${(i + 1).toString().padStart(3, '0')}`;
-            
-            const newJobData = {
-              ...jobDetails,
-              jobNo: newJobNo,
-              startDate: startDate.toISOString(),
-              endDate: endDate.toISOString(),
-              parentJobId: Id,
-              isRepeating: true,
-              repeatJob: {
-                groupId: repeatGroupId,
-                sequence: i + 1,
-                totalInSequence: services,
-                frequency: frequency,
-                originalJobId: Id,
-                originalJobNo: jobDetails.jobNo
-              },
-              jobStatus: defaultStatus || 'created',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-
-            // Remove status-specific fields
-            delete newJobData.completedAt;
-            delete newJobData.completedBy;
-            delete newJobData.startedAt;
-            delete newJobData.startedBy;
-            delete newJobData.cancelledAt;
-            delete newJobData.cancelledBy;
-            delete newJobData.validatedAt;
-            delete newJobData.validatedBy;
-
-            const newJobRef = doc(db, "jobs", newJobId);
-            batch.set(newJobRef, newJobData);
-
-            newJobsData.push({
-              Id: newJobId,
-              Subject: `${jobDetails.jobName} (${i + 1}/${services})`, // Add sequence to subject
-              JobNo: newJobNo,
-              Customer: jobDetails.customerName,
-              ServiceLocation: jobDetails.location?.locationName || "",
-              AssignedWorkers: jobDetails.assignedWorkers?.map((worker) => ({
-                workerId: worker.workerId,
-                fullName: worker.fullName || worker.workerId,
-                profilePicture: worker.profilePicture || "/images/avatar/NoProfile.png",
-              })) || [],
-              StartTime: startDate,
-              EndTime: endDate,
-              JobStatus: newJobData.jobStatus,
-              Description: jobDetails.jobDescription,
-              Priority: jobDetails.priority || "",
-              Category: jobDetails.category || "N/A",
-              ServiceCall: jobDetails.serviceCallID || "N/A",
-              Equipment: jobDetails.equipments?.[0]?.itemName || "N/A",
-              IsRepeatJob: true,
-              RepeatSequence: `${i + 1}/${services}`,
-              RepeatGroupId: repeatGroupId
-            });
-          }
-
-          // Update the original job to indicate it has repeat jobs
-          batch.update(jobRef, {
-            hasRepeatJobs: true,
-            repeatGroupId: repeatGroupId
-          });
-
-          // Commit the batch
-          await batch.commit();
-
-          // Update the events state
-          const updatedEvents = [...events, ...newJobsData];
-          setEvents(updatedEvents);
-          setFilteredEvents(
-            searchTerm
-              ? updatedEvents.filter(event =>
-                  event.Subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  event.JobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  event.Customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  event.ServiceLocation.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-              : updatedEvents
-          );
-
-          Swal.close();
-          showToast(`Successfully created ${newDates.length} repeated jobs`, 'success');
-          
-          if (scheduleObj.current) {
-            scheduleObj.current.refreshEvents();
-          }
-
-          invalidateCache();
-        } catch (error) {
-          console.error('Error in job creation:', error);
-          Swal.close();
-          showToast(`Failed to create repeated jobs: ${error.message}`, 'error');
-        }
+        toast.success(`Successfully created ${repeatDates.length} repeated jobs`, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
       }
     } catch (error) {
-      console.error('Error in repeat job dialog:', error);
-      Swal.close();
-      showToast('Failed to open repeat job dialog', 'error');
+      console.error('Error:', error);
+      toast.error('Failed to create repeated jobs', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     }
   };
+
+  // Add this useEffect to handle events update
+  useEffect(() => {
+    if (scheduleObj.current && events.length > 0) {
+      scheduleObj.current.eventSettings.dataSource = events;
+      scheduleObj.current.refresh();
+    }
+  }, [events]);
 
   useEffect(() => {
     // Component mount

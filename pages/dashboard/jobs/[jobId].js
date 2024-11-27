@@ -804,16 +804,15 @@ const JobDetails = () => {
   const renderAssignedEquipments = () => {
     return (
       <section className={styles.section}>
-           <div className={styles.sectionHeader}>
-           <FaTools size={16} className={styles.titleIcon} />
-            <h6 className={styles.sectionTitle}>
-              Assigned Equipments
-              <span className={styles.equipmentCount}>
-                {job.equipments?.length || 0} items
-              </span>
-            </h6>
+        <div className={styles.sectionHeader}>
+          <FaTools size={16} className={styles.titleIcon} />
+          <h6 className={styles.sectionTitle}>
+            Assigned Equipments
+            <span className={styles.equipmentCount}>
+              {job.equipments?.length || 0} items
+            </span>
+          </h6>
         </div>
-       
         
         <div className={styles.equipmentList}>
           {job.equipments?.map((equipment, index) => (
@@ -823,10 +822,12 @@ const JobDetails = () => {
                 onClick={() => toggleEquipment(index)}
               >
                 <div className={styles.equipmentTitle}>
-                  <h3 className={styles.equipmentName}>{equipment.itemName}</h3>
-                  <Badge className={`${styles.typeBadge} ${styles[equipment.equipmentType.toLowerCase()]}`}>
-                    {equipment.equipmentType}
-                  </Badge>
+                  <h3 className={styles.equipmentName}>{equipment.itemName || 'Unnamed Equipment'}</h3>
+                  {equipment.equipmentType && (
+                    <Badge className={`${styles.typeBadge} ${styles[equipment.equipmentType.toLowerCase()]}`}>
+                      {equipment.equipmentType}
+                    </Badge>
+                  )}
                 </div>
                 <button className={styles.collapseButton}>
                   {expandedEquipments[index] ? (
@@ -842,31 +843,31 @@ const JobDetails = () => {
                   <div className={styles.detailItem}>
                     <FaHashtag size={14} className={styles.detailIcon} />
                     <span className={styles.detailLabel}>Model:</span>
-                    <span className={styles.detailValue}>{equipment.modelSeries}</span>
+                    <span className={styles.detailValue}>{equipment.modelSeries || 'N/A'}</span>
                   </div>
                   
                   <div className={styles.detailItem}>
                     <FaBarcode size={14} className={styles.detailIcon} />
                     <span className={styles.detailLabel}>Item Code:</span>
-                    <span className={styles.detailValue}>{equipment.itemCode}</span>
+                    <span className={styles.detailValue}>{equipment.itemCode || 'N/A'}</span>
                   </div>
                   
                   <div className={styles.detailItem}>
                     <FaLayerGroup size={14} className={styles.detailIcon} />
                     <span className={styles.detailLabel}>Group:</span>
-                    <span className={styles.detailValue}>{equipment.itemGroup}</span>
+                    <span className={styles.detailValue}>{equipment.itemGroup || 'N/A'}</span>
                   </div>
                   
                   <div className={styles.detailItem}>
                     <FaQrcode size={14} className={styles.detailIcon} />
                     <span className={styles.detailLabel}>Serial No:</span>
-                    <span className={styles.detailValue}>{equipment.serialNo}</span>
+                    <span className={styles.detailValue}>{equipment.serialNo || 'N/A'}</span>
                   </div>
 
                   <div className={styles.detailItem}>
                     <FaMapMarkerAlt size={14} className={styles.detailIcon} />
                     <span className={styles.detailLabel}>Location:</span>
-                    <span className={styles.detailValue}>{equipment.equipmentLocation}</span>
+                    <span className={styles.detailValue}>{equipment.equipmentLocation || 'N/A'}</span>
                   </div>
                 </div>
 
@@ -876,11 +877,11 @@ const JobDetails = () => {
                       <div className={styles.warrantyDates}>
                         <small>
                           <FaCalendarCheck size={12} />
-                          Warranty Start: {equipment.warrantyStartDate}
+                          Warranty Start: {equipment.warrantyStartDate || 'N/A'}
                         </small>
                         <small>
                           <FaCalendarTimes size={12} />
-                          Warranty End: {equipment.warrantyEndDate}
+                          Warranty End: {equipment.warrantyEndDate || 'N/A'}
                         </small>
                       </div>
                     )}
