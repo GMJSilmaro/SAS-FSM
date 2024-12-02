@@ -108,6 +108,9 @@ import FollowUpModal from '../../../components/FollowUpModal';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 import { getAuth } from 'firebase/auth';
+import { fetchFollowUpTypes } from '../../../utils/followUpUtils';
+import StatusBadge from '../../../components/StatusBadge';
+import FollowUpLegend from '../../../components/FollowUpLegend';
 
 
 // Helper function to fetch worker details from Firebase
@@ -196,44 +199,16 @@ const getStatusColor = (status) => {
 
 const googleMapsLibraries = ["places"];
 
-// Add this helper function at the top with your other helpers
-const getFollowUpStatusStyle = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'logged':
-      return { bg: '#FFF3CD', color: '#856404', border: '#FFEEBA' };
-    case 'in progress':
-      return { bg: '#CCE5FF', color: '#004085', border: '#B8DAFF' };
-    case 'closed':
-      return { bg: '#D4EDDA', color: '#155724', border: '#C3E6CB' };
-    case 'cancelled':
-      return { bg: '#F8D7DA', color: '#721C24', border: '#F5C6CB' };
-    default:
-      return { bg: '#E2E3E5', color: '#383D41', border: '#D6D8DB' };
-  }
-};
 
 // Update getPriorityColor function to handle numeric priorities
 const getPriorityColor = (priority) => {
-  // Handle numeric priorities
-  if (typeof priority === 'number') {
-    switch (priority) {
-      case 1: return '#198754'; // Low - green
-      case 2: return '#0d6efd'; // Normal - blue
-      case 3: return '#fd7e14'; // High - orange
-      case 4: return '#dc3545'; // Urgent - red
-      case 5: return '#6610f2'; // Critical - purple
-      default: return '#6c757d'; // Default - grey
-    }
-  }
-  
-  // Handle string priorities (fallback)
-  const priorityStr = String(priority || '').toLowerCase();
-  switch (priorityStr) {
-    case 'urgent': return '#dc3545';
-    case 'high': return '#fd7e14';
-    case 'normal': return '#0d6efd';
-    case 'low': return '#198754';
-    default: return '#6c757d';
+  switch (priority) {
+    case 1: return '#198754'; // Low - green
+    case 2: return '#0d6efd'; // Normal - blue
+    case 3: return '#fd7e14'; // High - orange
+    case 4: return '#dc3545'; // Urgent - red
+    case 5: return '#6610f2'; // Critical - purple
+    default: return '#6c757d'; // Default - grey
   }
 };
 
@@ -313,8 +288,9 @@ const JobDetails = () => {
     taskName: '',
     taskDescription: '',
     isPriority: false,
-    assignedTo: '',
-    isDone: false
+    isDone: false,
+    createdAt: new Date().toISOString(), // Add creation timestamp
+    completionDate: null
   }]);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const csoId = Cookies.get('workerId');
@@ -354,43 +330,17 @@ const JobDetails = () => {
     'Cancelled'
   ];
 
-  // Helper functions (outside of useEffect)
-  const getTypeWithColor = (typeName) => {
-    const type = followUpTypes.find(t => t.name === typeName);
-    return (
-      <div className={styles.followUpTypeWrapper}>
-        {type && (
-          <div 
-            className={styles.typeIndicator}
-            style={{ backgroundColor: type.color }} 
-          />
-        )}
-        <span>{typeName}</span>
-      </div>
-    );
-  };
+    // Add this useEffect to fetch follow-up types
+    useEffect(() => {
+      const loadFollowUpTypes = async () => {
+        const types = await fetchFollowUpTypes();
+        setFollowUpTypes(types);
+      };
+  
+      loadFollowUpTypes();
+    }, []);
+  
 
-  // Add the new useEffect for fetching follow-up types
-  useEffect(() => {
-    const fetchFollowUpTypes = async () => {
-      try {
-        const settingsRef = doc(db, 'settings', 'followUp');
-        const settingsDoc = await getDoc(settingsRef);
-        
-        if (settingsDoc.exists() && settingsDoc.data().types) {
-          const types = settingsDoc.data().types;
-          setFollowUpTypes(Object.entries(types).map(([id, type]) => ({
-            id,
-            ...type
-          })));
-        }
-      } catch (error) {
-        console.error('Error fetching follow-up types:', error);
-      }
-    };
-
-    fetchFollowUpTypes();
-  }, []);
 
 
   useEffect(() => {
@@ -543,8 +493,9 @@ const JobDetails = () => {
       taskName: '',
       taskDescription: '',
       isPriority: false,
-      assignedTo: '',
-      isDone: false
+      isDone: false,
+      createdAt: new Date().toISOString(), // Add timestamp for new tasks
+      completionDate: null
     }]);
   };
 
@@ -670,7 +621,7 @@ const JobDetails = () => {
                         }}
                       />
                     </Col>
-                    <Col xs={12}>
+                    {/* <Col xs={12}>
                       <Form.Control
                         as="textarea"
                         rows={2}
@@ -682,7 +633,7 @@ const JobDetails = () => {
                           setTaskInputs(newInputs);
                         }}
                       />
-                    </Col>
+                    </Col> */}
                     <Col xs={12}>
                       <Form.Check
                         type="checkbox"
@@ -764,22 +715,23 @@ const JobDetails = () => {
                           </Badge>
                         )}
                       </div>
-                      {task.taskDescription && (
-                        <p className={styles.taskDescription}>
-                          {task.taskDescription}
-                        </p>
-                      )}
-                      {task.completionDate && (
-                        <div className={styles.completionInfo}>
-                          <Badge bg="success" className={styles.completedBadge}>
-                            <Check size={10} /> Completed
-                          </Badge>
-                          <span className={styles.completionDate}>
-                            <Clock size={12} />
-                            {formatDateTime(task.completionDate)}
-                          </span>
-                        </div>
-                      )}
+                      <div className={styles.taskMeta}>
+                        <span className={styles.creationDate}>
+                          <Clock size={12} />
+                          Created At: {formatDateTime(task.createdAt) || 'NA'}
+                        </span>
+                        {task.completionDate && (
+                          <div className={styles.completionInfo}>
+                            <Badge bg="success" className={styles.completedBadge}>
+                              <Check size={10} /> Completed
+                            </Badge>
+                            <span className={styles.completionDate}>
+                              <Clock size={12} />
+                              Completed: {formatDateTime(task.completionDate)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <Button
@@ -2230,6 +2182,82 @@ const JobDetails = () => {
     router.push(`/jobs/edit-jobs/${jobId}`);
   };
 
+  // First, update or add these helper functions
+  const getStatusBadgeStyles = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'logged':
+        return {
+          backgroundColor: '#fff7ed',
+          color: '#c2410c',
+        };
+      case 'in progress':
+        return {
+          backgroundColor: '#eff6ff',
+          color: '#1d4ed8',
+        };
+      case 'closed':
+        return {
+          backgroundColor: '#f0fdf4',
+          color: '#15803d',
+        };
+      case 'cancelled':
+        return {
+          backgroundColor: '#fef2f2',
+          color: '#dc2626',
+        };
+      default:
+        return {
+          backgroundColor: '#f3f4f6',
+          color: '#6b7280',
+        };
+    }
+  };
+
+  // Update the getTypeBadgeStyles function
+  const getTypeBadgeStyles = (typeName) => {
+    const typeObj = followUpTypes.find(t => t.name.toLowerCase() === typeName?.toLowerCase());
+    
+    if (typeObj) {
+      return {
+        backgroundColor: `${typeObj.color}20`, // Adding 20 for 12% opacity
+        color: typeObj.color,
+        border: `1px solid ${typeObj.color}`,
+        padding: '4px 12px',
+        borderRadius: '12px',
+        fontSize: '0.75rem',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontWeight: '500'
+      };
+    }
+    
+    // Fallback styles if type not found
+    return {
+      backgroundColor: '#E2E2E220',
+      color: '#666',
+      border: '1px solid #E2E2E2',
+      padding: '4px 12px',
+      borderRadius: '12px',
+      fontSize: '0.75rem',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      fontWeight: '500'
+    };
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'logged': return 'fe-file-text';
+      case 'in progress': return 'fe-loader';
+      case 'closed': return 'fe-check-circle';
+      case 'cancelled': return 'fe-x-circle';
+      default: return 'fe-help-circle';
+    }
+  };
+
+
   return (
     <>
       <Toaster position="top-right" />
@@ -2396,7 +2424,10 @@ const JobDetails = () => {
                         <div className={styles.avatarSection}>
                           <div className={styles.avatar}>{job.customerName?.[0] || 'P'}</div>
                           <div className={styles.customerMeta}>
-                            <h3 className={styles.customerName}>{job.customerName}</h3>
+                         
+                            <h3 className={styles.customerName}>
+                              <a href={`/customers/view/${job.customerID}`} className={styles.customerName}>{job.customerName}</a>
+                              </h3>
                             <span className={styles.businessBadge}>Business</span>
                           </div>
                         </div>
@@ -2535,6 +2566,9 @@ const JobDetails = () => {
                       Add Follow-up
                     </button>
                   </div>
+
+                  {/* Add Legend Component here */}
+                  <FollowUpLegend followUpTypes={followUpTypes} />
                   
                   <div className={styles.followUpsList}>
                     {(!job.followUps || Object.keys(job.followUps).length === 0) ? (
@@ -2545,109 +2579,141 @@ const JobDetails = () => {
                     ) : (
                       Object.entries(job.followUps)
                         .sort(([, a], [, b]) => new Date(b.createdAt) - new Date(a.createdAt))
-                        .map(([id, followUp]) => (
-                          <div 
-                            key={id} 
-                            className={styles.followUpCard}
-                            style={{ 
-                              borderLeft: `4px solid ${getPriorityColor(followUp.priority)}` 
-                            }}
-                          >
-                            {editingFollowUp?.id === id ? (
-                              <div className={styles.editForm}>
-                                <Form onSubmit={(e) => {
-                                  e.preventDefault();
-                                  handleEditSave({ ...editingFollowUp });
-                                }}>
-                                  <Form.Group className="mb-3">
-                                    <Form.Control
-                                      as="textarea"
-                                      value={editingFollowUp.notes}
-                                      onChange={(e) => setEditingFollowUp({
-                                        ...editingFollowUp,
-                                        notes: e.target.value
-                                      })}
-                                    />
-                                  </Form.Group>
-                                {/* Add status dropdown */}
-                                <Form.Group className="mb-3">
-                                  <Form.Select
-                                    value={editingFollowUp.status}
-                                    onChange={(e) => setEditingFollowUp({
-                                      ...editingFollowUp,
-                                      status: e.target.value
-                                    })}
-                                  >
-                                    {FOLLOW_UP_STATUSES.map(status => (
-                                      <option key={status} value={status}>{status}</option>
-                                    ))}
-                                  </Form.Select>
-                                </Form.Group>
-                                <div className={styles.editActions}>
-                                  <Button 
-                                    variant="secondary" 
-                                    onClick={() => setEditingFollowUp(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button 
-                                    variant="primary" 
-                                    type="submit"
-                                  >
-                                    Save
-                                  </Button>
+                        .map(([id, followUp]) => {
+                          const typeObj = followUpTypes.find(t => t.name === followUp.type);
+                          const priorityColor = getPriorityColor(followUp.priority);
+                          
+                          return (
+                            <div 
+                              key={id} 
+                              className={styles.followUpCard}
+                              style={{ 
+                                borderLeft: `4px solid ${priorityColor}`
+                              }}
+                            >
+                              {editingFollowUp?.id === id ? (
+                                <div className={styles.editForm}>
+                                  <Form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleEditSave({ ...editingFollowUp });
+                                  }}>
+                                    <Form.Group className="mb-3">
+                                      <Form.Control
+                                        as="textarea"
+                                        value={editingFollowUp.notes}
+                                        onChange={(e) => setEditingFollowUp({
+                                          ...editingFollowUp,
+                                          notes: e.target.value
+                                        })}
+                                      />
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                      <Form.Select
+                                        value={editingFollowUp.status}
+                                        onChange={(e) => setEditingFollowUp({
+                                          ...editingFollowUp,
+                                          status: e.target.value
+                                        })}
+                                        className={styles.select}
+                                      >
+                                        {FOLLOW_UP_STATUSES.map(status => (
+                                          <option key={status} value={status}>{status}</option>
+                                        ))}
+                                      </Form.Select>
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                      <Form.Select
+                                        value={editingFollowUp.type}
+                                        onChange={(e) => setEditingFollowUp({
+                                          ...editingFollowUp,
+                                          type: e.target.value
+                                        })}
+                                        className={styles.select}
+                                      >
+                                        {followUpTypes.map(type => (
+                                          <option key={type.id} value={type.name}>{type.name}</option>
+                                        ))}
+                                      </Form.Select>
+                                    </Form.Group>
+                                    <div className={styles.editActions}>
+                                      <Button 
+                                        variant="secondary" 
+                                        onClick={() => setEditingFollowUp(null)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button 
+                                        variant="primary" 
+                                        type="submit"
+                                      >
+                                        Save
+                                      </Button>
+                                    </div>
+                                  </Form>
                                 </div>
-                              </Form>
+                              ) : (
+                                <>
+                                  <div className={styles.followUpHeader}>
+                                    <div className={styles.followUpStatus}>
+                                      {/* Status badge without border */}
+                                      <StatusBadge 
+                                        status={followUp.status}
+                                        icon={getStatusIcon(followUp.status)}
+                                      />
+                                      
+                                      {/* Type badge with border */}
+                                      <StatusBadge 
+                                        type={followUp.type}
+                                        color={typeObj?.color}
+                                        withBorder={true}
+                                      />
+                                    </div>
+                                    <div className={styles.followUpActions}>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        onClick={() => handleEditClick(followUp)}
+                                      >
+                                        <FaPencilAlt size={14} />
+                                      </Button>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        onClick={() => handleDeleteFollowUp(id)}
+                                      >
+                                        <FaTrash size={14} />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className={styles.followUpContent}>
+                                    <p className={styles.followUpNotes}>{followUp.notes}</p>
+                                    <div className={styles.followUpMeta}>
+                                      <div className={styles.metaItem}>
+                                        <Calendar4 size={12} />
+                                        <span>Due Date: {new Date(followUp.dueDate).toLocaleDateString()}</span>
+                                      </div>
+                                      <div className={styles.metaItem}>
+                                        <Clock size={12} />
+                                        <span>Created: {new Date(followUp.createdAt).toLocaleTimeString([], { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit' 
+                                        })}</span>
+                                      </div>
+                                      <div className={styles.metaItem}>
+                                        <PersonFill size={12} />
+                                        <span>Created By: {followUp.createdBy?.email || 'Unknown'}</span>
+                                      </div>
+                                      <div className={styles.metaItem}>
+                                        <PersonFill size={12} />
+                                        <span>Attended By: {followUp.updatedBy?.email || 'Unknown'}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                          ) : (
-                            <>
-                              <div className={styles.followUpHeader}>
-                                <div className={styles.followUpStatus}>
-                                  <Badge bg={getStatusBadgeColor(followUp.status)}>
-                                    {followUp.status}
-                                  </Badge>
-                                </div>
-                                <div className={styles.followUpActions}>
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    onClick={() => handleEditClick(followUp)}
-                                  >
-                                    <FaPencilAlt size={14} />
-                                  </Button>
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    onClick={() => handleDeleteFollowUp(id)}
-                                  >
-                                    <FaTrash size={14} />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className={styles.followUpContent}>
-                                <p className={styles.followUpNotes}>{followUp.notes}</p>
-                                <div className={styles.followUpMeta}>
-                                  <div className={styles.metaItem}>
-                                    <Calendar4 size={12} />
-                                    <span>Due: {new Date(followUp.dueDate).toLocaleDateString()}</span>
-                                  </div>
-                                  <div className={styles.metaItem}>
-                                    <Clock size={12} />
-                                    <span>Created: {new Date(followUp.createdAt).toLocaleTimeString([], { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
-                                    })}</span>
-                                  </div>
-                                  <div className={styles.metaItem}>
-                                    <PersonFill size={12} />
-                                    <span>By: {followUp.createdBy?.email || 'Unknown'}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))
+                          );
+                        })
                     )}
                   </div>
                 </section>

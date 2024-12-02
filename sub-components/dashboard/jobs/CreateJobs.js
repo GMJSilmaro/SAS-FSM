@@ -2986,27 +2986,27 @@ const AddNewJobs = ({ validateJobForm }) => {
                   <Form.Control
                     type="number"
                     name="estimatedDurationHours"
-                    value={formData.estimatedDurationHours}
+                    value={formData.estimatedDurationHours || 1} // Default to 1 hour
                     onChange={handleInputChange}
                     placeholder="Hours"
-                   
                   />
                   <InputGroup.Text>h</InputGroup.Text>
                   <Form.Control
                     type="number"
                     name="estimatedDurationMinutes"
-                    value={formData.estimatedDurationMinutes}
+                    value={formData.estimatedDurationMinutes || 0} // Default to 0 minutes
                     onChange={handleInputChange}
                     placeholder="Minutes"
-                   
                   />
                   <InputGroup.Text>m</InputGroup.Text>
                 </InputGroup>
+                {/* Removed auto-calculation message and logic
                 {formData.startTime && formData.endTime && (
                   <small className="text-muted">
                     Duration auto-calculated from time range
                   </small>
                 )}
+                */}
               </Form.Group>
             </Row>
             <hr className="my-4" />

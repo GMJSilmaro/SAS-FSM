@@ -5,7 +5,8 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp,
-  increment
+  increment,
+  getDoc
 } from "firebase/firestore";
 import { toast } from "react-toastify";
 
@@ -141,5 +142,25 @@ export const updateFollowUpStatus = async (followUpId, newStatus, csoId = null, 
     console.error("Error updating follow-up:", error);
     toast.error("Failed to update follow-up status");
     throw error;
+  }
+};
+
+export const fetchFollowUpTypes = async () => {
+  try {
+    const settingsRef = doc(db, 'settings', 'followUp');
+    const settingsDoc = await getDoc(settingsRef);
+    
+    if (settingsDoc.exists() && settingsDoc.data().types) {
+      const types = settingsDoc.data().types;
+      return Object.entries(types).map(([id, type]) => ({
+        id,
+        ...type
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching follow-up types:', error);
+    toast.error("Failed to load follow-up types");
+    return [];
   }
 }; 

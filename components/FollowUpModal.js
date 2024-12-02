@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { collection, getDocs } from "firebase/firestore";
+import { fetchFollowUpTypes } from '../utils/followUpUtils';
 
 const FollowUpModal = ({ 
   show, 
@@ -29,30 +30,12 @@ const FollowUpModal = ({
   ];
 
   useEffect(() => {
-    const fetchFollowUpTypes = async () => {
-      try {
-        console.log("Fetching follow-up types...");
-        const settingsRef = doc(db, 'settings', 'followUp');
-        const settingsDoc = await getDoc(settingsRef);
-        
-        console.log('Raw followUp settings:', settingsDoc.data());
-        
-        if (settingsDoc.exists() && settingsDoc.data().types) {
-          const types = settingsDoc.data().types;
-          const processedTypes = Object.entries(types).map(([id, type]) => ({
-            id,
-            ...type
-          }));
-          console.log('Processed follow-up types:', processedTypes);
-          setFollowUpTypes(processedTypes);
-        }
-      } catch (error) {
-        console.error('Error fetching follow-up types:', error);
-        toast.error("Failed to load follow-up types");
-      }
+    const loadFollowUpTypes = async () => {
+      const types = await fetchFollowUpTypes();
+      setFollowUpTypes(types);
     };
 
-    fetchFollowUpTypes();
+    loadFollowUpTypes();
   }, []);
 
   const handleSubmit = async (e) => {

@@ -1452,7 +1452,7 @@ const FieldServiceSchedules = () => {
               ref={scheduleRef}
               cssClass="custom-scheduler"
               width="100%"
-              height="650px"
+              height="100%"
               currentView="TimelineDay"
               selectedDate={currentDate}
               startHour="00:00"

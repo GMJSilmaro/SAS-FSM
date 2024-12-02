@@ -10,6 +10,22 @@ const headerStyle = {
   padding: '12px 8px',
 };
 
+const EQUIPMENT_FIELDS = [
+  { key: 'ItemCode', label: 'Item Code' },
+  { key: 'ModelSeries', label: 'Model Series' },
+  
+  { key: 'SerialNo', label: 'Serial No' },
+  { key: 'ItemName', label: 'Item Name' },
+  { key: 'ItemGroup', label: 'Item Group' },
+
+  { key: 'Brand', label: 'Brand' },
+  { key: 'WarrantyStartDate', label: 'Warranty Start Date' },
+  { key: 'WarrantyEndDate', label: 'Warranty End Date' },
+
+  { key: 'EquipmentLocation', label: 'Equipment Location' },
+  { key: 'Notes', label: 'Notes' },
+];
+
 const EquipmentsTab = ({ customerData }) => {
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -195,46 +211,50 @@ const EquipmentsTab = ({ customerData }) => {
         <Col>
           <div className="table-responsive">
             <Table striped bordered hover className="shadow-sm">
-              <thead className="bg-light">
-                <tr>
-                  <th onClick={() => handleSort('ItemCode')} style={headerStyle}>
-                    Item Code {sortField === 'ItemCode' && getSortIcon(sortDirection)}
-                  </th>
-                  <th onClick={() => handleSort('ItemName')} style={headerStyle}>
-                    Item Name {sortField === 'ItemName' && getSortIcon(sortDirection)}
-                  </th>
-                  <th onClick={() => handleSort('ModelSeries')} style={headerStyle}>
-                    Model Series {sortField === 'ModelSeries' && getSortIcon(sortDirection)}
-                  </th>
-                  <th onClick={() => handleSort('SerialNo')} style={headerStyle}>
-                    Serial No {sortField === 'SerialNo' && getSortIcon(sortDirection)}
-                  </th>
-                  <th onClick={() => handleSort('EquipmentLocation')} style={headerStyle}>
-                    Location {sortField === 'EquipmentLocation' && getSortIcon(sortDirection)}
-                  </th>
-                  <th onClick={() => handleSort('ServiceLocationAddress')} style={headerStyle}>
-                    Service Location Address {sortField === 'ServiceLocationAddress' && getSortIcon(sortDirection)}
-                  </th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedEquipments.map((item) => (
-                  <tr key={item.id} className="align-middle">
-                    <td>{item.ItemCode || 'N/A'}</td>
-                    <td>{item.ItemName || 'N/A'}</td>
-                    <td>{item.ModelSeries || 'N/A'}</td>
-                    <td>{item.SerialNo || 'N/A'}</td>
-                    <td>{item.EquipmentLocation || 'N/A'}</td>
-                    <td>{findServiceLocation(item.EquipmentLocation)}</td>
-                    <td>
-                      <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(item)}>
-                        <Eye className="me-1" /> View Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+            <thead className="bg-light">
+  <tr>
+    <th onClick={() => handleSort('ItemCode')} style={headerStyle}>
+      Item Code {sortField === 'ItemCode' && getSortIcon(sortDirection)}
+    </th>
+
+    <th onClick={() => handleSort('ModelSeries')} style={headerStyle}>
+      Model Series {sortField === 'ModelSeries' && getSortIcon(sortDirection)}
+    </th>
+    <th onClick={() => handleSort('SerialNo')} style={headerStyle}>
+      Serial No {sortField === 'SerialNo' && getSortIcon(sortDirection)}
+    </th>
+    <th onClick={() => handleSort('EquipmentLocation')} style={headerStyle}>
+      Location {sortField === 'EquipmentLocation' && getSortIcon(sortDirection)}
+    </th>
+    <th onClick={() => handleSort('ServiceLocationAddress')} style={headerStyle}>
+      Service Location Address {sortField === 'ServiceLocationAddress' && getSortIcon(sortDirection)}
+    </th>
+    <th onClick={() => handleSort('Notes')} style={headerStyle}>
+      Notes {sortField === 'Notes' && getSortIcon(sortDirection)}
+    </th>
+    <th>Actions</th>
+  </tr>
+</thead>
+
+<tbody>
+  {sortedEquipments.map((item) => (
+    <tr key={item.id} className="align-middle">
+      <td>{item.ItemCode || 'N/A'}</td>
+   
+      <td>{item.ModelSeries || 'N/A'}</td>
+      <td>{item.SerialNo || 'N/A'}</td>
+      <td>{item.EquipmentLocation || 'N/A'}</td>
+      <td>{findServiceLocation(item.EquipmentLocation)}</td>
+      <td>{item.Notes || 'N/A'}</td> 
+
+      <td>
+        <Button variant="outline-primary" size="sm" onClick={() => handleViewDetails(item)}>
+          <Eye className="me-1" /> View Details
+        </Button>
+      </td>
+    </tr>
+  ))}
+</tbody>
             </Table>
           </div>
         </Col>
@@ -281,10 +301,10 @@ const EquipmentsTab = ({ customerData }) => {
           {selectedEquipment && (
             <Table striped bordered>
               <tbody>
-                {Object.entries(selectedEquipment).map(([key, value]) => (
+                {EQUIPMENT_FIELDS.map(({ key, label }) => (
                   <tr key={key}>
-                    <td className="fw-bold">{key}</td>
-                    <td>{value || 'N/A'}</td>
+                    <td className="fw-bold" style={{ width: '200px' }}>{label}</td>
+                    <td>{selectedEquipment[key] || 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>
